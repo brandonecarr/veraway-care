@@ -69,7 +69,7 @@ export function useRealtimeMessages(issueId: string | null): UseRealtimeMessages
               table: 'issue_messages',
               filter: `issue_id=eq.${issueId}`
             },
-            (payload) => {
+            (payload: any) => {
               if (!isMounted) return;
 
               if (payload.eventType === 'INSERT') {
@@ -90,7 +90,7 @@ export function useRealtimeMessages(issueId: string | null): UseRealtimeMessages
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: string) => {
             if (!isMounted) return;
             
             if (status === 'SUBSCRIBED') {
