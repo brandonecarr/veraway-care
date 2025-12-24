@@ -194,11 +194,7 @@ export function MobileCommunicationSheet({
                           <span className="text-xs font-medium">
                             {isOwnMessage ? 'You' : message.user?.email?.split('@')[0] || 'User'}
                           </span>
-                          {message.user?.role && (
-                            <Badge variant="outline" className="text-[10px] py-0 h-4">
-                              {message.user.role}
-                            </Badge>
-                          )}
+
                         </div>
                         <div
                           className={cn(
