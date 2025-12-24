@@ -1,0 +1,6 @@
+<!-- This is a placeholder. Replace with actual 192x192 icon -->
+<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" fill="#2D7A7A"/>
+  <path d="M96 48c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm0 78c-16.5 0-30-13.5-30-30s13.5-30 30-30 30 13.5 30 30-13.5 30-30 30z" fill="#FAFAF8"/>
+  <circle cx="96" cy="96" r="12" fill="#FAFAF8"/>
+</svg>
