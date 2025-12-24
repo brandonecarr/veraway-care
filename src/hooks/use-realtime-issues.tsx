@@ -56,7 +56,7 @@ export function useRealtimeIssues(): UseRealtimeIssuesReturn {
               schema: 'public',
               table: 'issues'
             },
-            (payload) => {
+            (payload: any) => {
               if (!isMounted) return;
 
               if (payload.eventType === 'INSERT') {
