@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Clock, User, MessageSquare, CheckCircle2, Send, UserCircle, History, PlayCircle, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -61,6 +62,7 @@ export function IssueDetailPanel({
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [localStatus, setLocalStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Use local status if set, otherwise use issue status
@@ -315,9 +317,64 @@ export function IssueDetailPanel({
                 MRN: {issue.patient?.mrn}
               </p>
             </div>
-            <Badge variant={isOverdue() ? 'destructive' : 'outline'}>
-              {isOverdue() ? 'OVERDUE' : (currentStatus || 'open').toUpperCase().replace(/_/g, ' ')}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant={isOverdue() ? 'destructive' : 'outline'}>
+                {isOverdue() ? 'OVERDUE' : (currentStatus || 'open').toUpperCase().replace(/_/g, ' ')}
+              </Badge>
+              <Dialog open={showTimelineModal} onOpenChange={setShowTimelineModal}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 gap-2" title="View Activity Timeline">
+                    <History className="w-4 h-4" />
+                    <span className="text-xs">Activity Timeline</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[80vh]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <History className="w-5 h-5" />
+                      Activity Timeline ({auditHistory.length})
+                    </DialogTitle>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[60vh] pr-4">
+                    {isLoadingAudit ? (
+                      <div className="text-sm text-muted-foreground text-center py-8">
+                        Loading timeline...
+                      </div>
+                    ) : auditHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No activity recorded
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {auditHistory.map((entry) => (
+                          <div key={entry.id} className="flex gap-3 text-sm">
+                            <div className="w-1 bg-[#D4D4D4] rounded-full flex-shrink-0" />
+                            <div className="flex-1 pb-3">
+                              <div className="flex items-baseline gap-2 flex-wrap mb-1">
+                                <span className="font-medium text-[#1A1A1A]">
+                                  {formatAuditAction(entry.action, entry.details, entry.assigned_to_user)}
+                                </span>
+                                <span className="text-xs text-[#999] font-mono">
+                                  {format(new Date(entry.created_at), 'MMM d, HH:mm')}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#666]">
+                                by {entry.user?.name || entry.user?.email?.split('@')[0] || 'System'}
+                              </p>
+                              {entry.action === 'updated' && entry.details?.note && (
+                                <p className="text-sm text-[#333] mt-2 bg-[#F5F5F5] rounded p-2">
+                                  "{entry.details.note}"
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </SheetHeader>
 
@@ -375,46 +432,43 @@ export function IssueDetailPanel({
 
             <Separator />
 
-            {/* Audit History */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <History className="w-4 h-4" />
-                Activity Timeline ({auditHistory.length})
-              </h3>
-              
-              {isLoadingAudit ? (
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  Loading timeline...
-                </div>
-              ) : auditHistory.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No activity recorded
-                </p>
-              ) : (
-                <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {auditHistory.map((entry) => (
-                    <div key={entry.id} className="flex gap-3 text-sm">
-                      <div className="w-1 bg-[#D4D4D4] rounded-full flex-shrink-0" />
-                      <div className="flex-1 pb-3">
-                        <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                          <span className="font-medium text-[#1A1A1A]">
-                            {formatAuditAction(entry.action, entry.details, entry.assigned_to_user)}
-                          </span>
-                          <span className="text-xs text-[#999] font-mono">
-                            {format(new Date(entry.created_at), 'MMM d, HH:mm')}
-                          </span>
+            {/* Update Notes Display */}
+            {(() => {
+              const updateNotes = auditHistory.filter((entry) => entry.action === 'updated' && entry.details?.note);
+              return updateNotes.length > 0 ? (
+                <>
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Update Notes ({updateNotes.length})
+                    </h3>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                      {updateNotes.map((entry) => (
+                        <div key={entry.id} className="bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg p-4">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-6 h-6">
+                                <AvatarFallback className="text-xs bg-[#2D7A7A]/10 text-[#2D7A7A]">
+                                  {entry.user?.name?.[0] || entry.user?.email?.[0]?.toUpperCase() || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium text-[#1A1A1A]">
+                                {entry.user?.name || entry.user?.email?.split('@')[0] || 'Unknown'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-[#999] font-mono">
+                              {format(new Date(entry.created_at), 'MMM d, yyyy HH:mm')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-[#333]">{entry.details.note}</p>
                         </div>
-                        <p className="text-xs text-[#666]">
-                          by {entry.user?.name || entry.user?.email?.split('@')[0] || 'System'}
-                        </p>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Separator />
+                  </div>
+                  <Separator />
+                </>
+              ) : null;
+            })()}
 
             {/* Add Update Note */}
             {currentStatus !== 'resolved' && (
