@@ -22,7 +22,7 @@ export default function HandoffsPage() {
 
   useEffect(() => {
     const initUser = async () => {
-      const supabase = createClient();
+      const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/sign-in');

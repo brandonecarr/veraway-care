@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import AdvancedAnalytics from './advanced-analytics';
 
 export default async function AnalyticsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
