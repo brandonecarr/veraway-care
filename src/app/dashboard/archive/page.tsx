@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
+import { createClient } from '../../../../supabase/client';
 
 const ITEMS_PER_PAGE_DESKTOP = 6; // 3 columns x 2 rows
 const ITEMS_PER_PAGE_MOBILE = 5;
@@ -42,6 +44,10 @@ export default function ArchivePage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [mobileDisplayCount, setMobileDisplayCount] = useState(ITEMS_PER_PAGE_MOBILE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const isMobile = useIsMobile();
   const loaderRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +68,30 @@ export default function ArchivePage() {
       }
     };
 
+    const fetchCurrentUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setCurrentUser(profile);
+      }
+    };
+
+    const fetchAvailableUsers = async () => {
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableUsers(data);
+      }
+    };
+
     fetchResolvedIssues();
+    fetchCurrentUser();
+    fetchAvailableUsers();
   }, []);
 
   // Apply filters
@@ -250,9 +279,13 @@ export default function ArchivePage() {
                 <Card 
                   key={issue.id} 
                   className={cn(
-                    "p-4 md:p-6 border-l-4 transition-all hover:shadow-md",
+                    "p-4 md:p-6 border-l-4 transition-all hover:shadow-md cursor-pointer",
                     "border-l-[#81B29A]"
                   )}
+                  onClick={() => {
+                    setSelectedIssue(issue);
+                    setIsDetailPanelOpen(true);
+                  }}
                 >
                   <div className="space-y-3">
                     {/* Header */}
@@ -379,6 +412,27 @@ export default function ArchivePage() {
           </>
         )}
       </div>
+
+      {/* Issue Detail Panel */}
+      <IssueDetailPanel
+        issue={selectedIssue}
+        open={isDetailPanelOpen}
+        onClose={() => {
+          setIsDetailPanelOpen(false);
+          setSelectedIssue(null);
+        }}
+        onUpdate={(updatedIssue) => {
+          setIssues(prevIssues => 
+            prevIssues.map(issue => 
+              issue.id === updatedIssue.id ? updatedIssue : issue
+            )
+          );
+          setSelectedIssue(updatedIssue);
+        }}
+        currentUserId={currentUser?.id || ''}
+        userRole={currentUser?.role || 'clinician'}
+        availableUsers={availableUsers}
+      />
     </main>
   );
 }
