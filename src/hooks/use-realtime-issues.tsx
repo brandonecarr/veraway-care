@@ -86,7 +86,7 @@ export function useRealtimeIssues(): UseRealtimeIssuesReturn {
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: string) => {
             if (!isMounted) return;
             
             if (status === 'SUBSCRIBED') {
