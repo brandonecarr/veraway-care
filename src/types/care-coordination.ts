@@ -63,6 +63,7 @@ export interface Handoff {
   notes?: string;
   tagged_issues?: string[];
   created_at: string;
+  is_archived?: boolean;
   creator?: { id: string; email?: string; name?: string };
 }
 

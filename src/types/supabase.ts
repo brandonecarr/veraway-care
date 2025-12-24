@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_archived: boolean | null
           notes: string | null
           shift_end: string
           shift_start: string
@@ -28,6 +29,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           shift_end: string
           shift_start: string
@@ -37,6 +39,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           shift_end?: string
           shift_start?: string
