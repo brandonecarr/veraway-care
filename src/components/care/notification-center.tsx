@@ -29,7 +29,7 @@ export function NotificationCenter() {
 
   // Get current user ID
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       setUserId(user?.id || null);
     });
   }, []);
