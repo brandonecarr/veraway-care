@@ -3,6 +3,8 @@ import { createClient } from '../../../../../supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { sendPushNotification } from '@/lib/push-notifications';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();

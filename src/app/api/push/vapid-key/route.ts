@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 // VAPID keys should be generated using: npx web-push generate-vapid-keys
 // For production, these should be environment variables
 // For demo purposes, we'll use placeholder values that should be replaced

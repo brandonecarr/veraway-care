@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../../../../supabase/server';
+
+export const dynamic = 'force-dynamic';
 import DashboardNavbar from '@/components/dashboard-navbar';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 import { NotificationPreferences } from '@/components/care/notification-preferences';
