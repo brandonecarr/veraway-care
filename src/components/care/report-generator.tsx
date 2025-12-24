@@ -158,7 +158,7 @@ export function ReportGenerator({ issues, metrics, includeAuditTrail = true }: R
 
       const typeData = Object.entries(issuesByType).map(([type, count]) => [
         type.replace(/_/g, ' ').toUpperCase(),
-        count.toString(),
+        (count as number).toString(),
       ]);
 
       autoTable(doc, {
