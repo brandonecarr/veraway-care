@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Notification } from '@/types/care-coordination';
+
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../supabase/client';
@@ -43,8 +43,8 @@ export function NotificationCenter() {
     markAllAsRead 
   } = useRealtimeNotifications(userId);
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.is_read) {
+  const handleNotificationClick = (notification: any) => {
+    if (!notification.read) {
       markAsRead(notification.id);
     }
 
@@ -140,7 +140,7 @@ export function NotificationCenter() {
                     p-4 rounded-lg border cursor-pointer transition-all duration-200
                     hover:shadow-card-hover hover:border-brand-teal touch-manipulation
                     ${
-                      !notification.is_read
+                      !notification.read
                         ? 'bg-brand-teal/5 border-l-4 border-l-brand-teal'
                         : 'bg-white hover:bg-muted/30'
                     }
@@ -156,7 +156,7 @@ export function NotificationCenter() {
                         <h4 className="font-medium text-body text-brand-charcoal">
                           {notification.title}
                         </h4>
-                        {!notification.is_read && (
+                        {!notification.read && (
                           <Button
                             variant="ghost"
                             size="icon"
