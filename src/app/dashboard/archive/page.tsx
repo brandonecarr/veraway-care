@@ -417,17 +417,19 @@ export default function ArchivePage() {
       <IssueDetailPanel
         issue={selectedIssue}
         open={isDetailPanelOpen}
-        onClose={() => {
-          setIsDetailPanelOpen(false);
-          setSelectedIssue(null);
+        onOpenChange={(open) => {
+          setIsDetailPanelOpen(open);
+          if (!open) setSelectedIssue(null);
         }}
-        onUpdate={(updatedIssue) => {
+        onResolve={(issueId) => {
           setIssues(prevIssues => 
             prevIssues.map(issue => 
-              issue.id === updatedIssue.id ? updatedIssue : issue
+              issue.id === issueId ? { ...issue, status: 'resolved' as const } : issue
             )
           );
-          setSelectedIssue(updatedIssue);
+        }}
+        onAssign={(issueId, userId) => {
+          // Handle assignment if needed
         }}
         currentUserId={currentUser?.id || ''}
         userRole={currentUser?.role || 'clinician'}
