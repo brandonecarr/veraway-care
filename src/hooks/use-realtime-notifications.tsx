@@ -115,7 +115,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
               table: 'notifications',
               filter: `user_id=eq.${userId}`
             },
-            (payload) => {
+            (payload: any) => {
               if (!isMounted) return;
 
               if (payload.eventType === 'INSERT') {
@@ -146,7 +146,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
               }
             }
           )
-          .subscribe((status) => {
+          .subscribe((status: string) => {
             if (!isMounted) return;
             
             if (status === 'SUBSCRIBED') {
