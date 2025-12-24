@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { IssueStatus } from '@/types/care-coordination';
 import { Clock, AlertCircle, CheckCircle2, TrendingUp, MessageSquare, X, Keyboard, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { MetricCard } from './metric-card';
@@ -183,7 +184,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const handleStatusChange = async (issueId: string, newStatus: string) => {
     // Update the selected issue if it's the same one
     if (selectedIssue?.id === issueId) {
-      setSelectedIssue(prev => prev ? { ...prev, status: newStatus } : null);
+      setSelectedIssue(prev => prev ? { ...prev, status: newStatus as IssueStatus } : null);
     }
 
     // Refresh data - the real-time subscription will handle updates automatically
