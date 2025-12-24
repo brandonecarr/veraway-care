@@ -19,7 +19,7 @@ export async function GET(
     const messages = await getIssueMessages(params.id);
     
     // Get unique user IDs from messages
-    const userIds = [...new Set(messages.map((m: any) => m.user_id).filter(Boolean))];
+    const userIds = Array.from(new Set(messages.map((m: any) => m.user_id).filter(Boolean)));
     
     // Fetch user data from public.users table
     let usersMap: Record<string, any> = {};

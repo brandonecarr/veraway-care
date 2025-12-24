@@ -41,8 +41,8 @@ export function ReportGenerator({ issues, metrics, includeAuditTrail = true }: R
   const [filterClinician, setFilterClinician] = useState<string>('all');
   
   // Get unique values for filters
-  const issueTypes = [...new Set(issues.map(i => i.issue_type))];
-  const clinicians = [...new Set(issues.filter(i => i.assignee).map(i => i.assignee.id))];
+  const issueTypes = Array.from(new Set(issues.map(i => i.issue_type)));
+  const clinicians = Array.from(new Set(issues.filter(i => i.assignee).map(i => i.assignee.id)));
   const clinicianMap = issues.reduce((acc, i) => {
     if (i.assignee) acc[i.assignee.id] = i.assignee.name || i.assignee.email?.split('@')[0];
     return acc;

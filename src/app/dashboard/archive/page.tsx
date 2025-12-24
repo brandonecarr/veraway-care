@@ -130,7 +130,7 @@ export default function ArchivePage() {
     : filteredIssues.slice(startIndex, startIndex + ITEMS_PER_PAGE_DESKTOP);
 
   // Get unique issue types for filter
-  const issueTypes = [...new Set(issues.map(issue => issue.issue_type))];
+  const issueTypes = Array.from(new Set(issues.map(issue => issue.issue_type)));
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {

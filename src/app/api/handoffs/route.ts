@@ -20,7 +20,7 @@ export async function GET() {
     if (error) throw error;
 
     // Fetch creator details
-    const creatorIds = [...new Set(data?.filter(d => d.created_by).map(d => d.created_by) || [])];
+    const creatorIds = Array.from(new Set(data?.filter(d => d.created_by).map(d => d.created_by) || []));
     let creatorsMap: Record<string, any> = {};
     
     if (creatorIds.length > 0) {

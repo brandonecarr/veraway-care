@@ -56,7 +56,7 @@ export async function GET() {
       
       if (issuesData) {
         // Fetch assignee data
-        const assigneeIds = [...new Set(issuesData.filter(i => i.assigned_to).map(i => i.assigned_to))];
+        const assigneeIds = Array.from(new Set(issuesData.filter(i => i.assigned_to).map(i => i.assigned_to)));
         let assigneesMap: Record<string, any> = {};
         
         if (assigneeIds.length > 0) {

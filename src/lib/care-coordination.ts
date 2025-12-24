@@ -37,7 +37,7 @@ export async function getIssues(filters?: {
   if (error) throw error;
   
   // Fetch assignee data from public.users table
-  const assigneeIds = [...new Set(data?.filter(d => d.assigned_to).map(d => d.assigned_to) || [])];
+  const assigneeIds = Array.from(new Set(data?.filter(d => d.assigned_to).map(d => d.assigned_to) || []));
   
   let assigneesMap: Record<string, any> = {};
   if (assigneeIds.length > 0) {
