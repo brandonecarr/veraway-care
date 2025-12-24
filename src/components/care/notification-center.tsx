@@ -154,7 +154,7 @@ export function NotificationCenter() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-medium text-body text-brand-charcoal">
-                          {notification.title}
+                          {notification.type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Notification'}
                         </h4>
                         {!notification.read && (
                           <Button
@@ -173,11 +173,11 @@ export function NotificationCenter() {
                       <p className="text-body text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
-                      {notification.patient && (
+                      {notification.issue?.patient && (
                         <p className="text-metadata text-muted-foreground mt-2">
-                          Patient: {notification.patient.first_name}{' '}
-                          {notification.patient.last_name} (
-                          {notification.patient.mrn})
+                          Patient: {notification.issue.patient.first_name}{' '}
+                          {notification.issue.patient.last_name} (
+                          {notification.issue.patient.mrn})
                         </p>
                       )}
                       <p className="text-xs text-gray-400 mt-2">
