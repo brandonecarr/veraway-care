@@ -260,9 +260,9 @@ export function HandoffModal({ issues, onSuccess }: HandoffModalProps) {
                           <p className="text-sm font-medium mt-1 truncate">
                             {issue.patient?.first_name} {issue.patient?.last_name}
                           </p>
-                          {issue.notes && (
+                          {issue.description && (
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                              {issue.notes}
+                              {issue.description}
                             </p>
                           )}
                         </div>
