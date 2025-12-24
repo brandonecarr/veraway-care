@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Shield, Activity, FileText, Users } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AuditLogPage() {
   const supabase = await createClient();
 

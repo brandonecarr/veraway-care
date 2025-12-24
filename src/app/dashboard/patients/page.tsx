@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { PatientList } from '@/components/care/patient-list';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PatientsPage() {
   const supabase = await createClient();
 

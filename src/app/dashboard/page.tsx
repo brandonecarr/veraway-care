@@ -5,6 +5,8 @@ import { CareCoordinationDashboard } from "@/components/care/dashboard";
 import { MobileBottomNav } from "@/components/care/mobile-bottom-nav";
 import { getUserRole } from "@/lib/care-coordination";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Dashboard() {
   const supabase = await createClient();
 

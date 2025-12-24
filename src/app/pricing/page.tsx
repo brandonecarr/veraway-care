@@ -2,11 +2,22 @@ import Navbar from "@/components/navbar";
 import PricingCard from "@/components/pricing-card";
 import { createClient } from "../../../supabase/server";
 
-export default async function Pricing() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+export const dynamic = 'force-dynamic';
 
-    const { data: plans, error } = await supabase.functions.invoke('supabase-functions-get-plans');
+export default async function Pricing() {
+    let user = null;
+    let plans = null;
+    
+    try {
+        const supabase = await createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        user = authUser;
+        
+        const { data: plansData } = await supabase.functions.invoke('supabase-functions-get-plans');
+        plans = plansData;
+    } catch (error) {
+        console.error('Error initializing supabase:', error);
+    }
     return (
         <>
             <Navbar />

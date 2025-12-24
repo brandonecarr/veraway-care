@@ -5,11 +5,22 @@ import Footer from "@/components/footer";
 import { createClient } from "../../supabase/server";
 import { ArrowUpRight, CheckCircle2, Zap, Shield, Users } from 'lucide-react';
 
-export default async function Home() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export const dynamic = 'force-dynamic';
 
-  const { data: plans, error } = await supabase.functions.invoke('supabase-functions-get-plans');
+export default async function Home() {
+  let user = null;
+  let plans = null;
+  
+  try {
+    const supabase = await createClient();
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    user = authUser;
+    
+    const { data: plansData } = await supabase.functions.invoke('supabase-functions-get-plans');
+    plans = plansData;
+  } catch (error) {
+    console.error('Error initializing supabase:', error);
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">

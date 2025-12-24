@@ -2,6 +2,8 @@ import { createClient } from '../../../../supabase/server';
 import { redirect } from 'next/navigation';
 import AdvancedAnalytics from './advanced-analytics';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AnalyticsPage() {
   const supabase = await createClient();
   const {
