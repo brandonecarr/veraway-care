@@ -359,7 +359,7 @@ export function IssueDetailPanel({
                                 </span>
                               </div>
                               <p className="text-xs text-[#666]">
-                                by {entry.user?.name || entry.user?.email?.split('@')[0] || 'System'}
+                                by {entry.user?.name || entry.user?.email?.split('@')[0] || 'Unknown User'}
                               </p>
                               {entry.action === 'updated' && entry.details?.note && (
                                 <p className="text-sm text-[#333] mt-2 bg-[#F5F5F5] rounded p-2">

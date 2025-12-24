@@ -330,7 +330,7 @@ export function ReportGenerator({ issues, metrics, includeAuditTrail = true }: R
               format(new Date(entry.created_at), 'MMM d HH:mm'),
               `#${issueNumber}`,
               entry.action_type.replace(/_/g, ' ').toUpperCase(),
-              entry.user?.email?.split('@')[0] || 'System',
+              entry.user?.email?.split('@')[0] || 'Unknown User',
               entry.details?.substring(0, 40) || '-',
             ];
           });

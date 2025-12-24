@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       .from('issue_audit_log')
       .select(`
         *,
-        issue:issues(issue_number)
+        issue:issues(id, issue_number, status, patient:patients(id, first_name, last_name))
       `)
       .order('created_at', { ascending: false });
 

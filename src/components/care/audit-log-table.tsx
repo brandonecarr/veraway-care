@@ -10,7 +10,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download, Filter, Search, X, FileText, Printer } from 'lucide-react';
+import { CalendarIcon, Download, Filter, Search, X, FileText, Printer, ExternalLink } from 'lucide-react';
+import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
+import type { Issue } from '@/types/care-coordination';
+import { createClient } from '../../../supabase/client';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -35,7 +38,14 @@ interface AuditLogEntry {
     name?: string;
   };
   issue?: {
+    id: string;
     issue_number: number;
+    status: string;
+    patient?: {
+      id: string;
+      first_name: string;
+      last_name: string;
+    };
   };
 }
 
@@ -76,14 +86,100 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
   const [userFilter, setUserFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [userRole, setUserRole] = useState('clinician');
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; email?: string; name?: string }>>([]);
 
   useEffect(() => {
     fetchAuditLog();
+    fetchUserInfo();
+    fetchAvailableUsers();
   }, [issueId]);
 
   useEffect(() => {
     applyFilters();
   }, [entries, searchTerm, actionFilter, userFilter, dateRange]);
+
+  const fetchUserInfo = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentUserId(user.id);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (userData?.role) {
+        setUserRole(userData.role);
+      }
+    }
+  };
+
+  const fetchAvailableUsers = async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('users')
+      .select('id, email, name')
+      .order('name');
+    if (data) {
+      setAvailableUsers(data);
+    }
+  };
+
+  const handlePatientClick = async (issueId: string) => {
+    try {
+      const response = await fetch(`/api/issues/${issueId}`);
+      if (response.ok) {
+        const issue = await response.json();
+        setSelectedIssue(issue);
+        setIsDetailPanelOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching issue:', error);
+    }
+  };
+
+  const handleResolveIssue = async (issueId: string) => {
+    try {
+      await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      });
+      fetchAuditLog();
+    } catch (error) {
+      console.error('Error resolving issue:', error);
+    }
+  };
+
+  const handleAssignIssue = async (issueId: string, userId: string) => {
+    try {
+      await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_to: userId }),
+      });
+      fetchAuditLog();
+    } catch (error) {
+      console.error('Error assigning issue:', error);
+    }
+  };
+
+  const handleStatusChange = async (issueId: string, status: string) => {
+    try {
+      await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      fetchAuditLog();
+    } catch (error) {
+      console.error('Error changing status:', error);
+    }
+  };
 
   const fetchAuditLog = async () => {
     setIsLoading(true);
@@ -113,7 +209,9 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
         (entry) =>
           entry.action.toLowerCase().includes(term) ||
           entry.user?.email?.toLowerCase().includes(term) ||
-          entry.issue?.issue_number?.toString().includes(term) ||
+          entry.issue?.patient?.first_name?.toLowerCase().includes(term) ||
+          entry.issue?.patient?.last_name?.toLowerCase().includes(term) ||
+          `${entry.issue?.patient?.first_name} ${entry.issue?.patient?.last_name}`.toLowerCase().includes(term) ||
           JSON.stringify(entry.details).toLowerCase().includes(term)
       );
     }
@@ -153,12 +251,12 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
   const exportToCSV = () => {
     setIsExporting(true);
     try {
-      const headers = ['Timestamp', 'Issue #', 'Action', 'User', 'Details'];
+      const headers = ['Timestamp', 'Patient', 'Action', 'User', 'Details'];
       const rows = filteredEntries.map((entry) => [
         format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm:ss'),
-        entry.issue?.issue_number?.toString() || 'N/A',
+        entry.issue?.patient ? `${entry.issue.patient.first_name} ${entry.issue.patient.last_name}` : 'N/A',
         actionLabels[entry.action] || entry.action.toUpperCase(),
-        entry.user?.email || 'System',
+        entry.user?.email || 'Unknown User',
         formatDetails(entry.action, entry.details, entry.assigned_to_user),
       ]);
 
@@ -237,15 +335,15 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
 
       const tableData = filteredEntries.map((entry) => [
         format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm'),
-        `#${entry.issue?.issue_number || 'N/A'}`,
+        entry.issue?.patient ? `${entry.issue.patient.first_name} ${entry.issue.patient.last_name}` : 'N/A',
         actionLabels[entry.action] || entry.action.toUpperCase(),
-        entry.user?.name || entry.user?.email?.split('@')[0] || 'System',
+        entry.user?.name || entry.user?.email?.split('@')[0] || 'Unknown User',
         formatDetails(entry.action, entry.details, entry.assigned_to_user).substring(0, 60)
       ]);
 
       autoTable(doc, {
         startY: 25,
-        head: [['Timestamp', 'Issue', 'Action', 'User', 'Details']],
+        head: [['Timestamp', 'Patient', 'Action', 'User', 'Details']],
         body: tableData,
         theme: 'striped',
         styles: { fontSize: 7, cellPadding: 2 },
@@ -488,7 +586,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
             <TableHeader>
               <TableRow className="border-brand-border">
                 <TableHead className="font-mono text-audit uppercase tracking-wider">TIMESTAMP</TableHead>
-                {!issueId && <TableHead className="font-mono text-audit uppercase tracking-wider">ISSUE #</TableHead>}
+                {!issueId && <TableHead className="font-mono text-audit uppercase tracking-wider">PATIENT</TableHead>}
                 <TableHead className="font-mono text-audit uppercase tracking-wider">ACTION</TableHead>
                 <TableHead className="font-mono text-audit uppercase tracking-wider">USER</TableHead>
                 <TableHead className="font-mono text-audit uppercase tracking-wider">DETAILS</TableHead>
@@ -520,8 +618,18 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                       {format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm:ss')}
                     </TableCell>
                     {!issueId && (
-                      <TableCell className="font-mono text-audit font-semibold">
-                        #{entry.issue?.issue_number || 'N/A'}
+                      <TableCell>
+                        {entry.issue?.patient ? (
+                          <button
+                            onClick={() => entry.issue?.id && handlePatientClick(entry.issue.id)}
+                            className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors cursor-pointer text-left"
+                          >
+                            {entry.issue.patient.first_name} {entry.issue.patient.last_name}
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">N/A</span>
+                        )}
                       </TableCell>
                     )}
                     <TableCell>
@@ -538,7 +646,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                     <TableCell className="text-sm">
                       {entry.user?.name ||
                         entry.user?.email?.split('@')[0] ||
-                        'System'}
+                        'Unknown User'}
                     </TableCell>
                     <TableCell className="text-body text-muted-foreground max-w-md truncate">
                       {formatDetails(entry.action, entry.details, entry.assigned_to_user)}
@@ -550,6 +658,22 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
           </Table>
         </ScrollArea>
       </Card>
+
+      {/* Issue Detail Panel */}
+      <IssueDetailPanel
+        issue={selectedIssue}
+        open={isDetailPanelOpen}
+        onOpenChange={(open) => {
+          setIsDetailPanelOpen(open);
+          if (!open) setSelectedIssue(null);
+        }}
+        onResolve={handleResolveIssue}
+        onAssign={handleAssignIssue}
+        onStatusChange={handleStatusChange}
+        currentUserId={currentUserId}
+        userRole={userRole}
+        availableUsers={availableUsers}
+      />
     </div>
   );
 }
