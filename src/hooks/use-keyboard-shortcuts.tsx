@@ -17,10 +17,24 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      // Skip if user is typing in an input, textarea, or contenteditable
+      const target = event.target as HTMLElement;
+      const isTyping = 
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.isContentEditable ||
+        target.closest('[role="combobox"]');
+      
       for (const shortcut of shortcuts) {
         const ctrlMatch = shortcut.ctrlKey === undefined || shortcut.ctrlKey === event.ctrlKey;
         const metaMatch = shortcut.metaKey === undefined || shortcut.metaKey === event.metaKey;
         const shiftMatch = shortcut.shiftKey === undefined || shortcut.shiftKey === event.shiftKey;
+
+        // For shortcuts without modifiers (like '/'), skip if typing
+        const hasModifier = shortcut.ctrlKey || shortcut.metaKey || shortcut.shiftKey;
+        if (!hasModifier && isTyping && event.key !== 'Escape') {
+          continue;
+        }
 
         if (
           event.key === shortcut.key &&
@@ -45,8 +59,7 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
 
 export const GLOBAL_SHORTCUTS: KeyboardShortcut[] = [
   {
-    key: 'k',
-    metaKey: true,
+    key: '/',
     callback: () => {
       const searchInput = document.querySelector('[role="combobox"]') as HTMLInputElement;
       searchInput?.focus();
@@ -55,11 +68,19 @@ export const GLOBAL_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     key: 'n',
-    metaKey: true,
+    shiftKey: true,
     callback: () => {
       const fabButton = document.querySelector('[aria-label="Report new issue"]') as HTMLButtonElement;
       fabButton?.click();
     },
     description: 'New issue',
+  },
+  {
+    key: 'Escape',
+    callback: () => {
+      const activeElement = document.activeElement as HTMLElement;
+      activeElement?.blur();
+    },
+    description: 'Close / Unfocus',
   },
 ];

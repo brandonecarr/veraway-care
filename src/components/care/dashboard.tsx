@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
-import { Clock, AlertCircle, CheckCircle2, TrendingUp, MessageSquare, X, Keyboard, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, TrendingUp, MessageSquare, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { MetricCard } from './metric-card';
 import { QuickReportModal } from './quick-report-modal';
@@ -29,13 +29,6 @@ import { cn } from '@/lib/utils';
 import { ISSUE_TYPE_COLORS } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeIssues } from '@/hooks/use-realtime-issues';
-import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 
 const ITEMS_PER_PAGE_DESKTOP = 6; // 3 columns x 2 rows
 const ITEMS_PER_PAGE_MOBILE = 5;
@@ -55,43 +48,11 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'my' | 'open' | 'overdue'>('all');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(5);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-
-  // Keyboard shortcuts
-  useKeyboardShortcuts([
-    {
-      key: 'k',
-      metaKey: true,
-      callback: () => setFilter('all'),
-      description: 'Show all issues',
-    },
-    {
-      key: 'n',
-      metaKey: true,
-      callback: () => document.querySelector<HTMLButtonElement>('[aria-label="Report new issue"]')?.click(),
-      description: 'New issue',
-    },
-    {
-      key: '?',
-      shiftKey: true,
-      callback: () => setShowShortcuts(true),
-      description: 'Show keyboard shortcuts',
-    },
-    {
-      key: 'Escape',
-      callback: () => {
-        setIsDetailPanelOpen(false);
-        setIsCommunicationPanelOpen(false);
-        setShowShortcuts(false);
-      },
-      description: 'Close panels',
-    },
-  ]);
 
   // Sync issues state with real-time issues
   const issues = realtimeIssues;
@@ -293,15 +254,6 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowShortcuts(true)}
-              className="hidden md:flex items-center gap-2"
-            >
-              <Keyboard className="h-4 w-4" />
-              Shortcuts
-            </Button>
             {userRole === 'coordinator' && (
               <HandoffModal issues={issues} onSuccess={refreshIssues} />
             )}
@@ -698,41 +650,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         </Button>
       )}
 
-      {/* Keyboard Shortcuts Dialog */}
-      <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Keyboard Shortcuts</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">New Issue</span>
-                  <kbd className="px-2 py-1 text-xs bg-muted rounded">⌘ N</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Show All Issues</span>
-                  <kbd className="px-2 py-1 text-xs bg-muted rounded">⌘ K</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Close Panel</span>
-                  <kbd className="px-2 py-1 text-xs bg-muted rounded">Esc</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Show Shortcuts</span>
-                  <kbd className="px-2 py-1 text-xs bg-muted rounded">?</kbd>
-                </div>
-              </div>
-            </div>
-            <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                <strong>Mobile:</strong> Swipe right on issue cards to mark as resolved
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </main>
   );
 }

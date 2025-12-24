@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Drawer,
@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { PatientAutocomplete } from './patient-autocomplete';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Patient } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -97,8 +98,91 @@ function QuickReportForm({
   const [issueType, setIssueType] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('normal');
-  const [tags, setTags] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [filteredTags, setFilteredTags] = useState<string[]>([]);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Fetch existing tags on mount
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableTags(data.tags || []);
+        }
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    };
+    fetchTags();
+  }, []);
+
+  // Filter tags based on input
+  useEffect(() => {
+    if (tagInput.trim()) {
+      const currentTag = tagInput.toLowerCase().trim();
+      const filtered = availableTags.filter(
+        (tag) => 
+          tag.toLowerCase().includes(currentTag) && 
+          !selectedTags.includes(tag)
+      );
+      setFilteredTags(filtered);
+      setShowTagSuggestions(filtered.length > 0);
+    } else {
+      setFilteredTags([]);
+      setShowTagSuggestions(false);
+    }
+  }, [tagInput, availableTags, selectedTags]);
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current && 
+        !suggestionsRef.current.contains(event.target as Node) &&
+        tagInputRef.current &&
+        !tagInputRef.current.contains(event.target as Node)
+      ) {
+        setShowTagSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const addTag = useCallback((tag: string) => {
+    const normalizedTag = tag.toLowerCase().trim();
+    if (normalizedTag && !selectedTags.includes(normalizedTag)) {
+      setSelectedTags((prev) => [...prev, normalizedTag]);
+    }
+    setTagInput('');
+    setShowTagSuggestions(false);
+    tagInputRef.current?.focus();
+  }, [selectedTags]);
+
+  const removeTag = useCallback((tagToRemove: string) => {
+    setSelectedTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  }, []);
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === ',' && tagInput.trim()) {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === 'Backspace' && !tagInput && selectedTags.length > 0) {
+      removeTag(selectedTags[selectedTags.length - 1]);
+    } else if (e.key === 'Escape') {
+      setShowTagSuggestions(false);
+    }
+  };
 
   const issueTypes = [
     'Change in Condition',
@@ -129,8 +213,6 @@ function QuickReportForm({
     setIsSubmitting(true);
 
     try {
-      const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
-      
       const response = await fetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +222,7 @@ function QuickReportForm({
           issue_type: issueType,
           description: description || null,
           priority,
-          tags: tagArray.length > 0 ? tagArray : null,
+          tags: selectedTags.length > 0 ? selectedTags : null,
         }),
       });
 
@@ -183,7 +265,13 @@ function QuickReportForm({
           required
           value={issueType}
           onChange={(e) => setIssueType(e.target.value)}
-          className="w-full rounded-md border border-[#D4D4D4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D7A7A] bg-white"
+          className="w-full border border-[#D4D4D4] px-3 py-2 text-sm text-[#1A1A1A] focus:outline-none focus:border-[#2D7A7A] bg-white transition-colors appearance-none cursor-pointer hover:border-[#999]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%231A1A1A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center',
+            paddingRight: '36px'
+          }}
         >
           <option value="">Select issue type...</option>
           {issueTypes.map(type => (
@@ -199,7 +287,13 @@ function QuickReportForm({
         <select
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
-          className="w-full rounded-md border border-[#D4D4D4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D7A7A] bg-white"
+          className="w-full border border-[#D4D4D4] px-3 py-2 text-sm text-[#1A1A1A] focus:outline-none focus:border-[#2D7A7A] bg-white transition-colors appearance-none cursor-pointer hover:border-[#999]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%231A1A1A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center',
+            paddingRight: '36px'
+          }}
         >
           <option value="low">Low</option>
           <option value="normal">Normal</option>
@@ -221,17 +315,70 @@ function QuickReportForm({
         />
       </div>
 
-      <div>
+      <div className="relative">
         <label className="text-sm font-medium text-[#1A1A1A] mb-2 block">
           Tags (Optional)
         </label>
-        <Input
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="Separate tags with commas"
-          className="border-[#D4D4D4]"
-        />
-        <p className="text-xs text-[#999] mt-1">Example: urgent, pain-management, follow-up</p>
+        
+        {/* Selected Tags */}
+        {selectedTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {selectedTags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="bg-[#2D7A7A]/10 text-[#2D7A7A] hover:bg-[#2D7A7A]/20 cursor-pointer pr-1"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="ml-1 hover:text-[#E07A5F] focus:outline-none"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        
+        {/* Tag Input */}
+        <div className="relative">
+          <Input
+            ref={tagInputRef}
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={handleTagInputKeyDown}
+            onFocus={() => tagInput.trim() && filteredTags.length > 0 && setShowTagSuggestions(true)}
+            placeholder={selectedTags.length > 0 ? "Add more tags..." : "Type to search or add tags..."}
+            className="border-[#D4D4D4]"
+          />
+          
+          {/* Tag Suggestions Dropdown */}
+          {showTagSuggestions && (
+            <div
+              ref={suggestionsRef}
+              className="absolute z-50 w-full mt-1 bg-white border border-[#D4D4D4] rounded-md shadow-lg max-h-40 overflow-y-auto"
+            >
+              {filteredTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => addTag(tag)}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[#FAFAF8] focus:bg-[#FAFAF8] focus:outline-none transition-colors"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <p className="text-xs text-[#999] mt-1">
+          {availableTags.length > 0 
+            ? "Start typing to see suggestions, or press Enter/comma to add a new tag"
+            : "Press Enter or comma to add tags"}
+        </p>
       </div>
 
       <div className="flex gap-3 pt-4">
