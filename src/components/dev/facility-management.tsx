@@ -19,6 +19,13 @@ interface Facility {
   created_at: string;
   coordinator_count: number;
   coordinators_registered: boolean;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  phone?: string;
+  email?: string;
 }
 
 export function FacilityManagement() {
@@ -116,7 +123,7 @@ export function FacilityManagement() {
               Create Facility
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Facility</DialogTitle>
             </DialogHeader>
@@ -268,6 +275,13 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
     slug: '',
     subscription_tier: 'free',
     max_users: 10,
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    phone: '',
+    email: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -348,6 +362,87 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
           onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) })}
           className="mt-1"
         />
+      </div>
+
+      {/* Contact Information Section */}
+      <div className="border-t border-[#E0E0E0] pt-4 mt-4">
+        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Contact Information</h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Address Line 1</label>
+            <Input
+              value={formData.address_line1}
+              onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
+              placeholder="e.g., 123 Main Street"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Address Line 2</label>
+            <Input
+              value={formData.address_line2}
+              onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
+              placeholder="e.g., Suite 100"
+              className="mt-1"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-[#1A1A1A]">City</label>
+              <Input
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="e.g., Boston"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[#1A1A1A]">State</label>
+              <Input
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                placeholder="e.g., MA"
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">ZIP Code</label>
+            <Input
+              value={formData.zip_code}
+              onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+              placeholder="e.g., 02101"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Phone Number</label>
+            <Input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="e.g., (617) 555-0100"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Facility Email</label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="e.g., contact@facility.com"
+              className="mt-1"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4">

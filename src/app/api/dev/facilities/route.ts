@@ -85,7 +85,19 @@ export async function POST(request: Request) {
   try {
     const supabase = getAdminClient();
     const body = await request.json();
-    const { name, slug, subscription_tier, max_users } = body;
+    const {
+      name,
+      slug,
+      subscription_tier,
+      max_users,
+      address_line1,
+      address_line2,
+      city,
+      state,
+      zip_code,
+      phone,
+      email
+    } = body;
 
     if (!name || !slug) {
       return NextResponse.json(
@@ -118,6 +130,13 @@ export async function POST(request: Request) {
           subscription_tier: subscription_tier || 'free',
           max_users: max_users || 10,
           is_active: true,
+          address_line1: address_line1 || null,
+          address_line2: address_line2 || null,
+          city: city || null,
+          state: state || null,
+          zip_code: zip_code || null,
+          phone: phone || null,
+          email: email || null,
         },
       ])
       .select()
