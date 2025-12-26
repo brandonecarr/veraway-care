@@ -201,7 +201,7 @@ export default function SettingsPage() {
       .eq('facility_id', facilityId);
 
     if (users) {
-      // Get auth users to check email confirmation status
+      // Get auth users to check registration status
       const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
 
       // Get roles for all users
@@ -216,7 +216,9 @@ export default function SettingsPage() {
 
         return {
           ...user,
-          email_confirmed_at: authUser?.email_confirmed_at || null,
+          // Use last_sign_in_at instead of email_confirmed_at
+          // Only users who have logged in (set password and completed onboarding) are considered registered
+          email_confirmed_at: authUser?.last_sign_in_at || null,
           role: userRole?.role || 'clinician',
           job_role: userRole?.job_role,
         };

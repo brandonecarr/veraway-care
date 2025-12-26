@@ -62,8 +62,9 @@ export async function GET() {
       facilityData.count++;
 
       // Check if this coordinator has completed registration
+      // Must have logged in at least once (which means they've set a password)
       const authUser = authUsers.find(u => u.email === userEmail);
-      if (!authUser || !authUser.email_confirmed_at) {
+      if (!authUser || !authUser.last_sign_in_at) {
         facilityData.all_registered = false;
       }
     });
