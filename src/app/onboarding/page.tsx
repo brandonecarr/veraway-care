@@ -53,7 +53,11 @@ export default function OnboardingPage() {
     if (userError) {
       console.error('Error fetching user data:', userError);
     } else if (userData?.facilities) {
-      setFacility(userData.facilities as FacilityInfo);
+      // facilities is returned as an array by Supabase, get the first element
+      const facilityData = Array.isArray(userData.facilities)
+        ? userData.facilities[0]
+        : userData.facilities;
+      setFacility(facilityData as FacilityInfo);
     }
 
     setIsLoading(false);
