@@ -641,9 +641,9 @@ export default function SettingsPage() {
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{staff.name}</p>
                               {staff.email_confirmed_at ? (
-                                <CheckCircle className="w-4 h-4 text-green-600" title="Active" />
+                                <CheckCircle className="w-4 h-4 text-green-600" />
                               ) : (
-                                <Clock className="w-4 h-4 text-yellow-600" title="Pending" />
+                                <Clock className="w-4 h-4 text-yellow-600" />
                               )}
                             </div>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
