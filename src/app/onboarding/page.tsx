@@ -5,26 +5,74 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Building2, Mail, User } from 'lucide-react';
+import { Building2, Mail, User, ChevronRight, CheckCircle2, UserPlus, Lock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface FacilityInfo {
   id: string;
   name: string;
   slug: string;
   subscription_tier: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  phone?: string;
+  email?: string;
 }
+
+interface ClinicianInvite {
+  name: string;
+  email: string;
+  job_role: string;
+}
+
+const JOB_ROLES = [
+  { value: 'RN', label: 'RN - Registered Nurse' },
+  { value: 'LVN/LPN', label: 'LVN/LPN - Licensed Vocational/Practical Nurse' },
+  { value: 'HHA', label: 'HHA - Home Health Aide' },
+  { value: 'MSW', label: 'MSW - Medical Social Worker' },
+  { value: 'Chaplain', label: 'Chaplain' },
+  { value: 'MD', label: 'MD - Medical Doctor' },
+  { value: 'NP', label: 'NP - Nurse Practitioner' },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState('');
   const [facility, setFacility] = useState<FacilityInfo | null>(null);
+
+  // Step 1: Facility information
+  const [facilityForm, setFacilityForm] = useState({
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    phone: '',
+    email: '',
+  });
+
+  // Step 2: Clinician invite
+  const [clinicianForm, setClinicianForm] = useState<ClinicianInvite>({
+    name: '',
+    email: '',
+    job_role: '',
+  });
+
+  // Step 3: Password
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     checkSession();
@@ -35,42 +83,136 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      // No session, redirect to home
       router.push('/');
       return;
     }
 
+    setUserId(user.id);
     setUserEmail(user.email || '');
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
-    // Fetch user's facility information
-    // Note: This may fail if multi-tenancy migrations haven't been applied yet
+    // Fetch user's facility information with contact details
     try {
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('facility_id, facilities(id, name, slug, subscription_tier)')
+        .select(`
+          facility_id,
+          facilities(
+            id,
+            name,
+            slug,
+            subscription_tier,
+            address_line1,
+            address_line2,
+            city,
+            state,
+            zip_code,
+            phone,
+            email
+          )
+        `)
         .eq('id', user.id)
         .single();
 
       if (userError) {
         console.error('Error fetching user data:', userError);
-        // Gracefully handle error - user can still complete onboarding without facility info
       } else if (userData?.facilities) {
-        // facilities is returned as an array by Supabase, get the first element
         const facilityData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
         setFacility(facilityData as FacilityInfo);
+
+        // Pre-fill facility form with existing data
+        setFacilityForm({
+          address_line1: facilityData.address_line1 || '',
+          address_line2: facilityData.address_line2 || '',
+          city: facilityData.city || '',
+          state: facilityData.state || '',
+          zip_code: facilityData.zip_code || '',
+          phone: facilityData.phone || '',
+          email: facilityData.email || '',
+        });
       }
     } catch (error) {
       console.error('Error fetching facility data:', error);
-      // Continue anyway - facility display is optional
     }
 
     setIsLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStep1Submit = async () => {
+    // Validate required fields
+    if (!facilityForm.address_line1 || !facilityForm.city || !facilityForm.state || !facilityForm.zip_code) {
+      toast.error('Please fill in all required facility information');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/onboarding/update-facility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facility?.id,
+          ...facilityForm,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to update facility information');
+        return;
+      }
+
+      toast.success('Facility information verified');
+      setCurrentStep(2);
+    } catch (error) {
+      console.error('Error updating facility:', error);
+      toast.error('Failed to update facility information');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStep2Submit = async () => {
+    // Validate clinician form
+    if (!clinicianForm.name || !clinicianForm.email || !clinicianForm.job_role) {
+      toast.error('Please fill in all clinician information');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/onboarding/invite-clinician', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facility?.id,
+          ...clinicianForm,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to invite clinician');
+        return;
+      }
+
+      toast.success('Clinician invite sent');
+      setCurrentStep(3);
+    } catch (error) {
+      console.error('Error inviting clinician:', error);
+      toast.error('Failed to invite clinician');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStep3Submit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
@@ -88,7 +230,6 @@ export default function OnboardingPage() {
     try {
       const supabase = createClient();
 
-      // Update the user's password
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -100,7 +241,6 @@ export default function OnboardingPage() {
 
       toast.success('Account setup complete! Redirecting to dashboard...');
 
-      // Redirect to dashboard after short delay
       setTimeout(() => {
         router.push('/dashboard');
       }, 1500);
@@ -120,9 +260,15 @@ export default function OnboardingPage() {
     );
   }
 
+  const steps = [
+    { number: 1, title: 'Verify Facility', icon: Building2 },
+    { number: 2, title: 'Invite Clinician', icon: UserPlus },
+    { number: 3, title: 'Set Password', icon: Lock },
+  ];
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5] p-4">
-      <Card className="w-full max-w-2xl p-8">
+      <Card className="w-full max-w-3xl p-8">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             Welcome to Veraway Care
@@ -132,61 +278,271 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* User & Facility Information */}
-        <div className="mb-8 space-y-4">
-          <div className="bg-[#2D7A7A]/5 border border-[#2D7A7A]/20 rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-[#1A1A1A]">Your Information</h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-white rounded-full">
-                  <User className="w-5 h-5 text-[#2D7A7A]" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#666]">Name</p>
-                  <p className="font-medium text-[#1A1A1A]">{userName || 'Not provided'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-white rounded-full">
-                  <Mail className="w-5 h-5 text-[#2D7A7A]" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#666]">Email</p>
-                  <p className="font-medium text-[#1A1A1A]">{userEmail}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {facility && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4 text-[#1A1A1A]">Facility Assignment</h2>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-white rounded-full">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#666]">You've been assigned as coordinator for</p>
-                  <p className="font-semibold text-[#1A1A1A] text-lg">{facility.name}</p>
-                  <p className="text-xs text-[#666] mt-1">
-                    {facility.subscription_tier.charAt(0).toUpperCase() + facility.subscription_tier.slice(1)} Plan
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => (
+              <div key={step.number} className="flex items-center flex-1">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={cn(
+                      'w-12 h-12 rounded-full flex items-center justify-center border-2 transition-colors',
+                      currentStep > step.number
+                        ? 'bg-[#2D7A7A] border-[#2D7A7A] text-white'
+                        : currentStep === step.number
+                        ? 'bg-white border-[#2D7A7A] text-[#2D7A7A]'
+                        : 'bg-white border-[#D4D4D4] text-[#666]'
+                    )}
+                  >
+                    {currentStep > step.number ? (
+                      <CheckCircle2 className="w-6 h-6" />
+                    ) : (
+                      <step.icon className="w-6 h-6" />
+                    )}
+                  </div>
+                  <p
+                    className={cn(
+                      'text-xs mt-2 text-center font-medium',
+                      currentStep >= step.number ? 'text-[#1A1A1A]' : 'text-[#666]'
+                    )}
+                  >
+                    {step.title}
                   </p>
                 </div>
+                {index < steps.length - 1 && (
+                  <div
+                    className={cn(
+                      'flex-1 h-0.5 mx-4 transition-colors',
+                      currentStep > step.number ? 'bg-[#2D7A7A]' : 'bg-[#D4D4D4]'
+                    )}
+                  />
+                )}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
-        {/* Password Setup Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="border-t border-[#E0E0E0] pt-6">
-            <h2 className="text-lg font-semibold mb-4 text-[#1A1A1A]">Set Your Password</h2>
+        {/* User Information Card */}
+        <div className="mb-6 bg-[#2D7A7A]/5 border border-[#2D7A7A]/20 rounded-lg p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <User className="w-5 h-5 text-[#2D7A7A]" />
+              <div>
+                <p className="text-xs text-[#666]">Coordinator</p>
+                <p className="font-medium text-[#1A1A1A]">{userName || userEmail}</p>
+              </div>
+            </div>
+            {facility && (
+              <div className="flex items-center gap-3 flex-1">
+                <Building2 className="w-5 h-5 text-[#2D7A7A]" />
+                <div>
+                  <p className="text-xs text-[#666]">Facility</p>
+                  <p className="font-medium text-[#1A1A1A]">{facility.name}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Step 1: Verify Facility Information */}
+        {currentStep === 1 && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Verify Facility Information</h2>
+              <p className="text-sm text-[#666] mb-4">
+                Please verify and complete your facility's contact information
+              </p>
+            </div>
+
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-[#1A1A1A]">
-                  New Password *
-                </label>
+                <Label htmlFor="address_line1">Address Line 1 *</Label>
                 <Input
+                  id="address_line1"
+                  value={facilityForm.address_line1}
+                  onChange={(e) => setFacilityForm({ ...facilityForm, address_line1: e.target.value })}
+                  placeholder="e.g., 123 Main Street"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="address_line2">Address Line 2</Label>
+                <Input
+                  id="address_line2"
+                  value={facilityForm.address_line2}
+                  onChange={(e) => setFacilityForm({ ...facilityForm, address_line2: e.target.value })}
+                  placeholder="e.g., Suite 100"
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="city">City *</Label>
+                  <Input
+                    id="city"
+                    value={facilityForm.city}
+                    onChange={(e) => setFacilityForm({ ...facilityForm, city: e.target.value })}
+                    placeholder="e.g., Boston"
+                    className="mt-1"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="state">State *</Label>
+                  <Input
+                    id="state"
+                    value={facilityForm.state}
+                    onChange={(e) => setFacilityForm({ ...facilityForm, state: e.target.value })}
+                    placeholder="e.g., MA"
+                    className="mt-1"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="zip_code">ZIP Code *</Label>
+                <Input
+                  id="zip_code"
+                  value={facilityForm.zip_code}
+                  onChange={(e) => setFacilityForm({ ...facilityForm, zip_code: e.target.value })}
+                  placeholder="e.g., 02101"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={facilityForm.phone}
+                  onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
+                  placeholder="e.g., (617) 555-0100"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="facility_email">Facility Email</Label>
+                <Input
+                  id="facility_email"
+                  type="email"
+                  value={facilityForm.email}
+                  onChange={(e) => setFacilityForm({ ...facilityForm, email: e.target.value })}
+                  placeholder="e.g., contact@facility.com"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={handleStep1Submit}
+              disabled={isSubmitting}
+              className="w-full bg-[#2D7A7A] hover:bg-[#236060]"
+            >
+              {isSubmitting ? 'Saving...' : 'Continue'}
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2: Invite Clinician */}
+        {currentStep === 2 && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Invite Your First Clinician</h2>
+              <p className="text-sm text-[#666] mb-4">
+                Add a clinician to your team. They'll receive an email invitation to join.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="clinician_name">Clinician Name *</Label>
+                <Input
+                  id="clinician_name"
+                  value={clinicianForm.name}
+                  onChange={(e) => setClinicianForm({ ...clinicianForm, name: e.target.value })}
+                  placeholder="e.g., Jane Smith"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="clinician_email">Email Address *</Label>
+                <Input
+                  id="clinician_email"
+                  type="email"
+                  value={clinicianForm.email}
+                  onChange={(e) => setClinicianForm({ ...clinicianForm, email: e.target.value })}
+                  placeholder="e.g., jane.smith@example.com"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="job_role">Job Role *</Label>
+                <Select
+                  value={clinicianForm.job_role}
+                  onValueChange={(value) => setClinicianForm({ ...clinicianForm, job_role: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select a job role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_ROLES.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setCurrentStep(1)}
+                variant="outline"
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleStep2Submit}
+                disabled={isSubmitting}
+                className="flex-1 bg-[#2D7A7A] hover:bg-[#236060]"
+              >
+                {isSubmitting ? 'Sending Invite...' : 'Continue'}
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Set Password */}
+        {currentStep === 3 && (
+          <form onSubmit={handleStep3Submit} className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Set Your Password</h2>
+              <p className="text-sm text-[#666] mb-4">
+                Create a secure password to protect your account
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="password">New Password *</Label>
+                <Input
+                  id="password"
                   type="password"
                   required
                   value={password}
@@ -201,10 +557,9 @@ export default function OnboardingPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-[#1A1A1A]">
-                  Confirm Password *
-                </label>
+                <Label htmlFor="confirm_password">Confirm Password *</Label>
                 <Input
+                  id="confirm_password"
                   type="password"
                   required
                   value={confirmPassword}
@@ -215,16 +570,26 @@ export default function OnboardingPage() {
                 />
               </div>
             </div>
-          </div>
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-[#2D7A7A] hover:bg-[#236060]"
-          >
-            {isSubmitting ? 'Completing Setup...' : 'Complete Setup'}
-          </Button>
-        </form>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                variant="outline"
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 bg-[#2D7A7A] hover:bg-[#236060]"
+              >
+                {isSubmitting ? 'Completing Setup...' : 'Complete Setup'}
+              </Button>
+            </div>
+          </form>
+        )}
       </Card>
     </div>
   );
