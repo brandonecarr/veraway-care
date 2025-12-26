@@ -1,5 +1,5 @@
 import DashboardNavbar from '@/components/dashboard-navbar';
-import { createClient } from '../../../../supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { PatientList } from '@/components/care/patient-list';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';

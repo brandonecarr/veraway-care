@@ -12,7 +12,7 @@ import { format, formatDistanceToNow, isPast, isFuture } from 'date-fns';
 import DashboardNavbar from '@/components/dashboard-navbar';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
-import { createClient } from '../../../../supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import type { Handoff, Issue } from '@/types/care-coordination';
 

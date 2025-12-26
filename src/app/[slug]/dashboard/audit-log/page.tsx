@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '../../../../supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { AuditLogTable } from '@/components/care/audit-log-table';
 import DashboardNavbar from '@/components/dashboard-navbar';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';

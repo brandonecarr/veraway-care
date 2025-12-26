@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
-import { createClient } from '../../../../supabase/client';
+import { createClient } from '@/lib/supabase/client';
 
 const ITEMS_PER_PAGE_DESKTOP = 6; // 3 columns x 2 rows
 const ITEMS_PER_PAGE_MOBILE = 5;
