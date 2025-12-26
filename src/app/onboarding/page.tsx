@@ -44,20 +44,27 @@ export default function OnboardingPage() {
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
     // Fetch user's facility information
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('facility_id, facilities(id, name, slug, subscription_tier)')
-      .eq('id', user.id)
-      .single();
+    // Note: This may fail if multi-tenancy migrations haven't been applied yet
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('facility_id, facilities(id, name, slug, subscription_tier)')
+        .eq('id', user.id)
+        .single();
 
-    if (userError) {
-      console.error('Error fetching user data:', userError);
-    } else if (userData?.facilities) {
-      // facilities is returned as an array by Supabase, get the first element
-      const facilityData = Array.isArray(userData.facilities)
-        ? userData.facilities[0]
-        : userData.facilities;
-      setFacility(facilityData as FacilityInfo);
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        // Gracefully handle error - user can still complete onboarding without facility info
+      } else if (userData?.facilities) {
+        // facilities is returned as an array by Supabase, get the first element
+        const facilityData = Array.isArray(userData.facilities)
+          ? userData.facilities[0]
+          : userData.facilities;
+        setFacility(facilityData as FacilityInfo);
+      }
+    } catch (error) {
+      console.error('Error fetching facility data:', error);
+      // Continue anyway - facility display is optional
     }
 
     setIsLoading(false);
