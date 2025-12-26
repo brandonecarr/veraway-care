@@ -279,11 +279,11 @@ export default function OnboardingPage() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <div className="mb-8 flex justify-center">
+          <div className="flex items-center max-w-2xl w-full">
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center flex-1">
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center w-full">
                   <div
                     className={cn(
                       'w-12 h-12 rounded-full flex items-center justify-center border-2 transition-colors',
