@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Building2, Mail, User, ChevronRight, CheckCircle2, UserPlus, Lock } from 'lucide-react';
+import { Building2, User, ChevronRight, CheckCircle2, UserPlus, Lock, X, Mail, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FacilityInfo {
@@ -63,8 +63,9 @@ export default function OnboardingPage() {
     email: '',
   });
 
-  // Step 2: Clinician invite
-  const [clinicianForm, setClinicianForm] = useState<ClinicianInvite>({
+  // Step 2: Clinician invites - array to hold multiple clinicians
+  const [clinicians, setClinicians] = useState<ClinicianInvite[]>([]);
+  const [currentClinician, setCurrentClinician] = useState<ClinicianInvite>({
     name: '',
     email: '',
     job_role: '',
@@ -176,37 +177,75 @@ export default function OnboardingPage() {
     }
   };
 
+  const handleAddClinician = () => {
+    // Validate current clinician form
+    if (!currentClinician.name || !currentClinician.email || !currentClinician.job_role) {
+      toast.error('Please fill in all clinician fields');
+      return;
+    }
+
+    // Check for duplicate email
+    if (clinicians.some(c => c.email.toLowerCase() === currentClinician.email.toLowerCase())) {
+      toast.error('A clinician with this email has already been added');
+      return;
+    }
+
+    // Add to list
+    setClinicians([...clinicians, currentClinician]);
+
+    // Reset form
+    setCurrentClinician({
+      name: '',
+      email: '',
+      job_role: '',
+    });
+
+    toast.success('Clinician added to invite list');
+  };
+
+  const handleRemoveClinician = (index: number) => {
+    setClinicians(clinicians.filter((_, i) => i !== index));
+    toast.success('Clinician removed from invite list');
+  };
+
   const handleStep2Submit = async () => {
-    // Validate clinician form
-    if (!clinicianForm.name || !clinicianForm.email || !clinicianForm.job_role) {
-      toast.error('Please fill in all clinician information');
+    // Allow continuing without adding clinicians (optional during onboarding)
+    if (clinicians.length === 0) {
+      setCurrentStep(3);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/onboarding/invite-clinician', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facility_id: facility?.id,
-          ...clinicianForm,
-        }),
-      });
+      // Send invites for all clinicians
+      const invitePromises = clinicians.map(clinician =>
+        fetch('/api/onboarding/invite-clinician', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            facility_id: facility?.id,
+            ...clinician,
+          }),
+        })
+      );
 
-      const data = await response.json();
+      const responses = await Promise.all(invitePromises);
+      const results = await Promise.all(responses.map(r => r.json()));
 
-      if (!response.ok) {
-        toast.error(data.error || 'Failed to invite clinician');
+      // Check if any failed
+      const failedInvites = results.filter((_, i) => !responses[i].ok);
+
+      if (failedInvites.length > 0) {
+        toast.error(`Failed to send ${failedInvites.length} invite(s)`);
         return;
       }
 
-      toast.success('Clinician invite sent');
+      toast.success(`${clinicians.length} clinician invite(s) sent successfully`);
       setCurrentStep(3);
     } catch (error) {
-      console.error('Error inviting clinician:', error);
-      toast.error('Failed to invite clinician');
+      console.error('Error inviting clinicians:', error);
+      toast.error('Failed to send invites');
     } finally {
       setIsSubmitting(false);
     }
@@ -262,7 +301,7 @@ export default function OnboardingPage() {
 
   const steps = [
     { number: 1, title: 'Verify Facility', icon: Building2 },
-    { number: 2, title: 'Invite Clinician', icon: UserPlus },
+    { number: 2, title: 'Invite Clinicians', icon: UserPlus },
     { number: 3, title: 'Set Password', icon: Lock },
   ];
 
@@ -452,47 +491,48 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2: Invite Clinician */}
+        {/* Step 2: Invite Clinicians */}
         {currentStep === 2 && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Invite Your First Clinician</h2>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Invite Your Team</h2>
               <p className="text-sm text-[#666] mb-4">
-                Add a clinician to your team. They'll receive an email invitation to join.
+                Add clinicians to your facility. You can add more team members later from the dashboard.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="clinician_name">Clinician Name *</Label>
-                <Input
-                  id="clinician_name"
-                  value={clinicianForm.name}
-                  onChange={(e) => setClinicianForm({ ...clinicianForm, name: e.target.value })}
-                  placeholder="e.g., Jane Smith"
-                  className="mt-1"
-                  required
-                />
+            {/* Clinician Form */}
+            <div className="border border-[#E0E0E0] rounded-lg p-4 space-y-4 bg-[#FAFAF8]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="clinician_name">Name</Label>
+                  <Input
+                    id="clinician_name"
+                    value={currentClinician.name}
+                    onChange={(e) => setCurrentClinician({ ...currentClinician, name: e.target.value })}
+                    placeholder="e.g., Jane Smith"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="clinician_email">Email</Label>
+                  <Input
+                    id="clinician_email"
+                    type="email"
+                    value={currentClinician.email}
+                    onChange={(e) => setCurrentClinician({ ...currentClinician, email: e.target.value })}
+                    placeholder="e.g., jane.smith@example.com"
+                    className="mt-1"
+                  />
+                </div>
               </div>
 
               <div>
-                <Label htmlFor="clinician_email">Email Address *</Label>
-                <Input
-                  id="clinician_email"
-                  type="email"
-                  value={clinicianForm.email}
-                  onChange={(e) => setClinicianForm({ ...clinicianForm, email: e.target.value })}
-                  placeholder="e.g., jane.smith@example.com"
-                  className="mt-1"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="job_role">Job Role *</Label>
+                <Label htmlFor="job_role">Job Role</Label>
                 <Select
-                  value={clinicianForm.job_role}
-                  onValueChange={(value) => setClinicianForm({ ...clinicianForm, job_role: value })}
+                  value={currentClinician.job_role}
+                  onValueChange={(value) => setCurrentClinician({ ...currentClinician, job_role: value })}
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select a job role" />
@@ -506,7 +546,71 @@ export default function OnboardingPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <Button
+                onClick={handleAddClinician}
+                variant="outline"
+                className="w-full border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A] hover:text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add to Invite List
+              </Button>
             </div>
+
+            {/* Invited Clinicians List */}
+            {clinicians.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-[#1A1A1A]">
+                    Clinicians to Invite ({clinicians.length})
+                  </h3>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {clinicians.map((clinician, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-white border border-[#E0E0E0] rounded-lg hover:border-[#2D7A7A] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-[#2D7A7A]/10 flex items-center justify-center flex-shrink-0">
+                          <User className="w-5 h-5 text-[#2D7A7A]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[#1A1A1A] truncate">{clinician.name}</p>
+                          <div className="flex items-center gap-3 text-xs text-[#666]">
+                            <span className="flex items-center gap-1 truncate">
+                              <Mail className="w-3 h-3 flex-shrink-0" />
+                              {clinician.email}
+                            </span>
+                            <span className="flex items-center gap-1 flex-shrink-0">
+                              <Briefcase className="w-3 h-3" />
+                              {clinician.job_role}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleRemoveClinician(index)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {clinicians.length === 0 && (
+              <div className="text-center py-8 border-2 border-dashed border-[#E0E0E0] rounded-lg">
+                <UserPlus className="w-12 h-12 text-[#666] mx-auto mb-2" />
+                <p className="text-sm text-[#666]">No clinicians added yet</p>
+                <p className="text-xs text-[#999] mt-1">You can skip this step and add team members later</p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
@@ -521,7 +625,7 @@ export default function OnboardingPage() {
                 disabled={isSubmitting}
                 className="flex-1 bg-[#2D7A7A] hover:bg-[#236060]"
               >
-                {isSubmitting ? 'Sending Invite...' : 'Continue'}
+                {isSubmitting ? 'Sending Invites...' : clinicians.length > 0 ? `Send ${clinicians.length} Invite${clinicians.length > 1 ? 's' : ''}` : 'Skip for Now'}
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
