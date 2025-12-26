@@ -6,65 +6,62 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function InvitePage() {
   const router = useRouter();
-  const hasRedirected = useRef(false);
+  const hasProcessed = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    let authSubscription: any;
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
 
-    const handleInvite = async () => {
+    const processInvite = async () => {
       try {
-        // Listen for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (hasRedirected.current) return;
+        const supabase = createClient();
 
-          console.log('Auth state change:', event, session);
+        // Check if there's a hash in the URL
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
 
-          // Handle different auth events
-          if (event === 'SIGNED_IN' && session) {
-            hasRedirected.current = true;
-            router.push('/onboarding');
-          } else if (event === 'INITIAL_SESSION' && session) {
-            // Session was restored from storage
-            hasRedirected.current = true;
-            router.push('/onboarding');
-          } else if (event === 'PASSWORD_RECOVERY') {
-            hasRedirected.current = true;
-            router.push('/onboarding');
-          }
+        console.log('Hash params:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          type
         });
 
-        authSubscription = subscription;
+        if (accessToken && refreshToken) {
+          // Manually set the session using the tokens from the URL
+          console.log('Setting session from hash tokens...');
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
 
-        // Give Supabase a moment to process the hash parameters
-        await new Promise(resolve => setTimeout(resolve, 500));
+          if (sessionError) {
+            console.error('Error setting session:', sessionError);
+            setError('Failed to process invite link. The link may have expired. Please request a new invitation.');
+            return;
+          }
 
-        // Check for session after allowing hash processing
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          setError('Failed to process invite link. Please try again or contact support.');
-          return;
-        }
-
-        if (session && !hasRedirected.current) {
-          hasRedirected.current = true;
-          router.push('/onboarding');
-        } else if (!session) {
-          // No session after waiting - there might be an issue
-          console.warn('No session found after processing invite');
-          // Wait a bit longer for the auth state change event
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
-          // Check one more time
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          if (retrySession && !hasRedirected.current) {
-            hasRedirected.current = true;
+          if (data.session) {
+            console.log('Session established successfully');
+            // Clear the hash from the URL
+            window.history.replaceState(null, '', window.location.pathname);
+            // Redirect to onboarding
             router.push('/onboarding');
-          } else if (!hasRedirected.current) {
-            setError('Unable to process invite link. The link may have expired. Please request a new invitation.');
+          } else {
+            setError('Failed to establish session. Please try again.');
+          }
+        } else {
+          // No hash parameters, check if there's an existing session
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (session) {
+            console.log('Existing session found');
+            router.push('/onboarding');
+          } else {
+            console.error('No tokens in URL and no existing session');
+            setError('Invalid invite link. Please request a new invitation.');
           }
         }
       } catch (err) {
@@ -73,12 +70,7 @@ export default function InvitePage() {
       }
     };
 
-    handleInvite();
-
-    // Cleanup subscription
-    return () => {
-      authSubscription?.unsubscribe();
-    };
+    processInvite();
   }, [router]);
 
   if (error) {
