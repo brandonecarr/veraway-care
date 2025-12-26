@@ -17,6 +17,8 @@ export async function GET(request: Request) {
     const patient_id = searchParams.get('patient_id');
     const status = searchParams.get('status');
     const includeResolved = searchParams.get('includeResolved') === 'true';
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
+    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined;
 
     const filters: any = { includeResolved };
     if (patient_id) {
@@ -24,6 +26,12 @@ export async function GET(request: Request) {
     }
     if (status) {
       filters.status = status;
+    }
+    if (limit) {
+      filters.limit = limit;
+    }
+    if (offset !== undefined) {
+      filters.offset = offset;
     }
 
     const issues = await getIssues(filters);

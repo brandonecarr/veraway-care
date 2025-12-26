@@ -1,5 +1,6 @@
 import { TempoInit } from "@/components/tempo-init";
 import { QueryProvider } from "@/components/query-provider";
+import { RealtimeProvider } from "@/providers/realtime-provider";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
@@ -85,9 +86,11 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <QueryProvider>
-          {children}
-          <Toaster />
-          <TempoInit />
+          <RealtimeProvider>
+            {children}
+            <Toaster />
+            <TempoInit />
+          </RealtimeProvider>
         </QueryProvider>
       </body>
     </html>

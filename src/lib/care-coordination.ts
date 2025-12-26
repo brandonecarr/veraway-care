@@ -6,9 +6,11 @@ export async function getIssues(filters?: {
   assigned_to?: string;
   patient_id?: string;
   includeResolved?: boolean;
+  limit?: number;
+  offset?: number;
 }) {
   const supabase = await createClient();
-  
+
   let query = supabase
     .from('issues')
     .select(`
@@ -23,49 +25,60 @@ export async function getIssues(filters?: {
   } else if (!filters?.includeResolved) {
     query = query.neq('status', 'resolved');
   }
-  
+
   if (filters?.assigned_to) {
     query = query.eq('assigned_to', filters.assigned_to);
   }
-  
+
   if (filters?.patient_id) {
     query = query.eq('patient_id', filters.patient_id);
   }
 
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  
-  // Fetch assignee data from public.users table
-  const assigneeIds = Array.from(new Set(data?.filter(d => d.assigned_to).map(d => d.assigned_to) || []));
-  
-  let assigneesMap: Record<string, any> = {};
-  if (assigneeIds.length > 0) {
-    const { data: usersData } = await supabase
-      .from('users')
-      .select('id, email, name')
-      .in('id', assigneeIds);
-    
-    if (usersData) {
-      assigneesMap = usersData.reduce((acc, user) => {
-        acc[user.id] = user;
-        return acc;
-      }, {} as Record<string, any>);
-    }
+  // Add pagination
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
   }
-  
-  // Merge assignee data into issues
-  const enrichedData = data?.map(issue => ({
-    ...issue,
-    assignee: issue.assigned_to ? assigneesMap[issue.assigned_to] : null
-  }));
-  
-  return enrichedData as any[];
+
+  if (filters?.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  // Manually fetch user data for each issue using auth.users
+  if (data) {
+    const userIds = new Set<string>();
+    data.forEach((issue: any) => {
+      if (issue.assigned_to) userIds.add(issue.assigned_to);
+      if (issue.reported_by) userIds.add(issue.reported_by);
+      if (issue.resolved_by) userIds.add(issue.resolved_by);
+    });
+
+    // Fetch users from public.users table
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, email, name, avatar_url')
+      .in('id', Array.from(userIds));
+
+    const userMap = new Map(users?.map(u => [u.id, u]) || []);
+
+    // Attach user data to issues
+    return data.map((issue: any) => ({
+      ...issue,
+      assignee: issue.assigned_to ? userMap.get(issue.assigned_to) : null,
+      reporter: issue.reported_by ? userMap.get(issue.reported_by) : null,
+      resolver: issue.resolved_by ? userMap.get(issue.resolved_by) : null,
+    }));
+  }
+
+  return data as any[];
 }
 
 export async function getIssueById(id: string) {
   const supabase = await createClient();
-  
+
   const { data, error } = await supabase
     .from('issues')
     .select(`
@@ -74,8 +87,30 @@ export async function getIssueById(id: string) {
     `)
     .eq('id', id)
     .single();
-    
+
   if (error) throw error;
+
+  // Manually fetch user data
+  if (data) {
+    const userIds = [data.assigned_to, data.reported_by, data.resolved_by].filter(Boolean);
+
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email, name, avatar_url')
+        .in('id', userIds);
+
+      const userMap = new Map(users?.map(u => [u.id, u]) || []);
+
+      return {
+        ...data,
+        assignee: data.assigned_to ? userMap.get(data.assigned_to) : null,
+        reporter: data.reported_by ? userMap.get(data.reported_by) : null,
+        resolver: data.resolved_by ? userMap.get(data.resolved_by) : null,
+      };
+    }
+  }
+
   return data;
 }
 
@@ -113,16 +148,36 @@ export async function updateIssue(id: string, updates: Partial<Issue>) {
   return data;
 }
 
-export async function getPatients() {
+export async function getPatients(filters?: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+}) {
   const supabase = await createClient();
-  
-  const { data, error } = await supabase
+
+  let query = supabase
     .from('patients')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('last_name', { ascending: true });
-    
+
+  // Filter by status if provided
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  // Add pagination
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  if (filters?.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+  }
+
+  const { data, error, count } = await query;
+
   if (error) throw error;
-  return data as Patient[];
+  return { data: data as Patient[], count };
 }
 
 export async function getPatient(id: string) {
@@ -203,15 +258,34 @@ export async function searchPatients(searchTerm: string) {
 
 export async function getIssueMessages(issueId: string) {
   const supabase = await createClient();
-  
-  // Fetch messages - user data will be fetched separately by the API route
+
   const { data, error } = await supabase
     .from('issue_messages')
     .select('*')
     .eq('issue_id', issueId)
     .order('created_at', { ascending: true });
-    
+
   if (error) throw error;
+
+  // Manually fetch user data
+  if (data && data.length > 0) {
+    const userIds = Array.from(new Set(data.map(m => m.user_id).filter(Boolean)));
+
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email, name, avatar_url')
+        .in('id', userIds);
+
+      const userMap = new Map(users?.map(u => [u.id, u]) || []);
+
+      return data.map(message => ({
+        ...message,
+        user: message.user_id ? userMap.get(message.user_id) : null,
+      }));
+    }
+  }
+
   return data || [];
 }
 
@@ -230,14 +304,10 @@ export async function addIssueMessage(issueId: string, userId: string, message: 
 
 export async function getAuditLog(issueId?: string) {
   const supabase = await createClient();
-  
+
   let query = supabase
     .from('issue_audit_log')
-    .select(`
-      *,
-      user:user_id(id, email, raw_user_meta_data),
-      issue:issues(issue_number)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (issueId) {
@@ -245,114 +315,58 @@ export async function getAuditLog(issueId?: string) {
   }
 
   const { data, error } = await query;
-  
+
   if (error) throw error;
+
+  // Manually fetch user data and issue numbers
+  if (data && data.length > 0) {
+    const userIds = Array.from(new Set(data.map(a => a.user_id).filter(Boolean)));
+    const issueIds = Array.from(new Set(data.map(a => a.issue_id).filter(Boolean)));
+
+    const promises = [];
+
+    if (userIds.length > 0) {
+      promises.push(
+        supabase
+          .from('users')
+          .select('id, email, name')
+          .in('id', userIds)
+      );
+    }
+
+    if (issueIds.length > 0) {
+      promises.push(
+        supabase
+          .from('issues')
+          .select('id, issue_number')
+          .in('id', issueIds)
+      );
+    }
+
+    const results = await Promise.all(promises);
+    const userMap = new Map(results[0]?.data?.map((u: any) => [u.id, u]) || []);
+    const issueMap = new Map(results[1]?.data?.map((i: any) => [i.id, i]) || []);
+
+    return data.map(log => ({
+      ...log,
+      user: log.user_id ? userMap.get(log.user_id) : null,
+      issue: log.issue_id ? issueMap.get(log.issue_id) : null,
+    }));
+  }
+
   return data as any[];
 }
 
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const supabase = await createClient();
-  
-  const { data: allIssues, error } = await supabase
-    .from('issues')
-    .select('*');
-    
+
+  // Use database function for optimal performance
+  const { data, error } = await supabase.rpc('get_dashboard_metrics');
+
   if (error) throw error;
-  
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  const openIssues = allIssues?.filter(i => i.status === 'open' || i.status === 'in_progress') || [];
-  const overdueIssues = allIssues?.filter(i => {
-    if (i.status === 'resolved') return false;
-    const createdAt = new Date(i.created_at);
-    const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-    return hoursSinceCreation > 24;
-  }) || [];
-  
-  const resolvedToday = allIssues?.filter(i => {
-    if (i.status !== 'resolved' || !i.resolved_at) return false;
-    const resolvedAt = new Date(i.resolved_at);
-    return resolvedAt >= today;
-  }) || [];
-  
-  const resolvedIssues = allIssues?.filter(i => i.status === 'resolved' && i.resolved_at) || [];
-  const avgResolutionTime = resolvedIssues.length > 0
-    ? resolvedIssues.reduce((acc, issue) => {
-        const created = new Date(issue.created_at).getTime();
-        const resolved = new Date(issue.resolved_at!).getTime();
-        return acc + (resolved - created) / (1000 * 60 * 60);
-      }, 0) / resolvedIssues.length
-    : 0;
-    
-  // Only count active (non-resolved) issues for the "Issues by Type" filter
-  const typeCount: Record<string, number> = {};
-  (allIssues || []).filter(issue => issue.status !== 'resolved').forEach(issue => {
-    typeCount[issue.issue_type] = (typeCount[issue.issue_type] || 0) + 1;
-  });
-  const issuesByType: { type: string; count: number }[] = Object.entries(typeCount).map(([type, count]) => ({ type, count }));
-  
-  // Calculate clinician responsiveness
-  const assigneeStats: Record<string, { 
-    resolved: number; 
-    open: number; 
-    totalResolutionTime: number;
-    resolvedCount: number;
-  }> = {};
-  
-  (allIssues || []).forEach(issue => {
-    if (issue.assigned_to) {
-      if (!assigneeStats[issue.assigned_to]) {
-        assigneeStats[issue.assigned_to] = { resolved: 0, open: 0, totalResolutionTime: 0, resolvedCount: 0 };
-      }
-      if (issue.status === 'resolved' && issue.resolved_at) {
-        assigneeStats[issue.assigned_to].resolved++;
-        const created = new Date(issue.created_at).getTime();
-        const resolved = new Date(issue.resolved_at).getTime();
-        assigneeStats[issue.assigned_to].totalResolutionTime += (resolved - created) / (1000 * 60 * 60);
-        assigneeStats[issue.assigned_to].resolvedCount++;
-      } else {
-        assigneeStats[issue.assigned_to].open++;
-      }
-    }
-  });
-  
-  // Fetch user details for assignees
-  const assigneeIds = Object.keys(assigneeStats);
-  let clinicianResponsiveness: DashboardMetrics['clinicianResponsiveness'] = [];
-  
-  if (assigneeIds.length > 0) {
-    const { data: usersData } = await supabase
-      .from('users')
-      .select('id, email, name')
-      .in('id', assigneeIds);
-    
-    if (usersData) {
-      clinicianResponsiveness = usersData.map(user => {
-        const stats = assigneeStats[user.id];
-        return {
-          userId: user.id,
-          name: user.name || user.email?.split('@')[0] || 'Unknown',
-          email: user.email || '',
-          avgResponseTime: stats.resolvedCount > 0 
-            ? stats.totalResolutionTime / stats.resolvedCount 
-            : 0,
-          issuesResolved: stats.resolved,
-          openIssues: stats.open
-        };
-      }).sort((a, b) => b.issuesResolved - a.issuesResolved);
-    }
-  }
-  
-  return {
-    totalIssues: allIssues?.length || 0,
-    openIssues: openIssues.length,
-    overdueIssues: overdueIssues.length,
-    resolvedToday: resolvedToday.length,
-    avgResolutionTime,
-    issuesByType,
-    clinicianResponsiveness
-  };
+
+  // Return the data directly as it's already in the correct format
+  return data as DashboardMetrics;
 }
 
 export async function getUserRole(userId: string) {

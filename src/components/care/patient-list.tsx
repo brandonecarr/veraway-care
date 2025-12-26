@@ -45,7 +45,9 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
     setIsLoading(true);
     try {
       const response = await fetch('/api/patients');
-      const data = await response.json();
+      const result = await response.json();
+      // API returns { data: [], count: number }
+      const data = result.data || result;
       setPatients(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching patients:', error);
