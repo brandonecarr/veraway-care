@@ -46,6 +46,10 @@ export async function POST(request: Request) {
       }
     } else {
       // Create new user account and send invite
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/invite`
+        : 'https://www.verawaycare.com/invite';
+
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
         email,
         {
@@ -53,6 +57,7 @@ export async function POST(request: Request) {
             name,
             full_name: name,
           },
+          redirectTo: redirectUrl,
         }
       );
 
@@ -142,7 +147,13 @@ export async function POST(request: Request) {
 
     // If user existed but hasn't registered yet, resend the invite
     if (userExists && !userAlreadyRegistered) {
-      const { error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/invite`
+        : 'https://www.verawaycare.com/invite';
+
+      const { error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectUrl,
+      });
       if (resendError) {
         console.error('Resend invite error:', resendError);
         return NextResponse.json(
