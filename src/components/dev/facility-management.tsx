@@ -19,6 +19,8 @@ interface Facility {
   created_at: string;
   coordinator_count: number;
   coordinators_registered: boolean;
+  coordinator_name: string | null;
+  coordinator_email: string | null;
   address_line1?: string;
   address_line2?: string;
   city?: string;
@@ -197,16 +199,39 @@ export function FacilityManagement() {
                   <span className="font-medium">{facility.max_users}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#666]">Coordinators:</span>
-                  <span className="font-medium">{facility.coordinator_count}</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-[#666]">Created:</span>
                   <span className="font-medium">
                     {new Date(facility.created_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
+
+              {/* Coordinator Information */}
+              {facility.coordinator_count > 0 ? (
+                <div className="mb-4 p-3 bg-[#2D7A7A]/5 rounded-lg border border-[#2D7A7A]/10">
+                  <h4 className="text-xs font-semibold text-[#2D7A7A] uppercase tracking-wide mb-2">
+                    Coordinator
+                  </h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="text-[#666] min-w-[45px]">Name:</span>
+                      <span className="font-medium text-[#1A1A1A]">
+                        {facility.coordinator_name || 'Not set'}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-[#666] min-w-[45px]">Email:</span>
+                      <span className="font-medium text-[#1A1A1A] break-all">
+                        {facility.coordinator_email || 'Not set'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-[#999]/5 rounded-lg border border-[#999]/10">
+                  <p className="text-xs text-[#666] text-center">No coordinator assigned</p>
+                </div>
+              )}
 
               <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                 <Button

@@ -38,24 +38,34 @@ export async function GET() {
     // Fetch users
     const { data: users } = await supabase
       .from('users')
-      .select('id, email');
+      .select('id, email, name');
 
     // Get all auth users to check registration status
     const { data: authData } = await supabase.auth.admin.listUsers();
     const authUsers = authData?.users || [];
 
     // Create user map
-    const userMap = new Map(users?.map(u => [u.id, u.email]) || []);
+    const userMap = new Map(users?.map(u => [u.id, { email: u.email, name: u.name }]) || []);
 
     // Map coordinator data to facilities
-    const coordinatorMap = new Map<string, { count: number; all_registered: boolean }>();
+    const coordinatorMap = new Map<string, {
+      count: number;
+      all_registered: boolean;
+      coordinator_name: string | null;
+      coordinator_email: string | null;
+    }>();
 
     coordinators?.forEach(coord => {
       const facilityId = coord.facility_id;
-      const userEmail = userMap.get(coord.user_id);
+      const userInfo = userMap.get(coord.user_id);
 
       if (!coordinatorMap.has(facilityId)) {
-        coordinatorMap.set(facilityId, { count: 0, all_registered: true });
+        coordinatorMap.set(facilityId, {
+          count: 0,
+          all_registered: true,
+          coordinator_name: userInfo?.name || null,
+          coordinator_email: userInfo?.email || null,
+        });
       }
 
       const facilityData = coordinatorMap.get(facilityId)!;
@@ -63,7 +73,7 @@ export async function GET() {
 
       // Check if this coordinator has completed registration
       // Must have logged in at least once (which means they've set a password)
-      const authUser = authUsers.find(u => u.email === userEmail);
+      const authUser = authUsers.find(u => u.email === userInfo?.email);
       if (!authUser || !authUser.last_sign_in_at) {
         facilityData.all_registered = false;
       }
@@ -73,6 +83,8 @@ export async function GET() {
       ...facility,
       coordinator_count: coordinatorMap.get(facility.id)?.count || 0,
       coordinators_registered: coordinatorMap.get(facility.id)?.all_registered || false,
+      coordinator_name: coordinatorMap.get(facility.id)?.coordinator_name || null,
+      coordinator_email: coordinatorMap.get(facility.id)?.coordinator_email || null,
     }));
 
     return NextResponse.json(facilitiesWithCoordinators || []);
