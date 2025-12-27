@@ -179,7 +179,7 @@ export function ResolutionVelocity({ data, className }: ResolutionVelocityProps)
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
+        <div className="flex flex-col items-center justify-center text-center" style={{ minHeight: '340px' }}>
           <Activity className="w-12 h-12 text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground">No resolution data available yet</p>
           <p className="text-xs text-muted-foreground/70 mt-1">Data will appear once issues are resolved</p>
