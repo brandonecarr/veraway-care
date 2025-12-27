@@ -63,7 +63,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     u.id as user_id,
     COALESCE(u.name, u.email) as name,
     u.email,
@@ -72,16 +72,17 @@ BEGIN
     COUNT(DISTINCT CASE WHEN i.status = 'overdue' THEN i.id END)::BIGINT as overdue_count,
     COALESCE(
       ROUND(AVG(
-        CASE 
-          WHEN i.status = 'resolved' AND i.resolved_at IS NOT NULL 
+        CASE
+          WHEN i.status = 'resolved' AND i.resolved_at IS NOT NULL
           THEN EXTRACT(EPOCH FROM (i.resolved_at - i.created_at)) / 3600
         END
       )::numeric, 2),
       0
     ) as avg_completion_time
   FROM users u
+  INNER JOIN user_roles ur ON ur.user_id = u.id
   LEFT JOIN issues i ON i.assigned_to = u.id
-  WHERE u.role IN ('clinician', 'coordinator')
+  WHERE ur.role IN ('clinician', 'coordinator')
   GROUP BY u.id, u.name, u.email
   HAVING COUNT(i.id) > 0
   ORDER BY assigned_count DESC;

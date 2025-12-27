@@ -46,7 +46,7 @@ interface StaffMember {
   email: string;
   role: string;
   job_role?: string;
-  email_confirmed_at: string | null;
+  has_completed_onboarding: boolean;
   created_at: string;
 }
 
@@ -187,44 +187,18 @@ export default function SettingsPage() {
   };
 
   const loadStaffMembers = async (facilityId: string) => {
-    const supabase = createClient();
-
-    // Get all users in the facility with their roles
-    const { data: users } = await supabase
-      .from('users')
-      .select(`
-        id,
-        name,
-        email,
-        created_at
-      `)
-      .eq('facility_id', facilityId);
-
-    if (users) {
-      // Get auth users to check registration status
-      const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
-
-      // Get roles for all users
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('user_id, role, job_role')
-        .eq('facility_id', facilityId);
-
-      const staffWithStatus = users.map(user => {
-        const authUser = authUsers?.find(au => au.id === user.id);
-        const userRole = roles?.find(r => r.user_id === user.id);
-
-        return {
-          ...user,
-          // Use last_sign_in_at instead of email_confirmed_at
-          // Only users who have logged in (set password and completed onboarding) are considered registered
-          email_confirmed_at: authUser?.last_sign_in_at || null,
-          role: userRole?.role || 'clinician',
-          job_role: userRole?.job_role,
-        };
-      });
-
-      setStaffMembers(staffWithStatus);
+    try {
+      const response = await fetch('/api/settings/staff');
+      if (response.ok) {
+        const data = await response.json();
+        setStaffMembers(data);
+      } else {
+        console.error('Failed to load staff members');
+        setStaffMembers([]);
+      }
+    } catch (error) {
+      console.error('Error loading staff members:', error);
+      setStaffMembers([]);
     }
   };
 
@@ -671,7 +645,7 @@ export default function SettingsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <p className="font-medium truncate">{staff.name}</p>
-                              {staff.email_confirmed_at ? (
+                              {staff.has_completed_onboarding ? (
                                 <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
                               ) : (
                                 <Clock className="w-4 h-4 text-yellow-600 flex-shrink-0" />
@@ -692,7 +666,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                          {!staff.email_confirmed_at && staff.id !== userProfile?.id && (
+                          {!staff.has_completed_onboarding && staff.id !== userProfile?.id && (
                             <Button
                               onClick={() => handleResendInvite(staff.email)}
                               variant="outline"

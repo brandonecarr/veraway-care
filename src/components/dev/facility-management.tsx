@@ -312,14 +312,28 @@ export function FacilityManagement() {
               )}
 
               <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  onClick={() => handleInvite(facility)}
-                  variant="outline"
-                  className="flex-1 gap-2"
-                >
-                  <Mail className="h-4 w-4" />
-                  {facility.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
-                </Button>
+                {/* Only show invite/resend button if coordinator hasn't completed onboarding */}
+                {(!facility.coordinators_registered || facility.coordinator_count === 0) && (
+                  <Button
+                    onClick={() => handleInvite(facility)}
+                    variant="outline"
+                    className="flex-1 gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {facility.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
+                  </Button>
+                )}
+                {/* Show View Details button when coordinator has completed onboarding */}
+                {facility.coordinator_count > 0 && facility.coordinators_registered && (
+                  <Button
+                    onClick={() => handleViewDetails(facility)}
+                    variant="outline"
+                    className="flex-1 gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    View Details
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
