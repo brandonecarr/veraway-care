@@ -428,20 +428,32 @@ export default function OnboardingPage() {
 
         {/* User Information Card */}
         <div className="mb-6 bg-[#2D7A7A]/5 border border-[#2D7A7A]/20 rounded-lg p-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <User className="w-5 h-5 text-[#2D7A7A]" />
-              <div>
-                <p className="text-xs text-[#666]">{userRole === 'clinician' ? 'Clinician' : 'Coordinator'}</p>
-                <p className="font-medium text-[#1A1A1A]">{userName || userEmail}</p>
+          <div className="flex flex-col gap-3">
+            {/* User/Coordinator Section */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 bg-[#2D7A7A] rounded-lg flex-shrink-0">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-[#666] uppercase tracking-wide font-semibold">
+                  {userRole === 'clinician' ? 'Clinician' : 'Coordinator'}
+                </p>
+                <p className="font-semibold text-[#1A1A1A] truncate">{userName || userEmail}</p>
               </div>
             </div>
+
+            {/* Divider */}
+            {facility && <div className="border-t border-[#2D7A7A]/10" />}
+
+            {/* Facility Section */}
             {facility && (
-              <div className="flex items-center gap-3 flex-1">
-                <Building2 className="w-5 h-5 text-[#2D7A7A]" />
-                <div>
-                  <p className="text-xs text-[#666]">Facility</p>
-                  <p className="font-medium text-[#1A1A1A]">{facility.name}</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 bg-[#2D7A7A] rounded-lg flex-shrink-0">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-[#666] uppercase tracking-wide font-semibold">Facility</p>
+                  <p className="font-semibold text-[#1A1A1A] truncate">{facility.name}</p>
                 </div>
               </div>
             )}
