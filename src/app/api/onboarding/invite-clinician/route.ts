@@ -77,6 +77,10 @@ export async function POST(request: NextRequest) {
         ? `${process.env.NEXT_PUBLIC_SITE_URL}/invite`
         : 'https://www.verawaycare.com/invite';
 
+      console.log('📧 Sending invite email to:', email);
+      console.log('📧 Redirect URL:', redirectUrl);
+      console.log('📧 User metadata:', { name, job_role });
+
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
         email,
         {
@@ -90,7 +94,8 @@ export async function POST(request: NextRequest) {
       );
 
       if (authError) {
-        console.error('Auth error:', authError);
+        console.error('❌ Failed to send invite email:', authError);
+        console.error('❌ Error details:', JSON.stringify(authError, null, 2));
         return NextResponse.json(
           { error: authError.message || 'Failed to invite clinician' },
           { status: 400 }
@@ -98,9 +103,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (!authData.user) {
+        console.error('❌ No user data returned after invite');
         return NextResponse.json({ error: 'Failed to invite clinician' }, { status: 500 });
       }
 
+      console.log('✅ Invite email sent successfully to:', email);
+      console.log('✅ User ID:', authData.user.id);
       userId = authData.user.id;
     }
 
@@ -180,16 +188,21 @@ export async function POST(request: NextRequest) {
         ? `${process.env.NEXT_PUBLIC_SITE_URL}/invite`
         : 'https://www.verawaycare.com/invite';
 
+      console.log('📧 Resending invite email to:', email);
+      console.log('📧 Redirect URL:', redirectUrl);
+
       const { error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: redirectUrl,
       });
       if (resendError) {
-        console.error('Resend invite error:', resendError);
+        console.error('❌ Failed to resend invite email:', resendError);
+        console.error('❌ Error details:', JSON.stringify(resendError, null, 2));
         return NextResponse.json(
           { error: 'Failed to resend invite: ' + resendError.message },
           { status: 500 }
         );
       }
+      console.log('✅ Invite email resent successfully to:', email);
     }
 
     let message = 'Clinician invited successfully';
