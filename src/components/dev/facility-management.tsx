@@ -36,6 +36,8 @@ export function FacilityManagement() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showEditCoordinatorDialog, setShowEditCoordinatorDialog] = useState(false);
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,51 @@ export function FacilityManagement() {
   const handleViewDetails = (facility: Facility) => {
     setSelectedFacility(facility);
     setShowDetailsDialog(true);
+  };
+
+  const handleEditCoordinator = (facility: Facility) => {
+    setSelectedFacility(facility);
+    setShowEditCoordinatorDialog(true);
+  };
+
+  const handleDeleteCoordinator = (facility: Facility) => {
+    setSelectedFacility(facility);
+    setShowDeleteConfirmDialog(true);
+  };
+
+  const confirmDeleteCoordinator = async () => {
+    if (!selectedFacility || !selectedFacility.coordinator_email) return;
+
+    try {
+      const response = await fetch('/api/dev/delete-coordinator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: selectedFacility.id,
+          email: selectedFacility.coordinator_email,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Coordinator removed successfully');
+        setShowDeleteConfirmDialog(false);
+        setSelectedFacility(null);
+        fetchFacilities();
+        // Open invite dialog to add new coordinator
+        setTimeout(() => {
+          if (selectedFacility) {
+            setSelectedFacility(selectedFacility);
+            setShowInviteDialog(true);
+          }
+        }, 300);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to remove coordinator');
+      }
+    } catch (error) {
+      console.error('Error removing coordinator:', error);
+      toast.error('Failed to remove coordinator');
+    }
   };
 
   if (isLoading) {
@@ -209,9 +256,40 @@ export function FacilityManagement() {
               {/* Coordinator Information */}
               {facility.coordinator_count > 0 ? (
                 <div className="mb-4 p-3 bg-[#2D7A7A]/5 rounded-lg border border-[#2D7A7A]/10">
-                  <h4 className="text-xs font-semibold text-[#2D7A7A] uppercase tracking-wide mb-2">
-                    Coordinator
-                  </h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-[#2D7A7A] uppercase tracking-wide">
+                      Coordinator
+                    </h4>
+                    <div className="flex gap-1">
+                      {!facility.coordinators_registered ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCoordinator(facility);
+                          }}
+                          className="h-6 w-6 p-0 hover:bg-[#2D7A7A]/10"
+                          title="Edit coordinator information"
+                        >
+                          <Pencil className="h-3 w-3 text-[#2D7A7A]" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCoordinator(facility);
+                          }}
+                          className="h-6 w-6 p-0 hover:bg-red-100"
+                          title="Remove coordinator"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-600" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-1 text-sm">
                     <div className="flex items-start gap-2">
                       <span className="text-[#666] min-w-[45px]">Name:</span>
@@ -285,6 +363,74 @@ export function FacilityManagement() {
                 setSelectedFacility(null);
               }}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Coordinator Dialog */}
+      <Dialog open={showEditCoordinatorDialog} onOpenChange={setShowEditCoordinatorDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Coordinator Information</DialogTitle>
+          </DialogHeader>
+          {selectedFacility && (
+            <EditCoordinatorForm
+              facility={selectedFacility}
+              onSuccess={() => {
+                setShowEditCoordinatorDialog(false);
+                setSelectedFacility(null);
+                fetchFacilities();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Coordinator</DialogTitle>
+          </DialogHeader>
+          {selectedFacility && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> This action will completely remove the coordinator from the system.
+                </p>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 mb-2">
+                  <strong>Coordinator:</strong> {selectedFacility.coordinator_name}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Email:</strong> {selectedFacility.coordinator_email}
+                </p>
+              </div>
+
+              <p className="text-sm text-[#666]">
+                After removal, you'll be able to invite a new coordinator to this facility.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeleteConfirmDialog(false);
+                    setSelectedFacility(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmDeleteCoordinator}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Remove Coordinator
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -555,6 +701,94 @@ function InviteCoordinatorForm({
           {isSubmitting
             ? facility.coordinator_count > 0 ? 'Resending...' : 'Sending Invite...'
             : facility.coordinator_count > 0 ? 'Resend Invite' : 'Send Invite'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function EditCoordinatorForm({
+  facility,
+  onSuccess,
+}: {
+  facility: Facility;
+  onSuccess: () => void;
+}) {
+  const [email, setEmail] = useState(facility.coordinator_email || '');
+  const [name, setName] = useState(facility.coordinator_name || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/dev/update-coordinator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facility.id,
+          old_email: facility.coordinator_email,
+          new_email: email,
+          new_name: name,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Coordinator information updated successfully');
+        onSuccess();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to update coordinator');
+      }
+    } catch (error) {
+      console.error('Error updating coordinator:', error);
+      toast.error('Failed to update coordinator');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>Facility:</strong> {facility.name}
+        </p>
+      </div>
+
+      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-800">
+          <strong>Note:</strong> Updating the email will send a new invite to the coordinator with the updated information.
+        </p>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Coordinator Name *</label>
+        <Input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., John Doe"
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Email *</label>
+        <Input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="coordinator@facility.com"
+          className="mt-1"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="submit" disabled={isSubmitting} className="bg-[#2D7A7A] hover:bg-[#236060]">
+          {isSubmitting ? 'Updating...' : 'Update Coordinator'}
         </Button>
       </div>
     </form>
