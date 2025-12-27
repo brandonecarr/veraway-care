@@ -20,20 +20,18 @@ interface ClinicianWorkloadHeatmapProps {
   onClinicianClick?: (userId: string) => void;
 }
 
-export function ClinicianWorkloadHeatmap({ 
-  data, 
+export function ClinicianWorkloadHeatmap({
+  data,
   className,
-  onClinicianClick 
+  onClinicianClick
 }: ClinicianWorkloadHeatmapProps) {
-  if (!data || data.length === 0) {
-    return null;
-  }
+  const hasData = data && data.length > 0;
 
-  const maxAssigned = Math.max(...data.map(d => d.assignedCount));
-  const maxOverdue = Math.max(...data.map(d => d.overdueCount));
+  const maxAssigned = hasData ? Math.max(...data.map(d => d.assignedCount)) : 0;
+  const maxOverdue = hasData ? Math.max(...data.map(d => d.overdueCount)) : 0;
 
   // Sort by assigned count (highest workload first)
-  const sortedData = [...data].sort((a, b) => b.assignedCount - a.assignedCount);
+  const sortedData = hasData ? [...data].sort((a, b) => b.assignedCount - a.assignedCount) : [];
 
   return (
     <Card className={cn("p-6 border-brand-border hover:shadow-md transition-shadow", className)}>
@@ -51,8 +49,10 @@ export function ClinicianWorkloadHeatmap({
         </div>
       </div>
 
-      {/* Heatmap */}
-      <div className="space-y-3">
+      {hasData ? (
+        <>
+          {/* Heatmap */}
+          <div className="space-y-3">
         {sortedData.map((clinician) => {
           const workloadIntensity = maxAssigned > 0 
             ? (clinician.assignedCount / maxAssigned) * 100 
@@ -173,19 +173,27 @@ export function ClinicianWorkloadHeatmap({
             </div>
           );
         })}
-      </div>
+          </div>
 
-      {/* Legend */}
-      <div className="mt-6 pt-4 border-t border-brand-border flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded bg-gradient-to-r from-brand-teal/50 to-brand-teal/20" />
-          <span>Workload intensity</span>
+          {/* Legend */}
+          <div className="mt-6 pt-4 border-t border-brand-border flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-gradient-to-r from-brand-teal/50 to-brand-teal/20" />
+              <span>Workload intensity</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded border-2 border-[#E07A5F]" />
+              <span>Has overdue issues</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <Users className="w-12 h-12 text-muted-foreground/30 mb-3" />
+          <p className="text-sm text-muted-foreground">No workload data available yet</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">Data will appear once issues are assigned to clinicians</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded border-2 border-[#E07A5F]" />
-          <span>Has overdue issues</span>
-        </div>
-      </div>
+      )}
     </Card>
   );
 }
