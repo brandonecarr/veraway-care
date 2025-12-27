@@ -59,8 +59,9 @@ export function FacilityManagement() {
   };
 
   const handleInvite = async (facility: Facility) => {
-    if (facility.coordinator_count > 0 && !facility.coordinators_registered) {
-      // Resend scenario - call API directly (only if not all registered)
+    if (facility.coordinator_count > 0) {
+      // Resend scenario - call API directly
+      // The API will check registration status and skip registered users
       try {
         const response = await fetch('/api/dev/resend-invites', {
           method: 'POST',
