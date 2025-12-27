@@ -48,11 +48,39 @@ export async function GET(request: NextRequest) {
         end_date: endDate.toISOString(),
       });
 
+    // Transform snake_case to camelCase for frontend compatibility
+    const transformedResponseTimeTrends = (responseTimeTrends || []).map((item: any) => ({
+      date: item.date,
+      avgResponseTime: item.avg_response_time,
+      count: item.count,
+    }));
+
+    const transformedResolutionVelocity = (resolutionVelocity || []).map((item: any) => ({
+      date: item.date,
+      resolved: item.resolved,
+      avgHours: item.avg_hours,
+    }));
+
+    const transformedClinicianWorkload = (clinicianWorkload || []).map((item: any) => ({
+      userId: item.user_id,
+      name: item.name,
+      email: item.email,
+      assignedCount: item.assigned_count,
+      resolvedCount: item.resolved_count,
+      overdueCount: item.overdue_count,
+      avgCompletionTime: item.avg_completion_time,
+    }));
+
+    const transformedIssueTypeDistribution = (issueTypeDistribution || []).map((item: any) => ({
+      date: item.date,
+      distribution: item.distribution, // Already in correct format
+    }));
+
     return NextResponse.json({
-      responseTimeTrends: responseTimeTrends || [],
-      resolutionVelocity: resolutionVelocity || [],
-      clinicianWorkload: clinicianWorkload || [],
-      issueTypeDistribution: issueTypeDistribution || [],
+      responseTimeTrends: transformedResponseTimeTrends,
+      resolutionVelocity: transformedResolutionVelocity,
+      clinicianWorkload: transformedClinicianWorkload,
+      issueTypeDistribution: transformedIssueTypeDistribution,
     });
   } catch (error) {
     console.error('Error fetching advanced analytics:', error);
