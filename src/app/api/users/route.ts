@@ -24,25 +24,41 @@ export async function GET() {
       return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
     }
 
-    // Get all clinicians from the same facility by querying user_roles
-    const { data: userRoles, error } = await serverSupabase
+    // Step 1: Get all clinician user_ids from the same facility
+    const { data: userRoles, error: rolesError } = await serverSupabase
       .from('user_roles')
-      .select(`
-        user_id,
-        users!inner(id, email, name)
-      `)
+      .select('user_id')
       .eq('facility_id', currentUserData.facility_id)
       .eq('role', 'clinician');
 
-    if (error) {
-      throw error;
+    if (rolesError) {
+      console.error('Error fetching user roles:', rolesError);
+      throw rolesError;
     }
 
-    // Format the response - extract user data from the joined query
-    const users = (userRoles || []).map((ur: any) => ({
-      id: ur.users.id,
-      email: ur.users.email,
-      name: ur.users.name || ur.users.email?.split('@')[0]
+    if (!userRoles || userRoles.length === 0) {
+      // No clinicians found in this facility
+      return NextResponse.json([]);
+    }
+
+    // Step 2: Get user details for these clinician user_ids
+    const clinicianIds = userRoles.map(ur => ur.user_id);
+
+    const { data: clinicians, error: usersError } = await serverSupabase
+      .from('users')
+      .select('id, email, name')
+      .in('id', clinicianIds);
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      throw usersError;
+    }
+
+    // Format the response
+    const users = (clinicians || []).map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name || u.email?.split('@')[0]
     }));
 
     return NextResponse.json(users);
