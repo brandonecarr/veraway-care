@@ -9,7 +9,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AuditLogPage() {
+export default async function AuditLogPage({ params }: { params: { slug: string } }) {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,16 +19,27 @@ export default async function AuditLogPage() {
   }
 
   // Check if user is coordinator
+  const { data: userData } = await supabase
+    .from('users')
+    .select('facility_id')
+    .eq('id', user.id)
+    .single();
+
+  if (!userData?.facility_id) {
+    redirect('/sign-in');
+  }
+
   const { data: roleData } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
+    .eq('facility_id', userData.facility_id)
     .single();
 
   const isCoordinator = roleData?.role === 'coordinator';
 
   if (!isCoordinator) {
-    return redirect('/dashboard');
+    return redirect(`/${params.slug}/dashboard`);
   }
 
   // Get audit stats for the header
