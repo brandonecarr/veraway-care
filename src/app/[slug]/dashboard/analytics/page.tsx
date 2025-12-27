@@ -14,23 +14,12 @@ export default async function AnalyticsPage({ params }: { params: { slug: string
     redirect('/sign-in');
   }
 
-  // Check if user is coordinator
-  const { data: userData } = await supabase
-    .from('users')
-    .select('facility_id')
-    .eq('id', user.id)
-    .single();
-
-  if (!userData?.facility_id) {
-    redirect('/sign-in');
-  }
-
+  // Check if user is coordinator - use maybeSingle to avoid errors if no role exists
   const { data: roleData } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .eq('facility_id', userData.facility_id)
-    .single();
+    .maybeSingle();
 
   const isCoordinator = roleData?.role === 'coordinator';
 
@@ -39,5 +28,5 @@ export default async function AnalyticsPage({ params }: { params: { slug: string
     redirect(`/${params.slug}/dashboard`);
   }
 
-  return <AdvancedAnalytics userId={user.id} />;
+  return <AdvancedAnalytics userId={user.id} slug={params.slug} />;
 }

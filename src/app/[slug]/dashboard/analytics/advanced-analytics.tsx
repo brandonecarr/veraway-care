@@ -14,9 +14,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface AdvancedAnalyticsProps {
   userId: string;
+  slug: string;
 }
 
-export default function AdvancedAnalytics({ userId }: AdvancedAnalyticsProps) {
+export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsProps) {
   const router = useRouter();
   const [period, setPeriod] = useState<'7' | '30'>('30');
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -50,7 +51,7 @@ export default function AdvancedAnalytics({ userId }: AdvancedAnalyticsProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push(`/${slug}/dashboard`)}
               className="shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -123,7 +124,7 @@ export default function AdvancedAnalytics({ userId }: AdvancedAnalyticsProps) {
               <ClinicianWorkloadHeatmap
                 data={analyticsData.clinicianWorkload || []}
                 onClinicianClick={(userId) => {
-                  router.push(`/dashboard?assignedTo=${userId}`);
+                  router.push(`/${slug}/dashboard?assignedTo=${userId}`);
                 }}
               />
             </div>
