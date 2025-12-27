@@ -43,33 +43,35 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="min-h-screen bg-[#FAFAF8] pb-20 md:pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="space-y-4">
+          {/* Back button and title */}
+          <div className="flex items-start gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push(`/${slug}/dashboard`)}
-              className="shrink-0"
+              className="shrink-0 mt-1"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <BarChart3 className="w-8 h-8 text-brand-teal" />
-                <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 md:gap-3">
+                <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-brand-teal shrink-0" />
+                <h1 className="text-2xl md:text-5xl font-display font-bold tracking-tight">
                   Advanced Analytics
                 </h1>
               </div>
-              <p className="text-body text-muted-foreground mt-2">
+              <p className="text-sm md:text-body text-muted-foreground mt-1 md:mt-2">
                 Deep insights for operational decisions
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Controls - stacked on mobile, inline on desktop */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between pl-12 md:pl-14">
             <Tabs value={period} onValueChange={(v) => setPeriod(v as '7' | '30')}>
               <TabsList>
                 <TabsTrigger value="7">7 Days</TabsTrigger>
@@ -77,18 +79,22 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
               </TabsList>
             </Tabs>
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={fetchAnalytics}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchAnalytics}
+                disabled={isLoading}
+                className="gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
 
-            {analyticsData && (
-              <AnalyticsExport data={analyticsData} filename="care-coordination-analytics" />
-            )}
+              {analyticsData && (
+                <AnalyticsExport data={analyticsData} filename="care-coordination-analytics" />
+              )}
+            </div>
           </div>
         </div>
 
