@@ -24,27 +24,25 @@ export async function GET() {
       return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
     }
 
-    // Get all clinicians from the same facility
-    const { data: clinicians, error } = await serverSupabase
-      .from('users')
+    // Get all clinicians from the same facility by querying user_roles
+    const { data: userRoles, error } = await serverSupabase
+      .from('user_roles')
       .select(`
-        id,
-        email,
-        name,
-        user_roles!inner(role)
+        user_id,
+        users!inner(id, email, name)
       `)
       .eq('facility_id', currentUserData.facility_id)
-      .eq('user_roles.role', 'clinician');
+      .eq('role', 'clinician');
 
     if (error) {
       throw error;
     }
 
-    // Format the response
-    const users = (clinicians || []).map((u: any) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name || u.email?.split('@')[0]
+    // Format the response - extract user data from the joined query
+    const users = (userRoles || []).map((ur: any) => ({
+      id: ur.users.id,
+      email: ur.users.email,
+      name: ur.users.name || ur.users.email?.split('@')[0]
     }));
 
     return NextResponse.json(users);
