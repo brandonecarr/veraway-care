@@ -14,15 +14,23 @@ export async function GET() {
     }
 
     // Get the current user's facility_id
-    const { data: currentUserData } = await serverSupabase
+    const { data: currentUserData, error: userDataError } = await serverSupabase
       .from('users')
       .select('facility_id')
       .eq('id', user.id)
       .single();
 
+    if (userDataError) {
+      console.error('Error fetching current user data:', userDataError);
+      throw userDataError;
+    }
+
     if (!currentUserData?.facility_id) {
+      console.log('User has no facility_id:', user.id);
       return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
     }
+
+    console.log('Fetching clinicians for facility:', currentUserData.facility_id);
 
     // Step 1: Get all clinician user_ids from the same facility
     const { data: userRoles, error: rolesError } = await serverSupabase
@@ -35,6 +43,8 @@ export async function GET() {
       console.error('Error fetching user roles:', rolesError);
       throw rolesError;
     }
+
+    console.log('Found clinician roles:', userRoles?.length || 0);
 
     if (!userRoles || userRoles.length === 0) {
       // No clinicians found in this facility
@@ -62,8 +72,13 @@ export async function GET() {
     }));
 
     return NextResponse.json(users);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get users error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    // Return detailed error in development to help debug
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 }
