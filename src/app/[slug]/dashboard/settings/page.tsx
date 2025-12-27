@@ -323,6 +323,35 @@ export default function SettingsPage() {
     }
   };
 
+  const handleResendInvite = async (staffEmail: string) => {
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/settings/resend-clinician-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facility?.id,
+          email: staffEmail,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to resend invite');
+        return;
+      }
+
+      toast.success('Invite resent successfully');
+    } catch (error) {
+      console.error('Error resending invite:', error);
+      toast.error('Failed to resend invite');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleRemoveStaff = async (staffId: string) => {
     if (!confirm('Are you sure you want to remove this staff member?')) {
       return;
@@ -633,45 +662,59 @@ export default function SettingsPage() {
                     staffMembers.map((staff) => (
                       <div
                         key={staff.id}
-                        className="flex items-center justify-between p-4 bg-white border border-[#E0E0E0] rounded-lg"
+                        className="flex items-start justify-between p-4 bg-white border border-[#E0E0E0] rounded-lg"
                       >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="w-10 h-10 rounded-full bg-[#2D7A7A]/10 flex items-center justify-center">
+                        <div className="flex items-start gap-4 flex-1 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-[#2D7A7A]/10 flex items-center justify-center flex-shrink-0">
                             <User className="w-5 h-5 text-[#2D7A7A]" />
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{staff.name}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium truncate">{staff.name}</p>
                               {staff.email_confirmed_at ? (
-                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
                               ) : (
-                                <Clock className="w-4 h-4 text-yellow-600" />
+                                <Clock className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                               )}
                             </div>
-                            <div className="flex items-center gap-3 text-sm text-gray-600">
-                              <span className="flex items-center gap-1">
-                                <Mail className="w-3 h-3" />
-                                {staff.email}
-                              </span>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <Mail className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{staff.email}</span>
+                              </div>
                               {staff.job_role && (
-                                <span className="flex items-center gap-1">
-                                  <Briefcase className="w-3 h-3" />
-                                  {staff.job_role}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <Briefcase className="w-3 h-3 flex-shrink-0" />
+                                  <span>{staff.job_role}</span>
+                                </div>
                               )}
                             </div>
                           </div>
                         </div>
-                        {staff.id !== userProfile?.id && (
-                          <Button
-                            onClick={() => handleRemoveStaff(staff.id)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                          {!staff.email_confirmed_at && staff.id !== userProfile?.id && (
+                            <Button
+                              onClick={() => handleResendInvite(staff.email)}
+                              variant="outline"
+                              size="sm"
+                              disabled={isSaving}
+                              className="border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A] hover:text-white"
+                            >
+                              <Send className="w-4 h-4 mr-1" />
+                              Resend
+                            </Button>
+                          )}
+                          {staff.id !== userProfile?.id && (
+                            <Button
+                              onClick={() => handleRemoveStaff(staff.id)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
