@@ -155,7 +155,15 @@ export function FacilityManagement() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {facilities.map((facility) => (
-            <Card key={facility.id} className="p-6 hover:shadow-lg transition-shadow">
+            <Card
+              key={facility.id}
+              className="p-6 hover:shadow-lg transition-all cursor-pointer"
+              onClick={() => {
+                if (facility.coordinator_count > 0 && facility.coordinators_registered) {
+                  handleViewDetails(facility);
+                }
+              }}
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-10 h-10 bg-[#2D7A7A]/10 rounded-lg">
@@ -199,26 +207,15 @@ export function FacilityManagement() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                {facility.coordinator_count > 0 && facility.coordinators_registered ? (
-                  <Button
-                    onClick={() => handleViewDetails(facility)}
-                    variant="outline"
-                    className="flex-1 gap-2"
-                  >
-                    <Users className="h-4 w-4" />
-                    View Details
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => handleInvite(facility)}
-                    variant="outline"
-                    className="flex-1 gap-2"
-                  >
-                    <Mail className="h-4 w-4" />
-                    {facility.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
-                  </Button>
-                )}
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  onClick={() => handleInvite(facility)}
+                  variant="outline"
+                  className="flex-1 gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  {facility.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
+                </Button>
               </div>
             </Card>
           ))}
