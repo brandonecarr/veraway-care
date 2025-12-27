@@ -50,6 +50,7 @@ export default function OnboardingPage() {
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
   const [userId, setUserId] = useState('');
+  const [userRole, setUserRole] = useState<'coordinator' | 'clinician'>('coordinator');
   const [facility, setFacility] = useState<FacilityInfo | null>(null);
 
   // Step 1: Facility information
@@ -133,6 +134,25 @@ export default function OnboardingPage() {
           phone: facilityData.phone || '',
           email: facilityData.email || '',
         });
+      }
+
+      // Fetch user's role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role, job_role')
+        .eq('user_id', user.id)
+        .eq('facility_id', userData?.facility_id)
+        .single();
+
+      if (roleData?.role) {
+        setUserRole(roleData.role as 'coordinator' | 'clinician');
+        // Pre-fill job role for clinicians
+        if (roleData.role === 'clinician' && roleData.job_role) {
+          setCurrentClinician({
+            ...currentClinician,
+            job_role: roleData.job_role,
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching facility data:', error);
@@ -251,6 +271,41 @@ export default function OnboardingPage() {
     }
   };
 
+  // Clinician-specific: Confirm job role (Step 1 for clinicians)
+  const handleClinicianJobRoleSubmit = async () => {
+    if (!currentClinician.job_role) {
+      toast.error('Please select your job role');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const supabase = createClient();
+
+      // Update the user's job role in user_roles table
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ job_role: currentClinician.job_role })
+        .eq('user_id', userId)
+        .eq('facility_id', facility?.id);
+
+      if (error) {
+        console.error('Error updating job role:', error);
+        toast.error('Failed to update job role');
+        return;
+      }
+
+      toast.success('Job role confirmed');
+      setCurrentStep(2); // Move to password step (which is step 2 for clinicians)
+    } catch (error) {
+      console.error('Error updating job role:', error);
+      toast.error('Failed to update job role');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStep3Submit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -280,8 +335,10 @@ export default function OnboardingPage() {
 
       toast.success('Account setup complete! Redirecting to dashboard...');
 
+      // Redirect to facility-specific dashboard
+      const dashboardUrl = facility?.slug ? `/${facility.slug}/dashboard` : '/dashboard';
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push(dashboardUrl);
       }, 1500);
     } catch (error) {
       console.error('Error setting password:', error);
@@ -299,11 +356,19 @@ export default function OnboardingPage() {
     );
   }
 
-  const steps = [
+  // Different steps for coordinators vs clinicians
+  const coordinatorSteps = [
     { number: 1, title: 'Verify Facility', icon: Building2 },
     { number: 2, title: 'Invite Clinicians', icon: UserPlus },
     { number: 3, title: 'Set Password', icon: Lock },
   ];
+
+  const clinicianSteps = [
+    { number: 1, title: 'Confirm Job Role', icon: Briefcase },
+    { number: 2, title: 'Set Password', icon: Lock },
+  ];
+
+  const steps = userRole === 'clinician' ? clinicianSteps : coordinatorSteps;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5] p-4">
@@ -367,7 +432,7 @@ export default function OnboardingPage() {
             <div className="flex items-center gap-3 flex-1">
               <User className="w-5 h-5 text-[#2D7A7A]" />
               <div>
-                <p className="text-xs text-[#666]">Coordinator</p>
+                <p className="text-xs text-[#666]">{userRole === 'clinician' ? 'Clinician' : 'Coordinator'}</p>
                 <p className="font-medium text-[#1A1A1A]">{userName || userEmail}</p>
               </div>
             </div>
@@ -383,8 +448,8 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Step 1: Verify Facility Information */}
-        {currentStep === 1 && (
+        {/* Step 1: Verify Facility Information (Coordinators) OR Confirm Job Role (Clinicians) */}
+        {currentStep === 1 && userRole === 'coordinator' && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Verify Facility Information</h2>
@@ -491,8 +556,53 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 2: Invite Clinicians */}
-        {currentStep === 2 && (
+        {/* Step 1: Confirm Job Role (Clinicians) */}
+        {currentStep === 1 && userRole === 'clinician' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Confirm Your Job Role</h2>
+              <p className="text-sm text-[#666] mb-4">
+                Please confirm your job role to complete your profile
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="clinician_job_role">Job Role *</Label>
+                <Select
+                  value={currentClinician.job_role}
+                  onValueChange={(value) => setCurrentClinician({ ...currentClinician, job_role: value })}
+                >
+                  <SelectTrigger className="mt-1" id="clinician_job_role">
+                    <SelectValue placeholder="Select your job role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_ROLES.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-[#666] mt-2">
+                  This information helps us customize your experience
+                </p>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleClinicianJobRoleSubmit}
+              disabled={isSubmitting}
+              className="w-full bg-[#2D7A7A] hover:bg-[#236060]"
+            >
+              {isSubmitting ? 'Saving...' : 'Continue'}
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2: Invite Clinicians (Coordinators only) */}
+        {currentStep === 2 && userRole === 'coordinator' && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Invite Your Team</h2>
@@ -632,8 +742,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: Set Password */}
-        {currentStep === 3 && (
+        {/* Step 2/3: Set Password (Step 2 for clinicians, Step 3 for coordinators) */}
+        {((currentStep === 2 && userRole === 'clinician') || (currentStep === 3 && userRole === 'coordinator')) && (
           <form onSubmit={handleStep3Submit} className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Set Your Password</h2>
@@ -678,7 +788,7 @@ export default function OnboardingPage() {
             <div className="flex gap-3">
               <Button
                 type="button"
-                onClick={() => setCurrentStep(2)}
+                onClick={() => setCurrentStep(userRole === 'clinician' ? 1 : 2)}
                 variant="outline"
                 className="flex-1"
               >
