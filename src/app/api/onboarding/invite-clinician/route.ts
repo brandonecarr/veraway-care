@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
     if (userExists) {
       // User already exists
       userId = userExists.id;
-      userAlreadyRegistered = !!userExists.email_confirmed_at;
+      // Only consider user registered if they've actually signed in (set a password)
+      userAlreadyRegistered = !!userExists.last_sign_in_at;
 
       if (userAlreadyRegistered) {
         console.log('User already registered, adding to facility as clinician');
