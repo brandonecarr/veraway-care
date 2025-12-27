@@ -3,6 +3,7 @@
 import { encodedRedirect } from "@/utils/utils";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
+import { getUserFacilitySlug } from "@/lib/facility";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -86,7 +87,15 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
-  return redirect("/dashboard");
+  // Get the user's facility slug and redirect to facility-specific dashboard
+  const facilitySlug = await getUserFacilitySlug();
+
+  if (facilitySlug) {
+    return redirect(`/${facilitySlug}/dashboard`);
+  }
+
+  // Fallback to onboarding if no facility found
+  return redirect("/onboarding");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {

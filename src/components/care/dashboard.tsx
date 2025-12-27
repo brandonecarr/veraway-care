@@ -51,6 +51,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(5);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const openQuickReportModalRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
@@ -395,6 +396,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
               <IssuesByTypeChart
                 data={metrics.issuesByType || []}
                 onTypeClick={handleTypeFilterClick}
+                onAddIssue={() => openQuickReportModalRef.current?.()}
               />
             </div>
 
@@ -593,6 +595,9 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         userId={userId}
         onSuccess={() => {
           refreshIssues();
+        }}
+        onExternalTriggerSet={(trigger) => {
+          openQuickReportModalRef.current = trigger;
         }}
       />
 

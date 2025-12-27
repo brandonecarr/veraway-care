@@ -22,11 +22,20 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface QuickReportModalProps {
   userId: string;
   onSuccess?: (issue: any) => void;
+  externalTrigger?: () => void;
+  onExternalTriggerSet?: (trigger: () => void) => void;
 }
 
-export function QuickReportModal({ userId, onSuccess }: QuickReportModalProps) {
+export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: QuickReportModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
+
+  // Expose the setIsOpen function to parent components
+  useEffect(() => {
+    if (onExternalTriggerSet) {
+      onExternalTriggerSet(() => setIsOpen(true));
+    }
+  }, [onExternalTriggerSet]);
 
   const handleSuccess = (issue: any) => {
     setIsOpen(false);

@@ -21,6 +21,7 @@ import { UserCircle, Home, Users, FileText, Moon, Menu, X, BarChart3, Archive } 
 import { useRouter, usePathname } from 'next/navigation'
 import { NotificationCenter } from './care/notification-center'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useFacilityPath } from '@/hooks/use-facility-slug'
 
 export default function DashboardNavbar() {
   const supabase = createClient()
@@ -28,42 +29,46 @@ export default function DashboardNavbar() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const getPath = useFacilityPath()
 
   const navLinks = [
-    { href: '/dashboard', label: 'Dashboard', icon: Home },
-    { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/dashboard/patients', label: 'Patients', icon: Users },
-    { href: '/dashboard/archive', label: 'Archive', icon: Archive },
-    { href: '/dashboard/audit-log', label: 'Audit Log', icon: FileText },
-    { href: '/dashboard/handoffs', label: 'Handoffs', icon: Moon },
+    { path: '', label: 'Dashboard', icon: Home },
+    { path: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { path: 'patients', label: 'Patients', icon: Users },
+    { path: 'archive', label: 'Archive', icon: Archive },
+    { path: 'audit-log', label: 'Audit Log', icon: FileText },
+    { path: 'handoffs', label: 'Handoffs', icon: Moon },
   ]
 
-  const handleNavClick = (href: string) => {
+  const handleNavClick = (path: string) => {
     setMobileMenuOpen(false)
-    router.push(href)
+    router.push(getPath(path))
   }
 
   return (
     <nav className="w-full border-b border-[#D4D4D4] bg-white py-4 sticky top-0 z-40">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-4 md:gap-6">
-          <Link href="/dashboard" prefetch className="text-xl font-bold text-[#1A1A1A]">
+          <Link href={getPath('')} prefetch className="text-xl font-bold text-[#1A1A1A]">
             CareTrack
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-2">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} prefetch>
-                <Button
-                  variant="ghost"
-                  className={pathname === link.href ? 'bg-[#FAFAF8]' : ''}
-                >
-                  <link.icon className="h-4 w-4 mr-2" />
-                  {link.label}
-                </Button>
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const href = getPath(link.path);
+              return (
+                <Link key={link.path} href={href} prefetch>
+                  <Button
+                    variant="ghost"
+                    className={pathname === href ? 'bg-[#FAFAF8]' : ''}
+                  >
+                    <link.icon className="h-4 w-4 mr-2" />
+                    {link.label}
+                  </Button>
+                </Link>
+              );
+            })}
           </div>
         </div>
         
@@ -79,7 +84,7 @@ export default function DashboardNavbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+                <DropdownMenuItem onClick={() => router.push(getPath('settings'))}>
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={async () => {
@@ -104,22 +109,25 @@ export default function DashboardNavbar() {
                 <SheetTitle className="text-left">Menu</SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-2 mt-6">
-                {navLinks.map((link) => (
-                  <Button
-                    key={link.href}
-                    variant={pathname === link.href ? 'secondary' : 'ghost'}
-                    className="justify-start h-12 text-base"
-                    onClick={() => handleNavClick(link.href)}
-                  >
-                    <link.icon className="h-5 w-5 mr-3" />
-                    {link.label}
-                  </Button>
-                ))}
+                {navLinks.map((link) => {
+                  const href = getPath(link.path);
+                  return (
+                    <Button
+                      key={link.path}
+                      variant={pathname === href ? 'secondary' : 'ghost'}
+                      className="justify-start h-12 text-base"
+                      onClick={() => handleNavClick(link.path)}
+                    >
+                      <link.icon className="h-5 w-5 mr-3" />
+                      {link.label}
+                    </Button>
+                  );
+                })}
                 <div className="border-t border-[#D4D4D4] my-4" />
                 <Button
                   variant="ghost"
                   className="justify-start h-12 text-base"
-                  onClick={() => handleNavClick('/dashboard/settings')}
+                  onClick={() => handleNavClick('settings')}
                 >
                   <UserCircle className="h-5 w-5 mr-3" />
                   Settings

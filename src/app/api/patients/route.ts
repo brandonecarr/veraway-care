@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../supabase/server';
+import { getPatients } from '@/lib/care-coordination';
 import type { Patient } from '@/types/care-coordination';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -13,16 +14,26 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('patients')
-      .select('*')
-      .order('last_name', { ascending: true });
+    const { searchParams } = new URL(request.url);
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
+    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : undefined;
+    const status = searchParams.get('status') || undefined;
 
-    if (error) throw error;
-    return NextResponse.json(data || []);
+    const filters: any = {};
+    if (limit) filters.limit = limit;
+    if (offset !== undefined) filters.offset = offset;
+    if (status) filters.status = status;
+
+    const result = await getPatients(filters);
+
+    // Return both data and count for pagination
+    return NextResponse.json({
+      data: result.data || [],
+      count: result.count || 0
+    });
   } catch (error) {
     console.error('Get patients error:', error);
-    return NextResponse.json([]);
+    return NextResponse.json({ data: [], count: 0 });
   }
 }
 
@@ -76,9 +87,18 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: 201 });
   } catch (error: any) {
     console.error('Create patient error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
     if (error.code === '23505') {
       return NextResponse.json({ error: 'Patient with this MRN already exists' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: error.message
+    }, { status: 500 });
   }
 }

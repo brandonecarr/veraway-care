@@ -498,40 +498,6 @@ export function IssueDetailPanel({
               </>
             )}
 
-            {/* Assignment */}
-            {canAssign && currentStatus !== 'resolved' && (
-              <>
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <UserCircle className="w-4 h-4" />
-                    Reassign Issue
-                  </h3>
-                  <div className="flex gap-2">
-                    <Select value={selectedUser} onValueChange={setSelectedUser}>
-                      <SelectTrigger className="flex-1 border-[#D4D4D4]">
-                        <SelectValue placeholder="Select user..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name || user.email?.split('@')[0] || 'Unknown'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      onClick={handleAssign} 
-                      disabled={!selectedUser}
-                      className="bg-[#2D7A7A] hover:bg-[#236060]"
-                    >
-                      Assign
-                    </Button>
-                  </div>
-                </div>
-                <Separator />
-              </>
-            )}
-
             {/* Messages */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -607,7 +573,38 @@ export function IssueDetailPanel({
 
         <Separator />
 
-        <div className="p-6 pt-4">
+        <div className="p-6 pt-4 space-y-4">
+          {/* Assignment */}
+          {canAssign && currentStatus !== 'resolved' && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <UserCircle className="w-4 h-4" />
+                Assign Issue
+              </h3>
+              <div className="flex gap-2">
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger className="flex-1 border-[#D4D4D4]">
+                    <SelectValue placeholder="Select clinician..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email?.split('@')[0] || 'Unknown'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAssign}
+                  disabled={!selectedUser}
+                  className="bg-[#2D7A7A] hover:bg-[#236060]"
+                >
+                  Assign
+                </Button>
+              </div>
+            </div>
+          )}
+
           {canResolve && currentStatus !== 'resolved' && (
             <div className="flex gap-3">
               {/* Status Toggle Button */}
