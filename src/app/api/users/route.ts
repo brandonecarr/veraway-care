@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '../../../../supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -14,28 +13,38 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Use service role key for admin operations
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Get the current user's facility_id
+    const { data: currentUserData } = await serverSupabase
+      .from('users')
+      .select('facility_id')
+      .eq('id', user.id)
+      .single();
 
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+    if (!currentUserData?.facility_id) {
+      return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
+    }
+
+    // Get all clinicians from the same facility
+    const { data: clinicians, error } = await serverSupabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        name,
+        user_roles!inner(role)
+      `)
+      .eq('facility_id', currentUserData.facility_id)
+      .eq('user_roles.role', 'clinician');
 
     if (error) {
       throw error;
     }
 
-    const users = data.users.map(u => ({
+    // Format the response
+    const users = (clinicians || []).map((u: any) => ({
       id: u.id,
       email: u.email,
-      name: u.user_metadata?.name || u.email?.split('@')[0]
+      name: u.name || u.email?.split('@')[0]
     }));
 
     return NextResponse.json(users);
