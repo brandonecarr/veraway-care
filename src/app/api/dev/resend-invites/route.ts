@@ -68,12 +68,12 @@ export async function POST(request: Request) {
     const results = await Promise.all(
       users.map(async (user) => {
         try {
-          // First, check if user has already registered (email confirmed)
+          // First, check if user has already registered (actually signed in with password)
           const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
           const authUser = authUsers.users.find(u => u.email === user.email);
 
-          if (authUser && authUser.email_confirmed_at) {
-            // User already registered, skip invite
+          if (authUser && authUser.last_sign_in_at) {
+            // User already registered (completed onboarding), skip invite
             return {
               email: user.email,
               success: false,
@@ -83,8 +83,15 @@ export async function POST(request: Request) {
           }
 
           // Resend the invite - this will expire old tokens and generate new ones
+          const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL
+            ? `${process.env.NEXT_PUBLIC_SITE_URL}/invite`
+            : 'https://www.verawaycare.com/invite';
+
           const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-            user.email
+            user.email,
+            {
+              redirectTo: redirectUrl,
+            }
           );
 
           if (inviteError) {
