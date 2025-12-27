@@ -28,29 +28,25 @@ export async function GET(request: NextRequest) {
       .rpc('get_response_time_trends', {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
-      })
-      .select('*');
+      });
 
     // 2. Resolution Velocity
     const { data: resolutionVelocity } = await supabase
       .rpc('get_resolution_velocity', {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
-      })
-      .select('*');
+      });
 
     // 3. Clinician Workload
     const { data: clinicianWorkload } = await supabase
-      .rpc('get_clinician_workload')
-      .select('*');
+      .rpc('get_clinician_workload');
 
     // 4. Issue Type Distribution Over Time
     const { data: issueTypeDistribution } = await supabase
       .rpc('get_issue_type_distribution', {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
-      })
-      .select('*');
+      });
 
     return NextResponse.json({
       responseTimeTrends: responseTimeTrends || [],
