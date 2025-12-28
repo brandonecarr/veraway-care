@@ -130,20 +130,19 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
       <div
         key={issue.id}
         className={cn(
-          'flex items-start gap-3 p-3 rounded-lg bg-white border border-[#D4D4D4] transition-all',
+          'flex items-center gap-3 p-3 rounded-lg bg-white border border-[#D4D4D4] transition-all',
           selectedIssueIds.includes(issue.id) && 'ring-2 ring-[#2D7A7A] ring-offset-1'
         )}
       >
         <Checkbox
           checked={selectedIssueIds.includes(issue.id)}
           onCheckedChange={() => toggleIssue(issue.id)}
-          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-xs text-muted-foreground">
-              #{issue.issue_number}
-            </span>
+          <p className="text-sm font-medium truncate">
+            {issue.patient?.first_name} {issue.patient?.last_name}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
             <Badge variant="secondary" className="text-xs">
               {issue.issue_type}
             </Badge>
@@ -154,14 +153,6 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
               </Badge>
             )}
           </div>
-          <p className="text-sm font-medium mt-1 truncate">
-            {issue.patient?.first_name} {issue.patient?.last_name}
-          </p>
-          {issue.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-              {issue.description}
-            </p>
-          )}
         </div>
       </div>
     );

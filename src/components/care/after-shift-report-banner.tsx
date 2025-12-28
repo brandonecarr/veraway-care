@@ -97,13 +97,13 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
       <div
         key={issue.id}
         onClick={() => onIssueClick?.(issue)}
-        className="flex items-center justify-between p-4 rounded-lg bg-white border-2 border-[#D4D4D4] transition-all cursor-pointer hover:shadow-lg hover:scale-[1.02]"
+        className="flex items-center justify-between p-3 rounded-lg bg-white border-2 border-[#D4D4D4] transition-all cursor-pointer hover:shadow-lg hover:scale-[1.02]"
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-muted-foreground">
-              #{issue.issue_number}
-            </span>
+          <p className="text-sm font-medium truncate">
+            {issue.patient?.first_name} {issue.patient?.last_name}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
             <Badge variant="secondary" className="text-xs">
               {issue.issue_type}
             </Badge>
@@ -111,9 +111,6 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
               <AlertCircle className="w-3 h-3 text-[#E07A5F]" />
             )}
           </div>
-          <p className="text-sm font-medium mt-1">
-            {issue.patient?.first_name} {issue.patient?.last_name}
-          </p>
         </div>
         <Badge variant="outline" className="text-xs capitalize">
           {issue.status.replace('_', ' ')}

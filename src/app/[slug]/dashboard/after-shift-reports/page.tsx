@@ -146,18 +146,18 @@ export default function AfterShiftReportsPage() {
     return (
       <Card
         key={issue.id}
-        className="p-4 cursor-pointer hover:shadow-md transition-all"
+        className="p-3 cursor-pointer hover:shadow-md transition-all"
         onClick={() => {
           setSelectedIssue(issue);
           setIsDetailPanelOpen(true);
         }}
       >
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="font-mono text-xs text-muted-foreground">
-                #{issue.issue_number}
-              </span>
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {issue.patient?.first_name} {issue.patient?.last_name}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
               <Badge variant="secondary" className="text-xs">
                 {issue.issue_type}
               </Badge>
@@ -171,14 +171,6 @@ export default function AfterShiftReportsPage() {
                 {issue.status.replace('_', ' ')}
               </Badge>
             </div>
-            <p className="text-sm font-medium">
-              {issue.patient?.first_name} {issue.patient?.last_name}
-            </p>
-            {issue.description && (
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                {issue.description}
-              </p>
-            )}
           </div>
         </div>
       </Card>
