@@ -29,23 +29,17 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Fetch coordinator roles
+    // Fetch coordinator roles WITH user data using Supabase join
+    // This avoids the pagination issue by only fetching coordinator users
     const { data: coordinators } = await supabase
       .from('user_roles')
-      .select('facility_id, user_id')
+      .select('facility_id, user_id, users(id, email, name)')
       .eq('role', 'coordinator');
 
-    // Fetch users
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, email, name');
-
-    // Get all auth users to check registration status
-    const { data: authData } = await supabase.auth.admin.listUsers();
+    // Get auth users for coordinators only to check registration status
+    const coordinatorUserIds = coordinators?.map(c => c.user_id) || [];
+    const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
     const authUsers = authData?.users || [];
-
-    // Create user map
-    const userMap = new Map(users?.map(u => [u.id, { email: u.email, name: u.name }]) || []);
 
     // Map coordinator data to facilities
     const coordinatorMap = new Map<string, {
@@ -57,7 +51,8 @@ export async function GET() {
 
     coordinators?.forEach(coord => {
       const facilityId = coord.facility_id;
-      const userInfo = userMap.get(coord.user_id);
+      // Handle both array and object response formats from Supabase join
+      const userInfo = Array.isArray(coord.users) ? coord.users[0] : coord.users;
 
       if (!coordinatorMap.has(facilityId)) {
         coordinatorMap.set(facilityId, {
