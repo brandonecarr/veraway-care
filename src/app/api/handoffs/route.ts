@@ -83,7 +83,14 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Handoffs insert error:', error);
+      return NextResponse.json({
+        error: 'Failed to insert handoff',
+        details: error.message,
+        code: error.code
+      }, { status: 500 });
+    }
 
     // Create audit log entries for each tagged issue (non-blocking)
     if (tagged_issues && tagged_issues.length > 0) {
@@ -142,8 +149,12 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create after shift report error:', error);
-    return NextResponse.json({ error: 'Failed to create after shift report' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to create after shift report',
+      details: error?.message || String(error),
+      code: error?.code
+    }, { status: 500 });
   }
 }
