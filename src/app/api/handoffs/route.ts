@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../supabase/server';
+import { sendPushNotificationToMultipleUsers } from '@/lib/push-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,20 +60,27 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { shift_start, shift_end, notes, tagged_issues } = body;
+    const { notes, tagged_issues } = body;
 
-    if (!shift_start || !shift_end) {
-      return NextResponse.json({ error: 'Shift start and end are required' }, { status: 400 });
+    // Get the current user's facility
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('facility_id, name, email')
+      .eq('id', user.id)
+      .single();
+
+    if (!currentUser?.facility_id) {
+      return NextResponse.json({ error: 'User facility not found' }, { status: 400 });
     }
 
     const { data, error } = await supabase
       .from('handoffs')
       .insert({
         created_by: user.id,
-        shift_start,
-        shift_end,
+        facility_id: currentUser.facility_id,
         notes,
-        tagged_issues
+        tagged_issues,
+        is_active: true
       })
       .select()
       .single();
@@ -84,11 +92,9 @@ export async function POST(request: Request) {
       const auditEntries = tagged_issues.map((issueId: string) => ({
         issue_id: issueId,
         user_id: user.id,
-        action: 'handoff_created',
+        action: 'after_shift_report_created',
         details: {
           handoff_id: data.id,
-          shift_start,
-          shift_end,
           tagged_count: tagged_issues.length
         }
       }));
@@ -96,9 +102,42 @@ export async function POST(request: Request) {
       await supabase.from('issue_audit_log').insert(auditEntries);
     }
 
+    // Get all users in the same facility for notifications
+    const { data: facilityUsers } = await supabase
+      .from('users')
+      .select('id')
+      .eq('facility_id', currentUser.facility_id)
+      .neq('id', user.id); // Don't notify the creator
+
+    if (facilityUsers && facilityUsers.length > 0) {
+      const creatorName = currentUser.name || currentUser.email?.split('@')[0] || 'A team member';
+      const issueCount = tagged_issues?.length || 0;
+
+      // Create in-app notifications for all facility staff
+      const notifications = facilityUsers.map((u: { id: string }) => ({
+        user_id: u.id,
+        type: 'handoff',
+        title: 'New After Shift Report',
+        message: `${creatorName} has submitted a new After Shift Report with ${issueCount} tagged issue${issueCount !== 1 ? 's' : ''}`,
+        related_handoff_id: data.id,
+        metadata: { push_priority: 'normal' }
+      }));
+
+      await supabase.from('notifications').insert(notifications);
+
+      // Send push notifications to all facility users
+      const userIds = facilityUsers.map((u: { id: string }) => u.id);
+      await sendPushNotificationToMultipleUsers(userIds, {
+        title: 'New After Shift Report',
+        body: `${issueCount} issue${issueCount !== 1 ? 's' : ''} require${issueCount === 1 ? 's' : ''} attention`,
+        url: '/dashboard/after-shift-reports',
+        tag: 'after-shift-report'
+      });
+    }
+
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Create handoff error:', error);
-    return NextResponse.json({ error: 'Failed to create handoff' }, { status: 500 });
+    console.error('Create after shift report error:', error);
+    return NextResponse.json({ error: 'Failed to create after shift report' }, { status: 500 });
   }
 }

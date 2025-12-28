@@ -10,8 +10,8 @@ import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
 import { CommunicationPanel } from './communication-panel';
 import { MobileCommunicationSheet } from './mobile-communication-sheet';
-import { HandoffModal } from './handoff-modal';
-import { HandoffBanner } from './handoff-banner';
+import { AfterShiftReportModal } from './after-shift-report-modal';
+import { AfterShiftReportBanner } from './after-shift-report-banner';
 import { ClinicianResponsiveness } from './clinician-responsiveness';
 import { ReportGenerator } from './report-generator';
 import { IssuesByTypeChart } from './issues-by-type-chart';
@@ -256,14 +256,14 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
           </div>
           <div className="flex items-center gap-3">
             {userRole === 'coordinator' && (
-              <HandoffModal issues={issues} onSuccess={refreshIssues} />
+              <AfterShiftReportModal issues={issues} onSuccess={refreshIssues} />
             )}
           </div>
         </div>
 
-        {/* After-Hours Handoff Banner */}
+        {/* After Shift Report Banner */}
         {(userRole === 'after_hours' || userRole === 'coordinator') && (
-          <HandoffBanner 
+          <AfterShiftReportBanner
             onIssueClick={(issue) => {
               setSelectedIssue(issue);
               setIsDetailPanelOpen(true);

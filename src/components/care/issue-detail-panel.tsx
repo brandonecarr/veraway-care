@@ -73,6 +73,14 @@ export function IssueDetailPanel({
     setLocalStatus(null);
   }, [issue?.id, issue?.status]);
 
+  // Clear form fields when the sheet closes
+  useEffect(() => {
+    if (!open) {
+      setUpdateNote('');
+      setNewMessage('');
+    }
+  }, [open]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };

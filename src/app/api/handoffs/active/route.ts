@@ -12,14 +12,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const now = new Date().toISOString();
-
-    // Get the most recent handoff that covers the current time
+    // Get the most recent active (non-archived) after shift report
     const { data: handoff, error } = await supabase
       .from('handoffs')
       .select('*')
-      .lte('shift_start', now)
-      .gte('shift_end', now)
+      .eq('is_archived', false)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();

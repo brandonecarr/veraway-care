@@ -16,7 +16,7 @@ const navItems: NavItem[] = [
   { path: 'patients', icon: Users, label: 'Patients' },
   { path: 'archive', icon: Archive, label: 'Archive' },
   { path: 'audit-log', icon: FileText, label: 'Audit' },
-  { path: 'handoffs', icon: Moon, label: 'Handoffs' },
+  { path: 'after-shift-reports', icon: FileText, label: 'Reports' },
 ];
 
 export function MobileBottomNav() {

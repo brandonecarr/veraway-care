@@ -254,9 +254,9 @@ export function NotificationPreferences() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="handoff">Handoffs</Label>
+                <Label htmlFor="handoff">After Shift Reports</Label>
                 <p className="text-metadata text-muted-foreground">
-                  When a new handoff is created for your shift
+                  When a new shift report is submitted
                 </p>
               </div>
               <Switch

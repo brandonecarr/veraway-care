@@ -58,14 +58,18 @@ export interface AuditLogEntry {
 export interface Handoff {
   id: string;
   created_by: string;
-  shift_start: string;
-  shift_end: string;
+  shift_start?: string;
+  shift_end?: string;
   notes?: string;
   tagged_issues?: string[];
   created_at: string;
   is_archived?: boolean;
+  is_active?: boolean;
   creator?: { id: string; email?: string; name?: string };
 }
+
+// Alias for new naming convention
+export type AfterShiftReport = Handoff;
 
 export interface DashboardMetrics {
   totalIssues: number;

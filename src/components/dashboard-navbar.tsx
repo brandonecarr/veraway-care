@@ -37,7 +37,7 @@ export default function DashboardNavbar() {
     { path: 'patients', label: 'Patients', icon: Users },
     { path: 'archive', label: 'Archive', icon: Archive },
     { path: 'audit-log', label: 'Audit Log', icon: FileText },
-    { path: 'handoffs', label: 'Handoffs', icon: Moon },
+    { path: 'after-shift-reports', label: 'Shift Reports', icon: FileText },
   ]
 
   const handleNavClick = (path: string) => {
