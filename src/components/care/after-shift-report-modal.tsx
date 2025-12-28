@@ -187,9 +187,9 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 space-y-4">
+        <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
           {/* Notes */}
-          <div className="space-y-2">
+          <div className="space-y-2 shrink-0">
             <label className="text-sm font-medium">Report Notes</label>
             <Textarea
               value={notes}
@@ -201,15 +201,15 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
           </div>
 
           {/* Tag Issues */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between mb-2 shrink-0">
               <label className="text-sm font-medium">Tag Issues for Follow-up</label>
               <Badge variant="outline" className="text-xs">
                 {selectedIssueIds.length} selected
               </Badge>
             </div>
 
-            <ScrollArea className="h-[350px] rounded-md border border-[#D4D4D4]">
+            <ScrollArea className="flex-1 rounded-md border border-[#D4D4D4]">
               <div className="p-3 space-y-4">
                 {activeIssues.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
@@ -263,7 +263,7 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 pt-4 border-t">
+        <div className="flex justify-end gap-3 pt-4 border-t shrink-0">
           <Button
             variant="outline"
             onClick={() => setOpen(false)}
