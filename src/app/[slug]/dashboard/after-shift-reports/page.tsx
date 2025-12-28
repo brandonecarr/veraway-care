@@ -154,24 +154,29 @@ export default function AfterShiftReportsPage() {
       >
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {issue.patient?.first_name} {issue.patient?.last_name}
-            </p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary" className="text-xs">
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-medium truncate">
+                {issue.patient?.first_name} {issue.patient?.last_name}
+              </p>
+              <Badge variant="secondary" className="text-xs shrink-0">
                 {issue.issue_type}
               </Badge>
               {overdue && (
-                <Badge variant="outline" className="text-xs bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]">
+                <Badge variant="outline" className="text-xs bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F] shrink-0">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   Overdue
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs capitalize">
-                {issue.status.replace('_', ' ')}
-              </Badge>
             </div>
+            {issue.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                {issue.description}
+              </p>
+            )}
           </div>
+          <Badge variant="outline" className="text-xs capitalize ml-3 shrink-0">
+            {issue.status.replace('_', ' ')}
+          </Badge>
         </div>
       </Card>
     );

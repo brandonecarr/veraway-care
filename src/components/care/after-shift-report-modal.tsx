@@ -130,29 +130,35 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
       <div
         key={issue.id}
         className={cn(
-          'flex items-center gap-3 p-3 rounded-lg bg-white border border-[#D4D4D4] transition-all',
+          'flex items-start gap-3 p-3 rounded-lg bg-white border border-[#D4D4D4] transition-all',
           selectedIssueIds.includes(issue.id) && 'ring-2 ring-[#2D7A7A] ring-offset-1'
         )}
       >
         <Checkbox
           checked={selectedIssueIds.includes(issue.id)}
           onCheckedChange={() => toggleIssue(issue.id)}
+          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {issue.patient?.first_name} {issue.patient?.last_name}
-          </p>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="text-xs">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium truncate">
+              {issue.patient?.first_name} {issue.patient?.last_name}
+            </p>
+            <Badge variant="secondary" className="text-xs shrink-0">
               {issue.issue_type}
             </Badge>
             {overdue && (
-              <Badge variant="outline" className="text-xs bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]">
+              <Badge variant="outline" className="text-xs bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F] shrink-0">
                 <AlertCircle className="w-3 h-3 mr-1" />
                 Overdue
               </Badge>
             )}
           </div>
+          {issue.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+              {issue.description}
+            </p>
+          )}
         </div>
       </div>
     );
