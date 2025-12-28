@@ -25,7 +25,7 @@ interface AfterShiftReportBannerProps {
 export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftReportBannerProps) {
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   const [taggedIssues, setTaggedIssues] = useState<Issue[]>([]);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
