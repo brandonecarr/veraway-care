@@ -22,6 +22,8 @@ interface AfterShiftReportBannerProps {
   onIssueClick?: (issue: Issue) => void;
 }
 
+const DISMISSED_REPORT_KEY = 'dismissed-after-shift-report-id';
+
 export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftReportBannerProps) {
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   const [taggedIssues, setTaggedIssues] = useState<Issue[]>([]);
@@ -39,7 +41,12 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
       const response = await fetch('/api/handoffs/active');
       if (response.ok) {
         const data = await response.json();
-        if (data) {
+        if (data?.handoff) {
+          // Check if this specific report was dismissed
+          const dismissedId = localStorage.getItem(DISMISSED_REPORT_KEY);
+          if (dismissedId === data.handoff.id) {
+            setIsDismissed(true);
+          }
           setHandoff(data.handoff);
           setTaggedIssues(data.taggedIssues || []);
         }
@@ -53,6 +60,13 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDismiss = () => {
+    if (handoff) {
+      localStorage.setItem(DISMISSED_REPORT_KEY, handoff.id);
+    }
+    setIsDismissed(true);
   };
 
   // Sort issues by priority
@@ -159,7 +173,7 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
             className="h-8 w-8"
             onClick={(e) => {
               e.stopPropagation();
-              setIsDismissed(true);
+              handleDismiss();
             }}
           >
             <X className="w-4 h-4" />
