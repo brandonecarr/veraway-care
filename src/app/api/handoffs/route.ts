@@ -79,8 +79,7 @@ export async function POST(request: Request) {
         created_by: user.id,
         facility_id: currentUser.facility_id,
         notes,
-        tagged_issues,
-        is_active: true
+        tagged_issues
       })
       .select()
       .single();

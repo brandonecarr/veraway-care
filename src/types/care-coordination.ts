@@ -64,7 +64,6 @@ export interface Handoff {
   tagged_issues?: string[];
   created_at: string;
   is_archived?: boolean;
-  is_active?: boolean;
   creator?: { id: string; email?: string; name?: string };
 }
 
