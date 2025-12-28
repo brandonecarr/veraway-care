@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   FileText,
   X,
@@ -212,7 +211,7 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
                   Click to view details
                 </Badge>
               </div>
-              <ScrollArea className="max-h-[350px]">
+              <div className="max-h-[350px] overflow-y-auto">
                 <div className="space-y-4">
                   {/* Urgent Issues */}
                   {sortedIssues.urgent.length > 0 && (
@@ -252,7 +251,7 @@ export function AfterShiftReportBanner({ className, onIssueClick }: AfterShiftRe
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           )}
         </div>
