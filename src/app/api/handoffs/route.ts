@@ -77,7 +77,6 @@ export async function POST(request: Request) {
       .from('handoffs')
       .insert({
         created_by: user.id,
-        facility_id: currentUser.facility_id,
         notes,
         tagged_issues
       })
@@ -86,52 +85,60 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Create audit log entries for each tagged issue
+    // Create audit log entries for each tagged issue (non-blocking)
     if (tagged_issues && tagged_issues.length > 0) {
-      const auditEntries = tagged_issues.map((issueId: string) => ({
-        issue_id: issueId,
-        user_id: user.id,
-        action: 'after_shift_report_created',
-        details: {
-          handoff_id: data.id,
-          tagged_count: tagged_issues.length
-        }
-      }));
+      try {
+        const auditEntries = tagged_issues.map((issueId: string) => ({
+          issue_id: issueId,
+          user_id: user.id,
+          action: 'after_shift_report_created',
+          details: {
+            handoff_id: data.id,
+            tagged_count: tagged_issues.length
+          }
+        }));
 
-      await supabase.from('issue_audit_log').insert(auditEntries);
+        await supabase.from('issue_audit_log').insert(auditEntries);
+      } catch (auditError) {
+        console.error('Failed to create audit log entries:', auditError);
+      }
     }
 
-    // Get all users in the same facility for notifications
-    const { data: facilityUsers } = await supabase
-      .from('users')
-      .select('id')
-      .eq('facility_id', currentUser.facility_id)
-      .neq('id', user.id); // Don't notify the creator
+    // Get all users in the same facility for notifications (non-blocking)
+    try {
+      const { data: facilityUsers } = await supabase
+        .from('users')
+        .select('id')
+        .eq('facility_id', currentUser.facility_id)
+        .neq('id', user.id); // Don't notify the creator
 
-    if (facilityUsers && facilityUsers.length > 0) {
-      const creatorName = currentUser.name || currentUser.email?.split('@')[0] || 'A team member';
-      const issueCount = tagged_issues?.length || 0;
+      if (facilityUsers && facilityUsers.length > 0) {
+        const creatorName = currentUser.name || currentUser.email?.split('@')[0] || 'A team member';
+        const issueCount = tagged_issues?.length || 0;
 
-      // Create in-app notifications for all facility staff
-      const notifications = facilityUsers.map((u: { id: string }) => ({
-        user_id: u.id,
-        type: 'handoff',
-        title: 'New After Shift Report',
-        message: `${creatorName} has submitted a new After Shift Report with ${issueCount} tagged issue${issueCount !== 1 ? 's' : ''}`,
-        related_handoff_id: data.id,
-        metadata: { push_priority: 'normal' }
-      }));
+        // Create in-app notifications for all facility staff
+        const notifications = facilityUsers.map((u: { id: string }) => ({
+          user_id: u.id,
+          type: 'handoff',
+          title: 'New After Shift Report',
+          message: `${creatorName} has submitted a new After Shift Report with ${issueCount} tagged issue${issueCount !== 1 ? 's' : ''}`,
+          related_handoff_id: data.id,
+          metadata: { push_priority: 'normal' }
+        }));
 
-      await supabase.from('notifications').insert(notifications);
+        await supabase.from('notifications').insert(notifications);
 
-      // Send push notifications to all facility users
-      const userIds = facilityUsers.map((u: { id: string }) => u.id);
-      await sendPushNotificationToMultipleUsers(userIds, {
-        title: 'New After Shift Report',
-        body: `${issueCount} issue${issueCount !== 1 ? 's' : ''} require${issueCount === 1 ? 's' : ''} attention`,
-        url: '/dashboard/after-shift-reports',
-        tag: 'after-shift-report'
-      });
+        // Send push notifications to all facility users
+        const userIds = facilityUsers.map((u: { id: string }) => u.id);
+        await sendPushNotificationToMultipleUsers(userIds, {
+          title: 'New After Shift Report',
+          body: `${issueCount} issue${issueCount !== 1 ? 's' : ''} require${issueCount === 1 ? 's' : ''} attention`,
+          url: '/dashboard/after-shift-reports',
+          tag: 'after-shift-report'
+        });
+      }
+    } catch (notifyError) {
+      console.error('Failed to send notifications:', notifyError);
     }
 
     return NextResponse.json(data);
