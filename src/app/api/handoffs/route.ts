@@ -73,12 +73,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User facility not found' }, { status: 400 });
     }
 
+    // Use current time as default for shift_start/shift_end (required by DB constraint)
+    const now = new Date().toISOString();
+
     const { data, error } = await supabase
       .from('handoffs')
       .insert({
         created_by: user.id,
         notes,
-        tagged_issues
+        tagged_issues,
+        shift_start: now,
+        shift_end: now
       })
       .select()
       .single();
