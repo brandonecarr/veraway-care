@@ -14,7 +14,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   FileText,
   Send,
@@ -209,7 +208,7 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
               </Badge>
             </div>
 
-            <ScrollArea className="flex-1 rounded-md border border-[#D4D4D4]">
+            <div className="flex-1 min-h-0 overflow-y-auto rounded-md border border-[#D4D4D4]">
               <div className="p-3 space-y-4">
                 {activeIssues.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
@@ -258,7 +257,7 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
                   </>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </div>
 
