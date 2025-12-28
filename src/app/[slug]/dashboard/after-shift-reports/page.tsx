@@ -84,6 +84,12 @@ export default function AfterShiftReportsPage() {
       );
 
       setHandoffs(handoffsWithIssues);
+
+      // Auto-expand the first active (non-archived) report
+      const firstActive = handoffsWithIssues.find(h => !h.is_archived);
+      if (firstActive) {
+        setExpandedId(firstActive.id);
+      }
     } catch (error) {
       setHandoffs([]);
     } finally {
