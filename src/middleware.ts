@@ -69,12 +69,20 @@ export async function middleware(request: NextRequest) {
 
     // If user is accessing /dashboard without a slug, redirect to facility-specific URL
     if (pathname.startsWith('/dashboard')) {
-      // Get user's facility slug
+      // Get user's facility slug and role
       const { data: userData } = await supabase
         .from('users')
-        .select('facility_id, facilities(slug)')
+        .select('facility_id, facilities(slug), user_roles(role)')
         .eq('id', user.id)
         .single();
+
+      // Check if user is an admin - admins don't need facility onboarding
+      const userRoles = userData?.user_roles as { role: string }[] | { role: string } | undefined;
+      const userRole = Array.isArray(userRoles) ? userRoles[0]?.role : userRoles?.role;
+      if (userRole === 'admin') {
+        // Admins can access dev-dashboard instead
+        return NextResponse.redirect(new URL('/dev-dashboard', request.url));
+      }
 
       if (userData?.facilities) {
         const facility = Array.isArray(userData.facilities)
