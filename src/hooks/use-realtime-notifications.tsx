@@ -9,10 +9,12 @@ interface Notification {
   user_id: string;
   issue_id: string;
   type: string;
+  title?: string;
   message: string;
   read: boolean;
   created_at: string;
   issue?: any;
+  related_issue_id?: string;
   metadata?: any;
 }
 
