@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '../../supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 interface Notification {
   id: string;
@@ -11,10 +12,11 @@ interface Notification {
   type: string;
   title?: string;
   message: string;
-  read: boolean;
+  is_read: boolean;
   created_at: string;
   issue?: any;
   related_issue_id?: string;
+  related_patient_id?: string;
   metadata?: any;
 }
 
@@ -66,7 +68,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
       if (response.ok) {
         setNotifications(prev =>
           prev.map(notif =>
-            notif.id === notificationId ? { ...notif, read: true } : notif
+            notif.id === notificationId ? { ...notif, is_read: true } : notif
           )
         );
       }
@@ -82,7 +84,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
       });
       if (response.ok) {
         setNotifications(prev =>
-          prev.map(notif => ({ ...notif, read: true }))
+          prev.map(notif => ({ ...notif, is_read: true }))
         );
       }
     } catch (error) {
@@ -120,13 +122,22 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
             (payload: any) => {
               if (!isMounted) return;
 
+              console.log('[Realtime Notifications] Event received:', payload.eventType, payload);
+
               if (payload.eventType === 'INSERT') {
+                const newNotif = payload.new as Notification;
+
+                // Show toast notification for new notification
+                toast.info(newNotif.title || 'New Notification', {
+                  description: newNotif.message,
+                  duration: 5000,
+                });
+
                 setNotifications((prev) => {
-                  if (prev.some(notif => notif.id === payload.new.id)) {
+                  if (prev.some(notif => notif.id === newNotif.id)) {
                     return prev;
                   }
-                  
-                  const newNotif = payload.new as Notification;
+
                   if (newNotif.metadata?.push_queued && !newNotif.metadata?.push_sent) {
                     fetch('/api/push/send', {
                       method: 'POST',
@@ -134,7 +145,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
                       body: JSON.stringify({ notificationId: newNotif.id }),
                     }).catch(() => {});
                   }
-                  
+
                   return [newNotif, ...prev];
                 });
               } else if (payload.eventType === 'UPDATE') {
@@ -150,9 +161,12 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
           )
           .subscribe((status: string) => {
             if (!isMounted) return;
-            
+
+            console.log('[Realtime Notifications] Subscription status:', status);
+
             if (status === 'SUBSCRIBED') {
               setIsConnected(true);
+              console.log('[Realtime Notifications] Successfully subscribed to channel');
             } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               // Retry connection after a delay
               if (retryTimeoutRef.current) {
@@ -188,7 +202,7 @@ export function useRealtimeNotifications(userId: string | null): UseRealtimeNoti
     };
   }, [userId, fetchNotifications]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return {
     notifications,

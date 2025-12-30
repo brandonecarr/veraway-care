@@ -44,7 +44,7 @@ export function NotificationCenter() {
   } = useRealtimeNotifications(userId);
 
   const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
+    if (!notification.is_read) {
       markAsRead(notification.id);
     }
 
@@ -148,7 +148,7 @@ export function NotificationCenter() {
                     p-4 rounded-lg border cursor-pointer transition-all duration-200
                     hover:shadow-card-hover hover:border-brand-teal touch-manipulation
                     ${
-                      !notification.read
+                      !notification.is_read
                         ? 'bg-brand-teal/5 border-l-4 border-l-brand-teal'
                         : 'bg-white hover:bg-muted/30'
                     }
@@ -164,7 +164,7 @@ export function NotificationCenter() {
                         <h4 className="font-medium text-body text-brand-charcoal">
                           {notification.title || notification.type?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Notification'}
                         </h4>
-                        {!notification.read && (
+                        {!notification.is_read && (
                           <Button
                             variant="ghost"
                             size="icon"
