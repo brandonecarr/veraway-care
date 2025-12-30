@@ -99,12 +99,18 @@ export function ConversationListItem({
   };
 
   const unreadCount = conversation.unread_count || 0;
+  const hasUnread = unreadCount > 0;
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full p-3 flex items-start gap-3 text-left transition-colors hover:bg-[#FAFAF8]',
+        'w-full p-3 flex items-start gap-3 text-left transition-colors',
+        // Unread state - darker background
+        hasUnread && !isSelected && 'bg-[#2D7A7A]/10 hover:bg-[#2D7A7A]/15',
+        // Normal state
+        !hasUnread && !isSelected && 'hover:bg-[#FAFAF8]',
+        // Selected state
         isSelected && 'bg-[#2D7A7A]/5 border-l-2 border-l-[#2D7A7A]'
       )}
     >
@@ -115,15 +121,18 @@ export function ConversationListItem({
           <div className="flex items-center gap-2 min-w-0">
             <span
               className={cn(
-                'font-medium text-sm truncate',
-                unreadCount > 0 ? 'text-[#1A1A1A]' : 'text-[#666]'
+                'text-sm truncate',
+                hasUnread ? 'font-bold text-[#1A1A1A]' : 'font-medium text-[#666]'
               )}
             >
               {getDisplayName()}
             </span>
             {getTypeBadge()}
           </div>
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className={cn(
+            'text-xs shrink-0',
+            hasUnread ? 'text-[#2D7A7A] font-semibold' : 'text-muted-foreground'
+          )}>
             {formatDistanceToNow(new Date(conversation.last_message_at), {
               addSuffix: false,
             })}
@@ -131,15 +140,20 @@ export function ConversationListItem({
         </div>
 
         {getSubtitle() && (
-          <p className="text-xs text-muted-foreground">{getSubtitle()}</p>
+          <p className={cn(
+            'text-xs',
+            hasUnread ? 'text-[#666]' : 'text-muted-foreground'
+          )}>
+            {getSubtitle()}
+          </p>
         )}
 
         {conversation.last_message_preview && (
           <p
             className={cn(
               'text-xs mt-1 truncate',
-              unreadCount > 0
-                ? 'text-[#1A1A1A] font-medium'
+              hasUnread
+                ? 'text-[#1A1A1A] font-semibold'
                 : 'text-muted-foreground'
             )}
           >
@@ -148,8 +162,8 @@ export function ConversationListItem({
         )}
       </div>
 
-      {unreadCount > 0 && (
-        <Badge className="bg-[#2D7A7A] text-white text-xs min-w-[20px] h-5 flex items-center justify-center">
+      {hasUnread && (
+        <Badge className="bg-[#2D7A7A] text-white text-xs min-w-[20px] h-5 flex items-center justify-center shrink-0">
           {unreadCount > 99 ? '99+' : unreadCount}
         </Badge>
       )}

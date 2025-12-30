@@ -254,17 +254,12 @@ ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversation_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
--- Conversations: Users can view conversations they participate in within their facility
+-- Conversations: Users can view conversations in their facility
+-- Note: Participant filtering is done at application level to avoid RLS recursion
 DROP POLICY IF EXISTS "Users can view their conversations" ON public.conversations;
 CREATE POLICY "Users can view their conversations" ON public.conversations
 FOR SELECT USING (
-    facility_id = public.get_user_facility_id() AND
-    EXISTS (
-        SELECT 1 FROM public.conversation_participants cp
-        WHERE cp.conversation_id = conversations.id
-        AND cp.user_id = auth.uid()
-        AND cp.left_at IS NULL
-    )
+    facility_id = public.get_user_facility_id()
 );
 
 -- Conversations: Users can create conversations in their facility
@@ -275,20 +270,15 @@ FOR INSERT WITH CHECK (
     facility_id IS NULL -- Allow trigger to set it
 );
 
--- Conversations: Users can update conversations they participate in
+-- Conversations: Users can update conversations in their facility
 DROP POLICY IF EXISTS "Users can update their conversations" ON public.conversations;
 CREATE POLICY "Users can update their conversations" ON public.conversations
 FOR UPDATE USING (
-    facility_id = public.get_user_facility_id() AND
-    EXISTS (
-        SELECT 1 FROM public.conversation_participants cp
-        WHERE cp.conversation_id = conversations.id
-        AND cp.user_id = auth.uid()
-        AND cp.left_at IS NULL
-    )
+    facility_id = public.get_user_facility_id()
 );
 
--- Participants: Users can view participants of their conversations
+-- Participants: Users can view participants of conversations in their facility
+-- Simplified to avoid infinite recursion
 DROP POLICY IF EXISTS "Users can view conversation participants" ON public.conversation_participants;
 CREATE POLICY "Users can view conversation participants" ON public.conversation_participants
 FOR SELECT USING (
@@ -296,16 +286,10 @@ FOR SELECT USING (
         SELECT 1 FROM public.conversations c
         WHERE c.id = conversation_participants.conversation_id
         AND c.facility_id = public.get_user_facility_id()
-        AND EXISTS (
-            SELECT 1 FROM public.conversation_participants cp
-            WHERE cp.conversation_id = c.id
-            AND cp.user_id = auth.uid()
-            AND cp.left_at IS NULL
-        )
     )
 );
 
--- Participants: Users can add participants to conversations they're in (for group chats)
+-- Participants: Users can add participants to conversations in their facility
 DROP POLICY IF EXISTS "Users can add participants" ON public.conversation_participants;
 CREATE POLICY "Users can add participants" ON public.conversation_participants
 FOR INSERT WITH CHECK (
@@ -313,10 +297,6 @@ FOR INSERT WITH CHECK (
         SELECT 1 FROM public.conversations c
         WHERE c.id = conversation_participants.conversation_id
         AND c.facility_id = public.get_user_facility_id()
-        AND (
-            c.type = 'group' OR -- Anyone can add to group chats
-            c.type = 'patient' -- Allow adding to patient chats (for new staff)
-        )
     )
 );
 

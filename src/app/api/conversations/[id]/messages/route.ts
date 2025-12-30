@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../../supabase/server';
-import { getMessages, sendMessage } from '@/lib/messages';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { getMessages, sendMessage, getConversation } from '@/lib/messages';
+import { sendPushNotificationToMultipleUsers } from '@/lib/push-notifications';
 
 export const dynamic = 'force-dynamic';
+
+// Create admin client for notification operations (bypasses RLS)
+const getAdminClient = () => createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+);
 
 export async function GET(
   request: Request,
@@ -70,6 +78,70 @@ export async function POST(
       messageType: message_type,
       metadata,
     });
+
+    // Get conversation details for notifications
+    const conversation = await getConversation(conversationId);
+
+    if (conversation && conversation.participants) {
+      // Get sender name
+      const { data: senderData } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('id', user.id)
+        .single();
+
+      const senderName = senderData?.name || senderData?.email?.split('@')[0] || 'Someone';
+
+      // Get conversation display name
+      let conversationName = conversation.name || 'a conversation';
+      if (conversation.type === 'patient' && conversation.patient) {
+        conversationName = `${conversation.patient.first_name} ${conversation.patient.last_name}'s care team`;
+      } else if (conversation.type === 'direct') {
+        conversationName = 'a direct message';
+      }
+
+      // Get recipient user IDs (exclude sender)
+      const recipientIds = conversation.participants
+        .filter((p) => p.user_id !== user.id && !p.left_at)
+        .map((p) => p.user_id);
+
+      if (recipientIds.length > 0) {
+        const adminClient = getAdminClient();
+
+        // Create in-app notifications for all recipients
+        const notifications = recipientIds.map((recipientId) => ({
+          user_id: recipientId,
+          type: 'message',
+          title: `New message from ${senderName}`,
+          message: content.trim().substring(0, 100),
+          metadata: {
+            conversation_id: conversationId,
+            conversation_type: conversation.type,
+            sender_id: user.id,
+            sender_name: senderName,
+            push_queued: true,
+          },
+        }));
+
+        // Insert notifications (fire and forget - don't block response)
+        adminClient
+          .from('notifications')
+          .insert(notifications)
+          .then(({ error }) => {
+            if (error) console.error('Failed to create notifications:', error);
+          });
+
+        // Send push notifications (fire and forget)
+        sendPushNotificationToMultipleUsers(recipientIds, {
+          title: `Message from ${senderName}`,
+          body: content.trim().substring(0, 100),
+          url: `/dashboard/messages?conversation=${conversationId}`,
+          tag: `message-${conversationId}`,
+        }).catch((error) => {
+          console.error('Failed to send push notifications:', error);
+        });
+      }
+    }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error: unknown) {

@@ -30,7 +30,7 @@ export function MessageCenter({ userId }: MessageCenterProps) {
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
 
   const { conversations, isLoading: isLoadingConversations, refreshConversations } =
-    useRealtimeConversations();
+    useRealtimeConversations({ selectedConversationId: selectedConversation?.id });
 
   const {
     messages,
@@ -43,11 +43,24 @@ export function MessageCenter({ userId }: MessageCenterProps) {
   } = useRealtimeChatMessages(selectedConversation?.id || null);
 
   const handleSelectConversation = useCallback(
-    (conversation: ConversationWithDetails) => {
+    async (conversation: ConversationWithDetails) => {
       setSelectedConversation(conversation);
       setIsMobileListOpen(false);
+
+      // Mark conversation as read when selected
+      if (conversation.unread_count && conversation.unread_count > 0) {
+        try {
+          await fetch(`/api/conversations/${conversation.id}/read`, {
+            method: 'POST',
+          });
+          // Refresh to update unread counts in the list
+          refreshConversations();
+        } catch (error) {
+          console.error('Failed to mark as read:', error);
+        }
+      }
     },
-    []
+    [refreshConversations]
   );
 
   const handleConversationCreated = useCallback(
@@ -64,10 +77,12 @@ export function MessageCenter({ userId }: MessageCenterProps) {
       await fetch(`/api/conversations/${selectedConversation.id}/read`, {
         method: 'POST',
       });
+      // Refresh to update unread counts in the list
+      refreshConversations();
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, refreshConversations]);
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">

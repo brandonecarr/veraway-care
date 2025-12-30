@@ -56,9 +56,44 @@ export async function getConversations(options?: {
 
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
 
-  // Get unread counts for each conversation
+  // Get current user for unread count calculation
   const { data: { user } } = await supabase.auth.getUser();
   const currentUserId = user?.id;
+
+  // Get unread counts for all conversations in a single query
+  // We'll count messages created after the user's last_read_at
+  const unreadCounts = new Map<string, number>();
+
+  if (currentUserId && conversationIds.length > 0) {
+    // For each conversation, get the user's last_read_at from participants
+    const userParticipants = (participants || []).filter(
+      (p) => p.user_id === currentUserId
+    );
+
+    // Build a map of conversation_id -> last_read_at
+    const lastReadMap = new Map<string, string>(
+      userParticipants.map((p) => [p.conversation_id, p.last_read_at])
+    );
+
+    // Count unread messages for each conversation
+    for (const convId of conversationIds) {
+      const lastReadAt = lastReadMap.get(convId);
+
+      let query = supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', convId)
+        .eq('is_deleted', false)
+        .neq('sender_id', currentUserId);
+
+      if (lastReadAt) {
+        query = query.gt('created_at', lastReadAt);
+      }
+
+      const { count } = await query;
+      unreadCounts.set(convId, count || 0);
+    }
+  }
 
   // Build conversation details
   return conversations.map((conv) => {
@@ -69,16 +104,10 @@ export async function getConversations(options?: {
         user: userMap.get(p.user_id) as User | undefined,
       }));
 
-    // Calculate unread count from participant's last_read_at
-    const currentParticipant = convParticipants.find(
-      (p) => p.user_id === currentUserId
-    );
-    const lastReadAt = currentParticipant?.last_read_at;
-
     return {
       ...conv,
       participants: convParticipants as ConversationParticipant[],
-      // We'll calculate unread_count separately if needed
+      unread_count: unreadCounts.get(conv.id) || 0,
     } as ConversationWithDetails;
   });
 }

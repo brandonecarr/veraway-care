@@ -48,8 +48,16 @@ export function NotificationCenter() {
       markAsRead(notification.id);
     }
 
+    setIsOpen(false);
+
+    // Handle message notifications - navigate to the conversation
+    if (notification.type === 'message' && notification.metadata?.conversation_id) {
+      router.push(`/dashboard/messages?conversation=${notification.metadata.conversation_id}`);
+      return;
+    }
+
+    // Handle issue-related notifications
     if (notification.related_issue_id) {
-      setIsOpen(false);
       router.push(`/dashboard?issue=${notification.related_issue_id}`);
     }
   };
@@ -154,7 +162,7 @@ export function NotificationCenter() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-medium text-body text-brand-charcoal">
-                          {notification.type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Notification'}
+                          {notification.title || notification.type?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Notification'}
                         </h4>
                         {!notification.read && (
                           <Button
@@ -173,6 +181,11 @@ export function NotificationCenter() {
                       <p className="text-body text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
+                      {notification.type === 'message' && notification.metadata?.sender_name && (
+                        <p className="text-metadata text-muted-foreground mt-2">
+                          From: {notification.metadata.sender_name}
+                        </p>
+                      )}
                       {notification.issue?.patient && (
                         <p className="text-metadata text-muted-foreground mt-2">
                           Patient: {notification.issue.patient.first_name}{' '}
