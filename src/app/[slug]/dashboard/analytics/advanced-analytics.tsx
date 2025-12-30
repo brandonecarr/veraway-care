@@ -9,12 +9,24 @@ import { AnalyticsExport } from '@/components/care/analytics-export';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw, BarChart3, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { format, subDays, subMonths } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+const PERIOD_OPTIONS = [
+  { value: '7', label: '7 Days' },
+  { value: '14', label: '14 Days' },
+  { value: '30', label: '30 Days' },
+  { value: '60', label: '60 Days' },
+  { value: '90', label: '90 Days' },
+  { value: 'bimonth', label: 'Bi-Monthly' },
+  { value: 'biannual', label: 'Bi-Annual' },
+  { value: 'year', label: 'Year' },
+  { value: 'custom', label: 'Custom' },
+];
 
 type PeriodType = '7' | '14' | '30' | '60' | '90' | 'bimonth' | 'biannual' | 'year' | 'custom';
 
@@ -107,100 +119,102 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
             </div>
           </div>
 
-          {/* Controls - stacked on mobile, inline on desktop */}
-          <div className="flex flex-col gap-3 pl-12 md:pl-14">
-            {/* Date Range Tabs */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Tabs value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
-                <TabsList className="flex-wrap h-auto gap-1">
-                  <TabsTrigger value="7" className="text-xs sm:text-sm">7 Days</TabsTrigger>
-                  <TabsTrigger value="14" className="text-xs sm:text-sm">14 Days</TabsTrigger>
-                  <TabsTrigger value="30" className="text-xs sm:text-sm">30 Days</TabsTrigger>
-                  <TabsTrigger value="60" className="text-xs sm:text-sm">60 Days</TabsTrigger>
-                  <TabsTrigger value="90" className="text-xs sm:text-sm">90 Days</TabsTrigger>
-                  <TabsTrigger value="bimonth" className="text-xs sm:text-sm">Bi-Month</TabsTrigger>
-                  <TabsTrigger value="biannual" className="text-xs sm:text-sm">Bi-Annual</TabsTrigger>
-                  <TabsTrigger value="year" className="text-xs sm:text-sm">Year</TabsTrigger>
-                  <TabsTrigger value="custom" className="text-xs sm:text-sm">Custom</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+        </div>
 
-            {/* Custom Date Pickers - shown when Custom is selected */}
-            {period === 'custom' && (
-              <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-[#D4D4D4] rounded-lg">
-                <span className="text-sm text-muted-foreground">From:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "justify-start text-left font-normal min-w-[140px]",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      disabled={(date) => date > new Date() || (customEndDate ? date > customEndDate : false)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+        {/* Controls Section - full width to match cards */}
+        <div className="space-y-4">
+          {/* Date Range Dropdown and Action Buttons */}
+          <div className="flex items-center gap-3">
+            <Select value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
+              <SelectTrigger className="w-[180px] bg-white">
+                <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-                <span className="text-sm text-muted-foreground">To:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        "justify-start text-left font-normal min-w-[140px]",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      disabled={(date) => date > new Date() || (customStartDate ? date < customStartDate : false)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={fetchAnalytics}
+              disabled={isLoading}
+              className="shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {analyticsData && (
+              <AnalyticsExport data={analyticsData} filename="care-coordination-analytics" />
             )}
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchAnalytics}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-
-              {analyticsData && (
-                <AnalyticsExport data={analyticsData} filename="care-coordination-analytics" />
-              )}
-            </div>
           </div>
+
+          {/* Custom Date Pickers - shown when Custom is selected */}
+          {period === 'custom' && (
+            <div className="p-4 bg-white border border-[#D4D4D4] rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                {/* From Date */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">From</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !customStartDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customStartDate}
+                        onSelect={setCustomStartDate}
+                        disabled={(date) => date > new Date() || (customEndDate ? date > customEndDate : false)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* To Date */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">To</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !customEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={setCustomEndDate}
+                        disabled={(date) => date > new Date() || (customStartDate ? date < customStartDate : false)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
