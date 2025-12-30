@@ -12,10 +12,17 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Messages
+-- Messages (Message Center)
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Issue Messages (Care Coordination)
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.issue_messages;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -33,10 +40,17 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Issues (for issue realtime updates)
+-- Issues
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.issues;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Patients
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.patients;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -47,9 +61,11 @@ END $$;
 
 ALTER TABLE public.notifications REPLICA IDENTITY FULL;
 ALTER TABLE public.messages REPLICA IDENTITY FULL;
+ALTER TABLE public.issue_messages REPLICA IDENTITY FULL;
 ALTER TABLE public.conversations REPLICA IDENTITY FULL;
 ALTER TABLE public.conversation_participants REPLICA IDENTITY FULL;
 ALTER TABLE public.issues REPLICA IDENTITY FULL;
+ALTER TABLE public.patients REPLICA IDENTITY FULL;
 
 -- =====================================================
 -- STEP 3: Grant SELECT permissions for realtime
@@ -57,12 +73,15 @@ ALTER TABLE public.issues REPLICA IDENTITY FULL;
 
 GRANT SELECT ON public.notifications TO authenticated;
 GRANT SELECT ON public.messages TO authenticated;
+GRANT SELECT ON public.issue_messages TO authenticated;
 GRANT SELECT ON public.conversations TO authenticated;
 GRANT SELECT ON public.conversation_participants TO authenticated;
 GRANT SELECT ON public.issues TO authenticated;
+GRANT SELECT ON public.patients TO authenticated;
 
 -- Also grant INSERT/UPDATE for messages (needed for sending)
 GRANT INSERT, UPDATE ON public.messages TO authenticated;
+GRANT INSERT, UPDATE ON public.issue_messages TO authenticated;
 GRANT INSERT, UPDATE ON public.conversation_participants TO authenticated;
 
 -- =====================================================
@@ -85,4 +104,4 @@ SELECT c.relname as table_name,
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
-AND c.relname IN ('notifications', 'messages', 'conversations', 'conversation_participants', 'issues');
+AND c.relname IN ('notifications', 'messages', 'issue_messages', 'conversations', 'conversation_participants', 'issues', 'patients');
