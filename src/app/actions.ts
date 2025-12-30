@@ -87,13 +87,13 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
-  // Check if user is an admin
+  // Check if user is an admin - use maybeSingle to avoid errors if no role exists
   if (data.user) {
     const { data: userRoleData } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', data.user.id)
-      .single();
+      .maybeSingle();
 
     if (userRoleData?.role === 'admin') {
       return redirect('/dev-dashboard');

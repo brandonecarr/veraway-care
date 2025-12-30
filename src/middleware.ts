@@ -67,67 +67,90 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const pathname = request.nextUrl.pathname;
 
-    // If user is accessing /dashboard without a slug, redirect to facility-specific URL
-    if (pathname.startsWith('/dashboard')) {
-      // Get user's facility slug
-      const { data: userData } = await supabase
-        .from('users')
-        .select('facility_id, facilities(slug)')
-        .eq('id', user.id)
-        .single();
+    try {
+      // If user is accessing /dashboard without a slug, redirect to facility-specific URL
+      if (pathname.startsWith('/dashboard')) {
+        // Get user's facility slug - use maybeSingle to avoid errors if no row exists
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('facility_id, facilities(slug)')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      // Check if user is an admin - query user_roles directly
-      const { data: userRoleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
+        if (userError) {
+          console.error('Middleware: Error fetching user data:', userError);
+          // Don't block user, let them through to handle error in the page
+          return response;
+        }
 
-      if (userRoleData?.role === 'admin') {
-        // Admins can access dev-dashboard instead
-        return NextResponse.redirect(new URL('/dev-dashboard', request.url));
+        // Check if user is an admin - use maybeSingle to avoid errors if no role exists
+        const { data: userRoleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (roleError) {
+          console.error('Middleware: Error fetching user role:', roleError);
+          // Continue without role check
+        }
+
+        if (userRoleData?.role === 'admin') {
+          // Admins can access dev-dashboard instead
+          return NextResponse.redirect(new URL('/dev-dashboard', request.url));
+        }
+
+        if (userData?.facilities) {
+          const facility = Array.isArray(userData.facilities)
+            ? userData.facilities[0]
+            : userData.facilities;
+
+          if (facility?.slug) {
+            // Redirect to facility-specific URL
+            const newPath = pathname.replace('/dashboard', `/${facility.slug}/dashboard`);
+            return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
+          }
+        }
+
+        // If no facility found, user can't access dashboard
+        return NextResponse.redirect(new URL('/onboarding', request.url));
       }
 
-      if (userData?.facilities) {
-        const facility = Array.isArray(userData.facilities)
-          ? userData.facilities[0]
-          : userData.facilities;
+      // If accessing /:slug/dashboard, verify the slug matches user's facility
+      const slugMatch = pathname.match(/^\/([^\/]+)\/dashboard/);
+      if (slugMatch) {
+        const slug = slugMatch[1];
 
-        if (facility?.slug) {
-          // Redirect to facility-specific URL
-          const newPath = pathname.replace('/dashboard', `/${facility.slug}/dashboard`);
-          return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
+        // Get user's facility slug to verify - use maybeSingle
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('facility_id, facilities(slug)')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (userError) {
+          console.error('Middleware: Error fetching user data for slug verification:', userError);
+          // Don't block user, let them through
+          return response;
+        }
+
+        if (userData?.facilities) {
+          const facility = Array.isArray(userData.facilities)
+            ? userData.facilities[0]
+            : userData.facilities;
+
+          // Verify slug matches user's facility
+          if (facility?.slug && facility.slug !== slug) {
+            // Redirect to correct facility slug
+            const newPath = pathname.replace(`/${slug}/`, `/${facility.slug}/`);
+            return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
+          }
         }
       }
-
-      // If no facility found, user can't access dashboard
-      return NextResponse.redirect(new URL('/onboarding', request.url));
-    }
-
-    // If accessing /:slug/dashboard, verify the slug matches user's facility
-    const slugMatch = pathname.match(/^\/([^\/]+)\/dashboard/);
-    if (slugMatch) {
-      const slug = slugMatch[1];
-
-      // Get user's facility slug to verify
-      const { data: userData } = await supabase
-        .from('users')
-        .select('facility_id, facilities(slug)')
-        .eq('id', user.id)
-        .single();
-
-      if (userData?.facilities) {
-        const facility = Array.isArray(userData.facilities)
-          ? userData.facilities[0]
-          : userData.facilities;
-
-        // Verify slug matches user's facility
-        if (facility?.slug && facility.slug !== slug) {
-          // Redirect to correct facility slug
-          const newPath = pathname.replace(`/${slug}/`, `/${facility.slug}/`);
-          return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
-        }
-      }
+    } catch (error) {
+      console.error('Middleware: Unexpected error:', error);
+      // On any error, let the request through rather than blocking the user
+      return response;
     }
   }
 
