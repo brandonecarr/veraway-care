@@ -4,7 +4,7 @@
   "description": "Issue tracking and care coordination for hospice agencies",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#FAFAF8",
+  "background_color": "#FFFFFF",
   "theme_color": "#FFFFFF",
   "orientation": "any",
   "icons": [
