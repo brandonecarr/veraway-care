@@ -78,13 +78,26 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error, data } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  // Check if user is an admin
+  if (data.user) {
+    const { data: userRoleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', data.user.id)
+      .single();
+
+    if (userRoleData?.role === 'admin') {
+      return redirect('/dev-dashboard');
+    }
   }
 
   // Get the user's facility slug and redirect to facility-specific dashboard

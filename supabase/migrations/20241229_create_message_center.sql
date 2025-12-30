@@ -445,3 +445,18 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION public.get_conversation_unread_count IS 'Returns the number of unread messages in a conversation for the current user';
+
+-- =====================================================
+-- GRANT PERMISSIONS TO AUTHENTICATED ROLE
+-- =====================================================
+-- RLS policies only filter rows AFTER the user has base table permissions
+-- Without these grants, authenticated users cannot access the tables at all
+
+GRANT SELECT, INSERT, UPDATE ON public.conversations TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.conversation_participants TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.messages TO authenticated;
+
+-- Also grant to service_role for admin operations
+GRANT ALL ON public.conversations TO service_role;
+GRANT ALL ON public.conversation_participants TO service_role;
+GRANT ALL ON public.messages TO service_role;

@@ -33,10 +33,24 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ conversations });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get conversations error:', error);
+
+    let errorMessage = 'Unknown error';
+    let errorCode = undefined;
+
+    if (error && typeof error === 'object') {
+      if ('message' in error) {
+        errorMessage = String((error as { message: unknown }).message);
+      }
+      if ('code' in error) {
+        errorCode = String((error as { code: unknown }).code);
+      }
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+    }
+
     return NextResponse.json(
-      { error: 'Failed to fetch conversations' },
+      { error: 'Failed to fetch conversations', details: errorMessage, code: errorCode },
       { status: 500 }
     );
   }
@@ -93,10 +107,27 @@ export async function POST(request: Request) {
     return NextResponse.json(conversation, { status: 201 });
   } catch (error: unknown) {
     console.error('Create conversation error:', error);
+
+    // Handle Supabase/PostgreSQL errors which have code and message properties
+    let errorMessage = 'Unknown error';
+    let errorCode = undefined;
+
+    if (error && typeof error === 'object') {
+      if ('message' in error) {
+        errorMessage = String((error as { message: unknown }).message);
+      }
+      if ('code' in error) {
+        errorCode = String((error as { code: unknown }).code);
+      }
+      // Log full error for debugging
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+    }
+
     return NextResponse.json(
       {
         error: 'Failed to create conversation',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: errorMessage,
+        code: errorCode,
       },
       { status: 500 }
     );
