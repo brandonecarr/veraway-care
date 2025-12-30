@@ -121,15 +121,22 @@ export async function createIssue(issue: {
   description?: string;
   priority?: string;
   tags?: string[];
+  assigned_to?: string;
 }) {
   const supabase = await createClient();
-  
+
+  // Auto-assign to creator if no assignee specified
+  const issueData = {
+    ...issue,
+    assigned_to: issue.assigned_to || issue.reported_by,
+  };
+
   const { data, error } = await supabase
     .from('issues')
-    .insert(issue)
+    .insert(issueData)
     .select()
     .single();
-    
+
   if (error) throw error;
   return data;
 }

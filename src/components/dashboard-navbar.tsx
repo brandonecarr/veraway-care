@@ -33,12 +33,12 @@ export default function DashboardNavbar() {
 
   const navLinks = [
     { path: '', label: 'Dashboard', icon: Home },
-    { path: 'messages', label: 'Messages', icon: MessageSquare },
     { path: 'analytics', label: 'Analytics', icon: BarChart3 },
     { path: 'patients', label: 'Patients', icon: Users },
     { path: 'archive', label: 'Archive', icon: Archive },
     { path: 'audit-log', label: 'Audit Log', icon: FileText },
     { path: 'after-shift-reports', label: 'Shift Reports', icon: FileText },
+    { path: 'messages', label: 'Message Center', icon: MessageSquare },
   ]
 
   const handleNavClick = (path: string) => {

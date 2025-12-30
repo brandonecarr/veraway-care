@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import {
   Drawer,
   DrawerContent,
@@ -13,20 +13,22 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PatientAutocomplete } from './patient-autocomplete';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Patient } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface QuickReportModalProps {
   userId: string;
+  userRole?: string;
   onSuccess?: (issue: any) => void;
   externalTrigger?: () => void;
   onExternalTriggerSet?: (trigger: () => void) => void;
 }
 
-export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: QuickReportModalProps) {
+export function QuickReportModal({ userId, userRole = 'clinician', onSuccess, onExternalTriggerSet }: QuickReportModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -49,9 +51,9 @@ export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: Qu
         onClick={() => setIsOpen(true)}
         className="fixed bottom-24 right-6 md:bottom-8 md:right-8 h-14 w-14 md:h-16 md:w-16 rounded-full bg-brand-teal hover:bg-brand-teal/90 text-white shadow-lg hover:shadow-xl transition-all hover:scale-[0.98] active:scale-95 flex items-center justify-center z-50 touch-manipulation"
         aria-label="Report new issue"
-        style={{ 
+        style={{
           // Safe area for devices with notch/home indicator - applied to bottom position
-          marginBottom: 'env(safe-area-inset-bottom, 0px)' 
+          marginBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
         <Plus className="h-7 w-7 md:h-8 md:w-8" />
@@ -68,6 +70,7 @@ export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: Qu
             <ScrollArea className="flex-1 px-4 pb-6">
               <QuickReportForm
                 userId={userId}
+                userRole={userRole}
                 onSuccess={handleSuccess}
                 onCancel={() => setIsOpen(false)}
               />
@@ -84,6 +87,7 @@ export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: Qu
             </DialogHeader>
             <QuickReportForm
               userId={userId}
+              userRole={userRole}
               onSuccess={handleSuccess}
               onCancel={() => setIsOpen(false)}
             />
@@ -94,13 +98,15 @@ export function QuickReportModal({ userId, onSuccess, onExternalTriggerSet }: Qu
   );
 }
 
-function QuickReportForm({ 
-  userId, 
-  onSuccess, 
-  onCancel 
-}: { 
-  userId: string; 
-  onSuccess: (issue: any) => void; 
+function QuickReportForm({
+  userId,
+  userRole = 'clinician',
+  onSuccess,
+  onCancel
+}: {
+  userId: string;
+  userRole?: string;
+  onSuccess: (issue: any) => void;
   onCancel: () => void;
 }) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -113,8 +119,13 @@ function QuickReportForm({
   const [filteredTags, setFilteredTags] = useState<string[]>([]);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>(userId);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  const isCoordinator = userRole === 'coordinator';
 
   // Fetch existing tags on mount
   useEffect(() => {
@@ -131,6 +142,24 @@ function QuickReportForm({
     };
     fetchTags();
   }, []);
+
+  // Fetch available users for coordinators
+  useEffect(() => {
+    if (!isCoordinator) return;
+
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableUsers(data.users || []);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+    fetchUsers();
+  }, [isCoordinator]);
 
   // Filter tags based on input
   useEffect(() => {
@@ -208,7 +237,7 @@ function QuickReportForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedPatient) {
       toast.error('Please select a patient');
       return;
@@ -219,6 +248,14 @@ function QuickReportForm({
       return;
     }
 
+    // Show confirmation dialog
+    setShowConfirmDialog(true);
+  };
+
+  const confirmSubmit = async () => {
+    if (!selectedPatient) return;
+
+    setShowConfirmDialog(false);
     setIsSubmitting(true);
 
     try {
@@ -228,6 +265,7 @@ function QuickReportForm({
         body: JSON.stringify({
           patient_id: selectedPatient.id,
           reported_by: userId,
+          assigned_to: selectedAssignee,
           issue_type: issueType,
           description: description || null,
           priority,
@@ -310,6 +348,31 @@ function QuickReportForm({
           <option value="urgent">Urgent</option>
         </select>
       </div>
+
+      {/* Assign to dropdown - Coordinators only */}
+      {isCoordinator && (
+        <div>
+          <label className="text-sm font-medium text-[#1A1A1A] mb-2 block">
+            Assign To
+          </label>
+          <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+            <SelectTrigger className="w-full border-[#D4D4D4]">
+              <SelectValue placeholder="Select assignee..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableUsers.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name || user.email?.split('@')[0] || 'Unknown'}
+                  {user.id === userId && ' (You)'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-[#999] mt-1">
+            Issues are auto-assigned to the creator by default
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="text-sm font-medium text-[#1A1A1A] mb-2 block">
@@ -408,6 +471,48 @@ function QuickReportForm({
           {isSubmitting ? 'Submitting...' : 'Report Issue'}
         </Button>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Issue Creation
+            </DialogTitle>
+            <DialogDescription className="pt-4 space-y-3">
+              <p className="text-[#333]">
+                You are about to create an issue for <strong>{selectedPatient?.first_name} {selectedPatient?.last_name}</strong>.
+              </p>
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Clock className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-medium">Resolution Timer Starts Immediately</p>
+                  <p className="mt-1">
+                    Once created, the 24-hour resolution timer will begin. Issues not resolved within 24 hours will be marked as overdue.
+                  </p>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmSubmit}
+              className="bg-[#2D7A7A] hover:bg-[#236060]"
+            >
+              Create Issue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

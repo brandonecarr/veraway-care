@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Clock, User, CheckCircle2, UserCircle, History, PlayCircle, FileText, Users } from 'lucide-react';
+import { User, CheckCircle2, UserCircle, History, FileText, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -511,32 +511,6 @@ export function IssueDetailPanel({
 
           {canResolve && currentStatus !== 'resolved' && (
             <div className="flex gap-3">
-              {/* Status Toggle Button */}
-              {currentStatus === 'open' && (
-                <Button
-                  variant="outline"
-                  className="flex-1 border-blue-500 text-blue-700 hover:bg-blue-50"
-                  size="lg"
-                  onClick={() => handleStatusChange('in_progress')}
-                  disabled={isUpdatingStatus}
-                >
-                  <PlayCircle className="w-4 h-4 mr-2" />
-                  {isUpdatingStatus ? 'Updating...' : 'Start Progress'}
-                </Button>
-              )}
-              {currentStatus === 'in_progress' && (
-                <Button
-                  variant="outline"
-                  className="flex-1 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
-                  size="lg"
-                  onClick={() => handleStatusChange('open')}
-                  disabled={isUpdatingStatus}
-                >
-                  <Clock className="w-4 h-4 mr-2" />
-                  {isUpdatingStatus ? 'Updating...' : 'Back To Open'}
-                </Button>
-              )}
-              
               {/* Resolve Button */}
               <AlertDialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
                 <AlertDialogTrigger asChild>

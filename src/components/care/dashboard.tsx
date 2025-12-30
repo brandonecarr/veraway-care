@@ -593,6 +593,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
       {/* Floating Action Button with Quick Report Modal */}
       <QuickReportModal
         userId={userId}
+        userRole={userRole}
         onSuccess={() => {
           refreshIssues();
         }}
