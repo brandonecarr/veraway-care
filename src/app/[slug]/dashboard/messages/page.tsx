@@ -6,7 +6,11 @@ import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 
 export const dynamic = 'force-dynamic';
 
-export default async function MessagesPage() {
+interface MessagesPageProps {
+  searchParams: { conversation?: string };
+}
+
+export default async function MessagesPage({ searchParams }: MessagesPageProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,10 +20,12 @@ export default async function MessagesPage() {
     return redirect('/sign-in');
   }
 
+  const initialConversationId = searchParams.conversation || null;
+
   return (
     <>
       <DashboardNavbar />
-      <MessageCenter userId={user.id} />
+      <MessageCenter userId={user.id} initialConversationId={initialConversationId} />
       <MobileBottomNav />
     </>
   );

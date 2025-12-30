@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -20,11 +20,13 @@ import { cn } from '@/lib/utils';
 
 interface MessageCenterProps {
   userId: string;
+  initialConversationId?: string | null;
 }
 
-export function MessageCenter({ userId }: MessageCenterProps) {
+export function MessageCenter({ userId, initialConversationId }: MessageCenterProps) {
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationWithDetails | null>(null);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
@@ -41,6 +43,17 @@ export function MessageCenter({ userId }: MessageCenterProps) {
     typingUsers,
     setTyping,
   } = useRealtimeChatMessages(selectedConversation?.id || null);
+
+  // Load initial conversation from query param when conversations are loaded
+  useEffect(() => {
+    if (initialConversationId && conversations.length > 0 && !hasLoadedInitial) {
+      const conversation = conversations.find(c => c.id === initialConversationId);
+      if (conversation) {
+        setSelectedConversation(conversation);
+        setHasLoadedInitial(true);
+      }
+    }
+  }, [initialConversationId, conversations, hasLoadedInitial]);
 
   const handleSelectConversation = useCallback(
     async (conversation: ConversationWithDetails) => {

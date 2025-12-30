@@ -3,13 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
-import { Clock, AlertCircle, CheckCircle2, TrendingUp, MessageSquare, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, useParams } from 'next/navigation';
 import { MetricCard } from './metric-card';
 import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
-import { CommunicationPanel } from './communication-panel';
-import { MobileCommunicationSheet } from './mobile-communication-sheet';
 import { AfterShiftReportModal } from './after-shift-report-modal';
 import { AfterShiftReportBanner } from './after-shift-report-banner';
 import { ClinicianResponsiveness } from './clinician-responsiveness';
@@ -39,12 +38,13 @@ interface CareCoordinationDashboardProps {
 }
 
 export function CareCoordinationDashboard({ userId, userRole }: CareCoordinationDashboardProps) {
+  const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string;
   const { issues: realtimeIssues, isConnected, isLoading, refreshIssues } = useRealtimeIssues();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
-  const [isCommunicationPanelOpen, setIsCommunicationPanelOpen] = useState(false);
-  const [communicationIssue, setCommunicationIssue] = useState<Issue | null>(null);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'my' | 'open' | 'overdue'>('all');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -498,10 +498,28 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       setSelectedIssue(issue);
                       setIsDetailPanelOpen(true);
                     }}
-                    onMessageClick={(e) => {
+                    onMessageClick={async (e) => {
                       e.stopPropagation();
-                      setCommunicationIssue(issue);
-                      setIsCommunicationPanelOpen(true);
+                      // Navigate to Message Center with patient's group chat
+                      if (issue.patient_id) {
+                        try {
+                          const response = await fetch(`/api/conversations/by-patient/${issue.patient_id}`);
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.conversation?.id) {
+                              router.push(`/${slug}/dashboard/messages?conversation=${data.conversation.id}`);
+                            } else {
+                              router.push(`/${slug}/dashboard/messages`);
+                            }
+                          } else {
+                            router.push(`/${slug}/dashboard/messages`);
+                          }
+                        } catch (error) {
+                          router.push(`/${slug}/dashboard/messages`);
+                        }
+                      } else {
+                        router.push(`/${slug}/dashboard/messages`);
+                      }
                     }}
                     onResolve={() => handleResolveIssue(issue.id)}
                   />
@@ -614,51 +632,8 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         currentUserId={userId}
         userRole={userRole}
         availableUsers={availableUsers}
+        slug={slug}
       />
-
-      {/* Floating Communication Panel - Desktop */}
-      {isCommunicationPanelOpen && !isMobile && (
-        <div className="fixed bottom-24 right-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <CommunicationPanel
-            issue={communicationIssue}
-            currentUserId={userId}
-            onClose={() => {
-              setIsCommunicationPanelOpen(false);
-              setCommunicationIssue(null);
-            }}
-            defaultExpanded={true}
-            position="right"
-          />
-        </div>
-      )}
-
-      {/* Mobile Communication Bottom Sheet */}
-      {isMobile && (
-        <MobileCommunicationSheet
-          issue={communicationIssue}
-          currentUserId={userId}
-          open={isCommunicationPanelOpen}
-          onOpenChange={(open) => {
-            setIsCommunicationPanelOpen(open);
-            if (!open) setCommunicationIssue(null);
-          }}
-        />
-      )}
-
-      {/* Quick Message Button - shows when communication panel is closed but an issue is selected */}
-      {!isCommunicationPanelOpen && selectedIssue && (
-        <Button
-          onClick={() => {
-            setCommunicationIssue(selectedIssue);
-            setIsCommunicationPanelOpen(true);
-          }}
-          className="fixed bottom-24 right-24 md:right-24 z-40 h-12 w-12 rounded-full bg-[#2D7A7A] hover:bg-[#236060] shadow-lg active:scale-95 transition-transform touch-manipulation"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </Button>
-      )}
-
-
     </main>
   );
 }

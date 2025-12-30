@@ -38,6 +38,7 @@ interface IssueDetailPanelProps {
   currentUserId: string;
   userRole: string;
   availableUsers?: Array<{ id: string; email?: string; name?: string }>;
+  slug?: string;
 }
 
 export function IssueDetailPanel({
@@ -50,7 +51,8 @@ export function IssueDetailPanel({
   onAddUpdate,
   currentUserId,
   userRole,
-  availableUsers = []
+  availableUsers = [],
+  slug
 }: IssueDetailPanelProps) {
   const router = useRouter();
   const [selectedUser, setSelectedUser] = useState('');
@@ -109,8 +111,8 @@ export function IssueDetailPanel({
   };
 
   const handleOpenPatientMessage = () => {
-    if (patientConversationId) {
-      router.push(`/dashboard/messages?conversation=${patientConversationId}`);
+    if (patientConversationId && slug) {
+      router.push(`/${slug}/dashboard/messages?conversation=${patientConversationId}`);
       onOpenChange(false);
     }
   };
@@ -337,7 +339,7 @@ export function IssueDetailPanel({
                   </ScrollArea>
                 </DialogContent>
               </Dialog>
-              {patientConversationId && (
+              {patientConversationId && slug && (
                 <Button
                   variant="ghost"
                   size="sm"
