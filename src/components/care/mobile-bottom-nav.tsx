@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Users, FileText, Moon, Archive } from 'lucide-react';
+import { Home, Users, FileText, Archive, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFacilityPath } from '@/hooks/use-facility-slug';
 
@@ -13,9 +13,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '', icon: Home, label: 'Home' }, // Empty string for base dashboard
+  { path: 'messages', icon: MessageSquare, label: 'Messages' },
   { path: 'patients', icon: Users, label: 'Patients' },
   { path: 'archive', icon: Archive, label: 'Archive' },
-  { path: 'audit-log', icon: FileText, label: 'Audit' },
   { path: 'after-shift-reports', icon: FileText, label: 'Reports' },
 ];
 

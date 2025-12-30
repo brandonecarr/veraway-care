@@ -17,7 +17,7 @@ import {
   SheetTrigger,
 } from './ui/sheet'
 import { Button } from './ui/button'
-import { UserCircle, Home, Users, FileText, Moon, Menu, X, BarChart3, Archive } from 'lucide-react'
+import { UserCircle, Home, Users, FileText, Moon, Menu, X, BarChart3, Archive, MessageSquare } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { NotificationCenter } from './care/notification-center'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -33,6 +33,7 @@ export default function DashboardNavbar() {
 
   const navLinks = [
     { path: '', label: 'Dashboard', icon: Home },
+    { path: 'messages', label: 'Messages', icon: MessageSquare },
     { path: 'analytics', label: 'Analytics', icon: BarChart3 },
     { path: 'patients', label: 'Patients', icon: Users },
     { path: 'archive', label: 'Archive', icon: Archive },

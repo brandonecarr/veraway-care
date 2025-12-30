@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '../../../../supabase/server'
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // First check if user is authenticated
     const serverSupabase = await createServerClient();
@@ -30,34 +30,48 @@ export async function GET() {
       return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
     }
 
-    console.log('Fetching clinicians for facility:', currentUserData.facility_id);
+    // Check query params for role filter
+    const { searchParams } = new URL(request.url);
+    const roleFilter = searchParams.get('role');
+    const allStaff = searchParams.get('all') === 'true';
 
-    // Step 1: Get all clinician user_ids from the same facility
-    const { data: userRoles, error: rolesError } = await serverSupabase
+    console.log('Fetching users for facility:', currentUserData.facility_id);
+
+    // Step 1: Get user_ids from the same facility (optionally filtered by role)
+    let rolesQuery = serverSupabase
       .from('user_roles')
       .select('user_id')
-      .eq('facility_id', currentUserData.facility_id)
-      .eq('role', 'clinician');
+      .eq('facility_id', currentUserData.facility_id);
+
+    if (roleFilter) {
+      rolesQuery = rolesQuery.eq('role', roleFilter);
+    } else if (!allStaff) {
+      // Default: only clinicians for backwards compatibility
+      rolesQuery = rolesQuery.eq('role', 'clinician');
+    }
+    // If allStaff=true, don't filter by role
+
+    const { data: userRoles, error: rolesError } = await rolesQuery;
 
     if (rolesError) {
       console.error('Error fetching user roles:', rolesError);
       throw rolesError;
     }
 
-    console.log('Found clinician roles:', userRoles?.length || 0);
+    console.log('Found user roles:', userRoles?.length || 0);
 
     if (!userRoles || userRoles.length === 0) {
-      // No clinicians found in this facility
-      return NextResponse.json([]);
+      // Return in format expected by message center
+      return NextResponse.json({ users: [] });
     }
 
-    // Step 2: Get user details for these clinician user_ids
-    const clinicianIds = userRoles.map(ur => ur.user_id);
+    // Step 2: Get user details for these user_ids
+    const userIds = userRoles.map(ur => ur.user_id);
 
-    const { data: clinicians, error: usersError } = await serverSupabase
+    const { data: usersData, error: usersError } = await serverSupabase
       .from('users')
-      .select('id, email, name')
-      .in('id', clinicianIds);
+      .select('id, email, name, avatar_url')
+      .in('id', userIds);
 
     if (usersError) {
       console.error('Error fetching users:', usersError);
@@ -65,13 +79,15 @@ export async function GET() {
     }
 
     // Format the response
-    const users = (clinicians || []).map((u: any) => ({
+    const users = (usersData || []).map((u: any) => ({
       id: u.id,
       email: u.email,
-      name: u.name || u.email?.split('@')[0]
+      name: u.name || u.email?.split('@')[0],
+      avatar_url: u.avatar_url
     }));
 
-    return NextResponse.json(users);
+    // Return in format expected by message center
+    return NextResponse.json({ users });
   } catch (error: any) {
     console.error('Get users error:', error);
     // Return detailed error in development to help debug
