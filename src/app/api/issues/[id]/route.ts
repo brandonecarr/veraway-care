@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../supabase/server';
 import { updateIssue } from '@/lib/care-coordination';
+import { notifyIssueAssigned, getUserFacilityId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -78,8 +79,39 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id: issueId } = await params;
     const body = await request.json();
-    const issue = await updateIssue(params.id, body);
+
+    // Check if this is an assignment update
+    const isAssignmentUpdate = body.assigned_to !== undefined;
+
+    // Get current issue for assignment comparison and patient info
+    let currentIssue = null;
+    if (isAssignmentUpdate) {
+      const { data } = await supabase
+        .from('issues')
+        .select('assigned_to, issue_number, patient:patients(first_name, last_name)')
+        .eq('id', issueId)
+        .single();
+      currentIssue = data;
+    }
+
+    const issue = await updateIssue(issueId, body);
+
+    // Send notification for assignment if it changed
+    if (isAssignmentUpdate && body.assigned_to && currentIssue && currentIssue.patient) {
+      const facilityId = await getUserFacilityId(user.id);
+      if (facilityId) {
+        const patient = Array.isArray(currentIssue.patient) ? currentIssue.patient[0] : currentIssue.patient;
+        notifyIssueAssigned(user.id, facilityId, {
+          id: issueId,
+          issue_number: currentIssue.issue_number,
+        }, {
+          first_name: patient.first_name,
+          last_name: patient.last_name,
+        }, body.assigned_to).catch((err) => console.error('Failed to send assignment notification:', err));
+      }
+    }
 
     return NextResponse.json(issue);
   } catch (error) {

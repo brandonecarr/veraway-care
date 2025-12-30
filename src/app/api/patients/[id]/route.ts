@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../supabase/server';
+import { notifyPatientUpdate, getUserFacilityId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
+    // Send notifications to all facility users (fire and forget)
+    const facilityId = await getUserFacilityId(user.id);
+    if (facilityId) {
+      const changedFields = Object.keys(updateData).join(', ');
+      notifyPatientUpdate(user.id, facilityId, {
+        id: data.id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        mrn: data.mrn,
+      }, changedFields).catch((err) => console.error('Failed to send patient update notification:', err));
+    }
+
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('Update patient error:', error);
@@ -113,6 +126,18 @@ export async function PATCH(
     if (error) throw error;
     if (!data) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+    }
+
+    // Send notifications to all facility users (fire and forget)
+    const facilityId = await getUserFacilityId(user.id);
+    if (facilityId) {
+      const changedFields = Object.keys(updateData).join(', ');
+      notifyPatientUpdate(user.id, facilityId, {
+        id: data.id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        mrn: data.mrn,
+      }, changedFields).catch((err) => console.error('Failed to send patient update notification:', err));
     }
 
     return NextResponse.json(data);
