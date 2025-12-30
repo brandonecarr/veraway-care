@@ -102,10 +102,33 @@ export function useRealtimeConversations(
                 sender_id: string | null;
                 content: string;
                 message_type: string;
+                created_at: string;
               };
 
-              // Refetch to update last_message_preview and ordering
-              fetchConversations();
+              // OPTIMIZED: Update only the affected conversation instead of refetching all
+              setConversations((prev) => {
+                const updated = prev.map((conv) => {
+                  if (conv.id === newMessage.conversation_id) {
+                    // Update preview and timestamp, increment unread if not selected
+                    const isSelected = conv.id === selectedConversationId;
+                    const isOwnMessage = newMessage.sender_id === user.id;
+                    return {
+                      ...conv,
+                      last_message_preview: newMessage.content.substring(0, 100),
+                      last_message_at: newMessage.created_at,
+                      unread_count: isSelected || isOwnMessage
+                        ? conv.unread_count
+                        : (conv.unread_count || 0) + 1,
+                    };
+                  }
+                  return conv;
+                });
+                // Re-sort by last_message_at
+                return updated.sort((a, b) =>
+                  new Date(b.last_message_at || 0).getTime() -
+                  new Date(a.last_message_at || 0).getTime()
+                );
+              });
 
               // Show toast if message is from another user and not in the selected conversation
               if (
@@ -144,9 +167,30 @@ export function useRealtimeConversations(
               schema: 'public',
               table: 'messages',
             },
-            () => {
+            (payload) => {
               if (!isMounted) return;
-              fetchConversations();
+              // OPTIMIZED: Update preview if the latest message was edited
+              const updatedMessage = payload.new as {
+                id: string;
+                conversation_id: string;
+                content: string;
+                is_deleted: boolean;
+              };
+
+              setConversations((prev) =>
+                prev.map((conv) => {
+                  if (conv.id === updatedMessage.conversation_id) {
+                    // Only update preview if this message might be the latest
+                    return {
+                      ...conv,
+                      last_message_preview: updatedMessage.is_deleted
+                        ? 'Message deleted'
+                        : updatedMessage.content.substring(0, 100),
+                    };
+                  }
+                  return conv;
+                })
+              );
             }
           )
           .subscribe((status: string) => {

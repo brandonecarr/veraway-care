@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useState } from "react";
 import { Issue } from "@/types/care-coordination";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,6 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
-import { useState } from "react";
 
 interface IssueCardProps {
   issue: Issue;
@@ -17,7 +17,11 @@ interface IssueCardProps {
   onResolve?: () => void;
 }
 
-export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCardProps) {
+/**
+ * IssueCard - Memoized to prevent re-renders when parent state changes
+ * Only re-renders when issue data or callbacks change
+ */
+export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCardProps) {
   const isAnimatingOut = (issue as any)._isAnimatingOut;
   const [swipeOffset, setSwipeOffset] = useState(0);
 
@@ -159,4 +163,4 @@ export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCa
     </Card>
     </div>
   );
-}
+});

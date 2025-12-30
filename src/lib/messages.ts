@@ -10,6 +10,7 @@ import type {
 
 /**
  * Get all conversations for the current user
+ * OPTIMIZED: Uses Supabase joins and batch unread counts (was 3+ queries, now 2)
  */
 export async function getConversations(options?: {
   includeArchived?: boolean;
@@ -17,12 +18,29 @@ export async function getConversations(options?: {
 }): Promise<ConversationWithDetails[]> {
   const supabase = await createClient();
 
+  // Get current user first for unread count calculation
+  const { data: { user } } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  // Single query with joins for conversations, participants, and users
   let query = supabase
     .from('conversations')
     .select(`
       *,
-      patient:patients(*)
+      patient:patients(*),
+      participants:conversation_participants!inner(
+        id,
+        conversation_id,
+        user_id,
+        role,
+        joined_at,
+        left_at,
+        last_read_at,
+        is_muted,
+        user:user_id(id, email, name, avatar_url)
+      )
     `)
+    .is('conversation_participants.left_at', null)
     .order('last_message_at', { ascending: false });
 
   if (!options?.includeArchived) {
@@ -38,93 +56,57 @@ export async function getConversations(options?: {
   if (error) throw error;
   if (!conversations) return [];
 
-  // Get all participants for these conversations
+  // Get unread counts using batch RPC function (replaces O(n) queries with O(1))
+  const unreadCounts = new Map<string, number>();
   const conversationIds = conversations.map((c) => c.id);
 
-  const { data: participants } = await supabase
-    .from('conversation_participants')
-    .select('*')
-    .in('conversation_id', conversationIds)
-    .is('left_at', null);
-
-  // Get user details for participants
-  const userIds = new Set(participants?.map((p) => p.user_id) || []);
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, email, name, avatar_url')
-    .in('id', Array.from(userIds));
-
-  const userMap = new Map(users?.map((u) => [u.id, u]) || []);
-
-  // Get current user for unread count calculation
-  const { data: { user } } = await supabase.auth.getUser();
-  const currentUserId = user?.id;
-
-  // Get unread counts for all conversations in a single query
-  // We'll count messages created after the user's last_read_at
-  const unreadCounts = new Map<string, number>();
-
   if (currentUserId && conversationIds.length > 0) {
-    // For each conversation, get the user's last_read_at from participants
-    const userParticipants = (participants || []).filter(
-      (p) => p.user_id === currentUserId
-    );
+    const { data: counts } = await supabase.rpc('get_batch_unread_counts', {
+      p_user_id: currentUserId,
+      p_conversation_ids: conversationIds,
+    });
 
-    // Build a map of conversation_id -> last_read_at
-    const lastReadMap = new Map<string, string>(
-      userParticipants.map((p) => [p.conversation_id, p.last_read_at])
-    );
-
-    // Count unread messages for each conversation
-    for (const convId of conversationIds) {
-      const lastReadAt = lastReadMap.get(convId);
-
-      let query = supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('conversation_id', convId)
-        .eq('is_deleted', false)
-        .neq('sender_id', currentUserId);
-
-      if (lastReadAt) {
-        query = query.gt('created_at', lastReadAt);
-      }
-
-      const { count } = await query;
-      unreadCounts.set(convId, count || 0);
+    if (counts) {
+      counts.forEach((row: { conversation_id: string; unread_count: number }) => {
+        unreadCounts.set(row.conversation_id, row.unread_count);
+      });
     }
   }
 
-  // Build conversation details
-  return conversations.map((conv) => {
-    const convParticipants = (participants || [])
-      .filter((p) => p.conversation_id === conv.id)
-      .map((p) => ({
-        ...p,
-        user: userMap.get(p.user_id) as User | undefined,
-      }));
-
-    return {
-      ...conv,
-      participants: convParticipants as ConversationParticipant[],
-      unread_count: unreadCounts.get(conv.id) || 0,
-    } as ConversationWithDetails;
-  });
+  // Build conversation details (data already joined, minimal processing)
+  return conversations.map((conv) => ({
+    ...conv,
+    participants: (conv.participants || []) as ConversationParticipant[],
+    unread_count: unreadCounts.get(conv.id) || 0,
+  })) as ConversationWithDetails[];
 }
 
 /**
  * Get a single conversation by ID with full details
+ * OPTIMIZED: Uses Supabase joins (was 3 queries, now 1)
  */
 export async function getConversation(
   conversationId: string
 ): Promise<ConversationWithDetails | null> {
   const supabase = await createClient();
 
+  // Single query with joins for conversation, patient, participants, and users
   const { data: conversation, error } = await supabase
     .from('conversations')
     .select(`
       *,
-      patient:patients(*)
+      patient:patients(*),
+      participants:conversation_participants(
+        id,
+        conversation_id,
+        user_id,
+        role,
+        joined_at,
+        left_at,
+        last_read_at,
+        is_muted,
+        user:user_id(id, email, name, avatar_url)
+      )
     `)
     .eq('id', conversationId)
     .single();
@@ -134,33 +116,20 @@ export async function getConversation(
     throw error;
   }
 
-  // Get participants
-  const { data: participants } = await supabase
-    .from('conversation_participants')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .is('left_at', null);
-
-  // Get user details
-  const userIds = participants?.map((p) => p.user_id) || [];
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, email, name, avatar_url')
-    .in('id', userIds);
-
-  const userMap = new Map(users?.map((u) => [u.id, u]) || []);
+  // Filter out participants who have left (can't filter in join)
+  const activeParticipants = (conversation.participants || []).filter(
+    (p: any) => p.left_at === null
+  );
 
   return {
     ...conversation,
-    participants: (participants || []).map((p) => ({
-      ...p,
-      user: userMap.get(p.user_id) as User | undefined,
-    })) as ConversationParticipant[],
+    participants: activeParticipants as ConversationParticipant[],
   } as ConversationWithDetails;
 }
 
 /**
  * Get messages for a conversation with cursor-based pagination
+ * OPTIMIZED: Uses Supabase joins for sender data (was 2 queries, now 1)
  */
 export async function getMessages(
   conversationId: string,
@@ -172,9 +141,13 @@ export async function getMessages(
   const supabase = await createClient();
   const limit = options?.limit || 50;
 
+  // Single query with join for sender details
   let query = supabase
     .from('messages')
-    .select('*')
+    .select(`
+      *,
+      sender:sender_id(id, email, name, avatar_url)
+    `)
     .eq('conversation_id', conversationId)
     .eq('is_deleted', false)
     .order('created_at', { ascending: false })
@@ -193,24 +166,8 @@ export async function getMessages(
   const hasMore = messages.length > limit;
   const messagesSlice = hasMore ? messages.slice(0, limit) : messages;
 
-  // Get sender details
-  const senderIds = new Set(
-    messagesSlice.map((m) => m.sender_id).filter(Boolean)
-  );
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, email, name, avatar_url')
-    .in('id', Array.from(senderIds));
-
-  const userMap = new Map(users?.map((u) => [u.id, u]) || []);
-
-  const messagesWithSenders = messagesSlice.map((m) => ({
-    ...m,
-    sender: m.sender_id ? (userMap.get(m.sender_id) as User | null) : null,
-  })) as MessageWithSender[];
-
-  // Reverse to get chronological order
-  messagesWithSenders.reverse();
+  // Cast and reverse to get chronological order
+  const messagesWithSenders = (messagesSlice as MessageWithSender[]).reverse();
 
   const cursor = hasMore
     ? messagesSlice[messagesSlice.length - 1]?.created_at

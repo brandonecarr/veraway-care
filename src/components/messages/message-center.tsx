@@ -16,10 +16,10 @@ import { NewConversationDialog } from './new-conversation-dialog';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
 import { useRealtimeConversations } from '@/hooks/use-realtime-conversations';
 import { useRealtimeChatMessages } from '@/hooks/use-realtime-chat-messages';
+import { useFacilityUsers } from '@/lib/queries/users';
 import type { ConversationWithDetails } from '@/types/messages';
 import type { Issue } from '@/types/care-coordination';
 import { useParams } from 'next/navigation';
-import { cn } from '@/lib/utils';
 
 interface MessageCenterProps {
   userId: string;
@@ -37,26 +37,12 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isIssueDetailOpen, setIsIssueDetailOpen] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
 
   const { conversations, isLoading: isLoadingConversations, refreshConversations } =
     useRealtimeConversations({ selectedConversationId: selectedConversation?.id });
 
-  // Fetch available users for issue assignment
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await fetch('/api/users?all=true');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableUsers(Array.isArray(data.users) ? data.users : []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-      }
-    };
-    fetchUsers();
-  }, []);
+  // Use cached facility users from React Query (replaces useEffect fetch)
+  const { data: availableUsers = [] } = useFacilityUsers();
 
   const {
     messages,

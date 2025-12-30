@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { ConversationListItem } from './conversation-list-item';
 import type { ConversationWithDetails, ConversationType } from '@/types/messages';
-import { cn } from '@/lib/utils';
 
 interface ConversationListProps {
   conversations: ConversationWithDetails[];
@@ -29,6 +28,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<ConversationType | 'all'>('all');
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const filteredConversations = conversations.filter((conv) => {
     // Filter by type
@@ -55,6 +55,22 @@ export function ConversationList({
 
     return true;
   });
+
+  // Virtual scrolling for performance with large lists
+  const virtualizer = useVirtualizer({
+    count: filteredConversations.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 88, // Approximate height of ConversationListItem
+    overscan: 5, // Render 5 items above/below visible area
+  });
+
+  // Memoized select handler to prevent unnecessary re-renders
+  const handleSelect = useCallback(
+    (conversation: ConversationWithDetails) => {
+      onSelect(conversation);
+    },
+    [onSelect]
+  );
 
   return (
     <div className="flex flex-col h-full border-r border-[#D4D4D4] bg-white">
@@ -102,47 +118,70 @@ export function ConversationList({
         </Tabs>
       </div>
 
-      {/* Conversation List */}
-      <ScrollArea className="flex-1">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-[#2D7A7A]" />
+      {/* Conversation List - Virtualized for performance */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8 flex-1">
+          <Loader2 className="w-6 h-6 animate-spin text-[#2D7A7A]" />
+        </div>
+      ) : filteredConversations.length === 0 ? (
+        <div className="text-center py-8 px-4 flex-1">
+          <MessageSquare className="w-10 h-10 mx-auto text-[#D4D4D4] mb-2" />
+          <p className="text-sm text-muted-foreground">
+            {searchQuery
+              ? 'No conversations found'
+              : filter !== 'all'
+                ? `No ${filter} conversations`
+                : 'No conversations yet'}
+          </p>
+          {!searchQuery && filter === 'all' && (
+            <Button
+              variant="link"
+              size="sm"
+              onClick={onNewConversation}
+              className="mt-2 text-[#2D7A7A]"
+            >
+              Start a conversation
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div
+          ref={parentRef}
+          className="flex-1 overflow-auto"
+        >
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const conversation = filteredConversations[virtualRow.index];
+              return (
+                <div
+                  key={conversation.id}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="border-b border-[#D4D4D4]"
+                >
+                  <ConversationListItem
+                    conversation={conversation}
+                    isSelected={conversation.id === selectedId}
+                    currentUserId={currentUserId}
+                    onClick={() => handleSelect(conversation)}
+                  />
+                </div>
+              );
+            })}
           </div>
-        ) : filteredConversations.length === 0 ? (
-          <div className="text-center py-8 px-4">
-            <MessageSquare className="w-10 h-10 mx-auto text-[#D4D4D4] mb-2" />
-            <p className="text-sm text-muted-foreground">
-              {searchQuery
-                ? 'No conversations found'
-                : filter !== 'all'
-                  ? `No ${filter} conversations`
-                  : 'No conversations yet'}
-            </p>
-            {!searchQuery && filter === 'all' && (
-              <Button
-                variant="link"
-                size="sm"
-                onClick={onNewConversation}
-                className="mt-2 text-[#2D7A7A]"
-              >
-                Start a conversation
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="divide-y divide-[#D4D4D4]">
-            {filteredConversations.map((conversation) => (
-              <ConversationListItem
-                key={conversation.id}
-                conversation={conversation}
-                isSelected={conversation.id === selectedId}
-                currentUserId={currentUserId}
-                onClick={() => onSelect(conversation)}
-              />
-            ))}
-          </div>
-        )}
-      </ScrollArea>
+        </div>
+      )}
     </div>
   );
 }

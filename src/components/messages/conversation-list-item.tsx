@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -14,7 +15,11 @@ interface ConversationListItemProps {
   onClick: () => void;
 }
 
-export function ConversationListItem({
+/**
+ * ConversationListItem - Memoized to prevent re-renders when other conversations change
+ * Only re-renders when this conversation's data, selection state, or callbacks change
+ */
+export const ConversationListItem = memo(function ConversationListItem({
   conversation,
   isSelected,
   currentUserId,
@@ -169,4 +174,4 @@ export function ConversationListItem({
       )}
     </button>
   );
-}
+});

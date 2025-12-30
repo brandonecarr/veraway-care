@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -10,7 +11,11 @@ interface MessageBubbleProps {
   isCurrentUser: boolean;
 }
 
-export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
+/**
+ * MessageBubble - Memoized to prevent re-renders when other messages change
+ * Only re-renders when this message's content or edit status changes
+ */
+export const MessageBubble = memo(function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
   // System messages
   if (message.message_type === 'system') {
     return (
@@ -82,4 +87,4 @@ export function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
       </div>
     </div>
   );
-}
+});

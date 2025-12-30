@@ -181,10 +181,10 @@ export function useRealtimeChatMessages(
             async (payload) => {
               if (!isMounted) return;
 
-              // Fetch sender info for the new message
               const newMessage = payload.new as MessageWithSender;
 
-              // Check if this is a temp message replacement
+              // OPTIMIZED: Attach sender from current user ref if it's own message,
+              // otherwise fetch sender info (API joins return sender but realtime doesn't)
               setMessages((prev) => {
                 // Remove any temp messages and duplicates
                 const filtered = prev.filter(
@@ -192,7 +192,12 @@ export function useRealtimeChatMessages(
                     !msg.id.startsWith('temp-') && msg.id !== newMessage.id
                 );
 
-                // Fetch sender info
+                // If it's our own message, we already have sender info
+                if (newMessage.sender_id === currentUserRef.current?.id) {
+                  return [...filtered, { ...newMessage, sender: currentUserRef.current }];
+                }
+
+                // For other users, need to fetch sender (realtime payload doesn't include joins)
                 if (newMessage.sender_id) {
                   supabase
                     .from('users')

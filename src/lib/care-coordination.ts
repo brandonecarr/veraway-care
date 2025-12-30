@@ -11,11 +11,16 @@ export async function getIssues(filters?: {
 }) {
   const supabase = await createClient();
 
+  // Use Supabase joins to fetch all related data in a single query
+  // This replaces the previous N+1 pattern (2 queries -> 1 query)
   let query = supabase
     .from('issues')
     .select(`
       *,
-      patient:patients(*)
+      patient:patients(*),
+      assignee:assigned_to(id, email, name, avatar_url),
+      reporter:reported_by(id, email, name, avatar_url),
+      resolver:resolved_by(id, email, name, avatar_url)
     `)
     .order('created_at', { ascending: false });
 
@@ -47,69 +52,26 @@ export async function getIssues(filters?: {
 
   if (error) throw error;
 
-  // Manually fetch user data for each issue using auth.users
-  if (data) {
-    const userIds = new Set<string>();
-    data.forEach((issue: any) => {
-      if (issue.assigned_to) userIds.add(issue.assigned_to);
-      if (issue.reported_by) userIds.add(issue.reported_by);
-      if (issue.resolved_by) userIds.add(issue.resolved_by);
-    });
-
-    // Fetch users from public.users table
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, email, name, avatar_url')
-      .in('id', Array.from(userIds));
-
-    const userMap = new Map(users?.map(u => [u.id, u]) || []);
-
-    // Attach user data to issues
-    return data.map((issue: any) => ({
-      ...issue,
-      assignee: issue.assigned_to ? userMap.get(issue.assigned_to) : null,
-      reporter: issue.reported_by ? userMap.get(issue.reported_by) : null,
-      resolver: issue.resolved_by ? userMap.get(issue.resolved_by) : null,
-    }));
-  }
-
   return data as any[];
 }
 
 export async function getIssueById(id: string) {
   const supabase = await createClient();
 
+  // Use Supabase joins to fetch all related data in a single query
   const { data, error } = await supabase
     .from('issues')
     .select(`
       *,
-      patient:patients(*)
+      patient:patients(*),
+      assignee:assigned_to(id, email, name, avatar_url),
+      reporter:reported_by(id, email, name, avatar_url),
+      resolver:resolved_by(id, email, name, avatar_url)
     `)
     .eq('id', id)
     .single();
 
   if (error) throw error;
-
-  // Manually fetch user data
-  if (data) {
-    const userIds = [data.assigned_to, data.reported_by, data.resolved_by].filter(Boolean);
-
-    if (userIds.length > 0) {
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, email, name, avatar_url')
-        .in('id', userIds);
-
-      const userMap = new Map(users?.map(u => [u.id, u]) || []);
-
-      return {
-        ...data,
-        assignee: data.assigned_to ? userMap.get(data.assigned_to) : null,
-        reporter: data.reported_by ? userMap.get(data.reported_by) : null,
-        resolver: data.resolved_by ? userMap.get(data.resolved_by) : null,
-      };
-    }
-  }
 
   return data;
 }
@@ -266,32 +228,17 @@ export async function searchPatients(searchTerm: string) {
 export async function getIssueMessages(issueId: string) {
   const supabase = await createClient();
 
+  // Use Supabase joins to fetch user data in a single query
   const { data, error } = await supabase
     .from('issue_messages')
-    .select('*')
+    .select(`
+      *,
+      user:user_id(id, email, name, avatar_url)
+    `)
     .eq('issue_id', issueId)
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-
-  // Manually fetch user data
-  if (data && data.length > 0) {
-    const userIds = Array.from(new Set(data.map(m => m.user_id).filter(Boolean)));
-
-    if (userIds.length > 0) {
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, email, name, avatar_url')
-        .in('id', userIds);
-
-      const userMap = new Map(users?.map(u => [u.id, u]) || []);
-
-      return data.map(message => ({
-        ...message,
-        user: message.user_id ? userMap.get(message.user_id) : null,
-      }));
-    }
-  }
 
   return data || [];
 }
@@ -312,9 +259,14 @@ export async function addIssueMessage(issueId: string, userId: string, message: 
 export async function getAuditLog(issueId?: string) {
   const supabase = await createClient();
 
+  // Use Supabase joins to fetch all related data in a single query
   let query = supabase
     .from('issue_audit_log')
-    .select('*')
+    .select(`
+      *,
+      user:user_id(id, email, name),
+      issue:issue_id(id, issue_number)
+    `)
     .order('created_at', { ascending: false });
 
   if (issueId) {
@@ -324,42 +276,6 @@ export async function getAuditLog(issueId?: string) {
   const { data, error } = await query;
 
   if (error) throw error;
-
-  // Manually fetch user data and issue numbers
-  if (data && data.length > 0) {
-    const userIds = Array.from(new Set(data.map(a => a.user_id).filter(Boolean)));
-    const issueIds = Array.from(new Set(data.map(a => a.issue_id).filter(Boolean)));
-
-    const promises = [];
-
-    if (userIds.length > 0) {
-      promises.push(
-        supabase
-          .from('users')
-          .select('id, email, name')
-          .in('id', userIds)
-      );
-    }
-
-    if (issueIds.length > 0) {
-      promises.push(
-        supabase
-          .from('issues')
-          .select('id, issue_number')
-          .in('id', issueIds)
-      );
-    }
-
-    const results = await Promise.all(promises);
-    const userMap = new Map(results[0]?.data?.map((u: any) => [u.id, u]) || []);
-    const issueMap = new Map(results[1]?.data?.map((i: any) => [i.id, i]) || []);
-
-    return data.map(log => ({
-      ...log,
-      user: log.user_id ? userMap.get(log.user_id) : null,
-      issue: log.issue_id ? issueMap.get(log.issue_id) : null,
-    }));
-  }
 
   return data as any[];
 }

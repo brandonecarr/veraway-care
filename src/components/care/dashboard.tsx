@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
 import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare } from 'lucide-react';
@@ -11,12 +12,21 @@ import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
 import { AfterShiftReportModal } from './after-shift-report-modal';
 import { AfterShiftReportBanner } from './after-shift-report-banner';
-import { ClinicianResponsiveness } from './clinician-responsiveness';
 import { ReportGenerator } from './report-generator';
-import { IssuesByTypeChart } from './issues-by-type-chart';
 import { IssueCard } from './issue-card';
 import { ConnectionStatus } from './connection-status';
 import { IssueCardSkeleton, MetricCardSkeleton, ChartSkeleton } from './loading-skeletons';
+
+// Dynamic imports for chart components to reduce initial bundle size
+const IssuesByTypeChart = dynamic(
+  () => import('./issues-by-type-chart').then((mod) => mod.IssuesByTypeChart),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const ClinicianResponsiveness = dynamic(
+  () => import('./clinician-responsiveness').then((mod) => mod.ClinicianResponsiveness),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
 import { ErrorBoundary } from '@/components/error-boundary';
 import type { Issue, DashboardMetrics } from '@/types/care-coordination';
 import { toast } from 'sonner';
