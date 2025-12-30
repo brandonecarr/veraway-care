@@ -273,6 +273,46 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
           />
         )}
 
+        {/* Overdue Issues Alert Banner */}
+        {metrics && metrics.overdueIssues > 0 && (
+          <div
+            className="animate-in fade-in slide-in-from-top-4 duration-500"
+            style={{ animationDelay: '50ms' }}
+          >
+            <Card
+              className="bg-gradient-to-r from-[#E63946]/10 to-[#E63946]/5 border-[#E63946]/30 cursor-pointer hover:border-[#E63946]/50 transition-colors"
+              onClick={() => setFilter('overdue')}
+            >
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#E63946]/20">
+                    <AlertCircle className="w-5 h-5 text-[#E63946]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#E63946]">
+                      {metrics.overdueIssues} {metrics.overdueIssues === 1 ? 'Issue' : 'Issues'} Overdue
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      These issues have been open for more than 24 hours and require immediate attention
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/10 hover:text-[#E63946]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilter('overdue');
+                  }}
+                >
+                  View Overdue
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Bento Grid Layout - Primary Metrics */}
         {isLoading && !metrics ? (
           <>
