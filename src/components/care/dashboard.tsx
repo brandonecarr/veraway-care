@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
-import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { MetricCard } from './metric-card';
@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { ISSUE_TYPE_COLORS } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeIssues } from '@/hooks/use-realtime-issues';
+import { useUnreadMessages } from '@/hooks/use-unread-messages';
 
 const ITEMS_PER_PAGE_DESKTOP = 6; // 3 columns x 2 rows
 const ITEMS_PER_PAGE_MOBILE = 5;
@@ -42,6 +43,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const params = useParams();
   const slug = params?.slug as string;
   const { issues: realtimeIssues, isConnected, isLoading, refreshIssues } = useRealtimeIssues();
+  const { totalUnread, latestConversation } = useUnreadMessages();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
@@ -241,20 +243,52 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     <main className="w-full min-h-screen pb-24 md:pb-24 bg-grain">
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12 space-y-6 md:space-y-12">
         {/* Header */}
-        <div 
+        <div
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in-up"
           style={{ animationDelay: '0ms' }}
         >
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight">
-                Care Coordination
-              </h1>
-              <ConnectionStatus isConnected={isConnected} />
+          <div className="flex items-center gap-4 flex-1">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight">
+                  Care Coordination
+                </h1>
+                <ConnectionStatus isConnected={isConnected} />
+              </div>
+              <p className="text-body text-muted-foreground mt-1 md:mt-2">
+                {userRole === 'coordinator' ? 'Coordinator View' : userRole === 'after_hours' ? 'After-Hours View' : 'Clinician View'}
+              </p>
             </div>
-            <p className="text-body text-muted-foreground mt-1 md:mt-2">
-              {userRole === 'coordinator' ? 'Coordinator View' : userRole === 'after_hours' ? 'After-Hours View' : 'Clinician View'}
-            </p>
+
+            {/* New Message Notification Card */}
+            {totalUnread > 0 && latestConversation && (
+              <Card
+                className="ml-auto bg-gradient-to-r from-[#2D7A7A]/10 to-[#2D7A7A]/5 border-[#2D7A7A]/30 cursor-pointer hover:border-[#2D7A7A]/50 hover:shadow-md transition-all hidden md:block"
+                onClick={() => router.push(`/${slug}/dashboard/messages?conversation=${latestConversation.id}`)}
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#2D7A7A]/20">
+                    <MessageSquare className="w-5 h-5 text-[#2D7A7A]" />
+                  </div>
+                  <div className="max-w-[200px]">
+                    <p className="font-semibold text-[#2D7A7A] text-sm">
+                      {totalUnread} New {totalUnread === 1 ? 'Message' : 'Messages'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {latestConversation.name ||
+                        (latestConversation.type === 'patient'
+                          ? `Patient: ${latestConversation.patient?.first_name || 'Unknown'} ${latestConversation.patient?.last_name || ''}`
+                          : 'Direct Message'
+                        )
+                      }
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="bg-[#2D7A7A] text-white text-xs">
+                    View
+                  </Badge>
+                </div>
+              </Card>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {userRole === 'coordinator' && (
@@ -262,6 +296,39 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
             )}
           </div>
         </div>
+
+        {/* Mobile New Message Notification */}
+        {totalUnread > 0 && latestConversation && (
+          <div className="md:hidden animate-in fade-in slide-in-from-top-4 duration-500">
+            <Card
+              className="bg-gradient-to-r from-[#2D7A7A]/10 to-[#2D7A7A]/5 border-[#2D7A7A]/30 cursor-pointer hover:border-[#2D7A7A]/50 transition-colors"
+              onClick={() => router.push(`/${slug}/dashboard/messages?conversation=${latestConversation.id}`)}
+            >
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#2D7A7A]/20">
+                    <MessageSquare className="w-5 h-5 text-[#2D7A7A]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#2D7A7A]">
+                      {totalUnread} New {totalUnread === 1 ? 'Message' : 'Messages'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Tap to view in Message Center
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-[#2D7A7A]/30 text-[#2D7A7A] hover:bg-[#2D7A7A]/10 hover:text-[#2D7A7A]"
+                >
+                  View
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* After Shift Report Banner */}
         {(userRole === 'after_hours' || userRole === 'coordinator') && (
