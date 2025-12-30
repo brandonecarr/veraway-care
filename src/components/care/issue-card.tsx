@@ -112,11 +112,9 @@ export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCa
             <h3 className="text-card-header font-semibold text-foreground truncate font-space">
               {issue.patient?.first_name} {issue.patient?.last_name}
             </h3>
-            {issue.description && (
-              <p className="text-body text-muted-foreground line-clamp-2 mt-1">
-                {issue.description}
-              </p>
-            )}
+            <p className="text-body text-muted-foreground line-clamp-2 mt-1 min-h-[2.5rem]">
+              {issue.description || '\u00A0'}
+            </p>
           </div>
           <Badge
             variant={isOverdue() ? "destructive" : "outline"}
