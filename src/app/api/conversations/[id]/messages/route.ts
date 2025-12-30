@@ -114,6 +114,7 @@ export async function POST(
           type: 'message',
           title: `New message from ${senderName}`,
           message: content.trim().substring(0, 100),
+          related_patient_id: conversation.type === 'patient' ? conversation.patient_id : null,
           metadata: {
             conversation_id: conversationId,
             conversation_type: conversation.type,
@@ -123,12 +124,18 @@ export async function POST(
           },
         }));
 
+        console.log('[Messages API] Creating notifications for', recipientIds.length, 'recipients');
+
         // Insert notifications (fire and forget - don't block response)
         adminClient
           .from('notifications')
           .insert(notifications)
-          .then(({ error }) => {
-            if (error) console.error('Failed to create notifications:', error);
+          .then(({ error, data }) => {
+            if (error) {
+              console.error('[Messages API] Failed to create notifications:', error);
+            } else {
+              console.log('[Messages API] Successfully created notifications');
+            }
           });
 
         // Send push notifications (fire and forget)
