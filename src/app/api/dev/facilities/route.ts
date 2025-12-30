@@ -29,15 +29,29 @@ export async function GET() {
 
     if (error) throw error;
 
-    // Fetch coordinator roles WITH user data using Supabase join
-    // This avoids the pagination issue by only fetching coordinator users
-    const { data: coordinators } = await supabase
+    // Fetch coordinator roles
+    const { data: coordinatorRoles } = await supabase
       .from('user_roles')
-      .select('facility_id, user_id, users(id, email, name)')
+      .select('facility_id, user_id')
       .eq('role', 'coordinator');
 
-    // Get auth users for coordinators only to check registration status
-    const coordinatorUserIds = coordinators?.map(c => c.user_id) || [];
+    // Get all coordinator user IDs
+    const coordinatorUserIds = coordinatorRoles?.map(c => c.user_id) || [];
+
+    // Fetch user data from public.users table for all coordinators
+    const usersMap = new Map<string, { email: string; name: string }>();
+    if (coordinatorUserIds.length > 0) {
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, email, name')
+        .in('id', coordinatorUserIds);
+
+      usersData?.forEach(user => {
+        usersMap.set(user.id, { email: user.email, name: user.name });
+      });
+    }
+
+    // Get auth users to check registration status
     const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
     const authUsers = authData?.users || [];
 
@@ -49,10 +63,14 @@ export async function GET() {
       coordinator_email: string | null;
     }>();
 
-    coordinators?.forEach(coord => {
+    console.log('Processing coordinator roles:', coordinatorRoles?.length || 0);
+    console.log('Users map size:', usersMap.size);
+
+    coordinatorRoles?.forEach(coord => {
       const facilityId = coord.facility_id;
-      // Handle both array and object response formats from Supabase join
-      const userInfo = Array.isArray(coord.users) ? coord.users[0] : coord.users;
+      const userInfo = usersMap.get(coord.user_id);
+
+      console.log(`Processing coordinator: user_id=${coord.user_id}, facility_id=${facilityId}, userInfo=`, userInfo);
 
       if (!coordinatorMap.has(facilityId)) {
         coordinatorMap.set(facilityId, {
@@ -61,6 +79,15 @@ export async function GET() {
           coordinator_name: userInfo?.name || null,
           coordinator_email: userInfo?.email || null,
         });
+      } else if (userInfo) {
+        // If we already have an entry but this coordinator has user info, update it
+        const existing = coordinatorMap.get(facilityId)!;
+        if (!existing.coordinator_name && userInfo.name) {
+          existing.coordinator_name = userInfo.name;
+        }
+        if (!existing.coordinator_email && userInfo.email) {
+          existing.coordinator_email = userInfo.email;
+        }
       }
 
       const facilityData = coordinatorMap.get(facilityId)!;
@@ -73,6 +100,8 @@ export async function GET() {
         facilityData.all_registered = false;
       }
     });
+
+    console.log('Coordinator map:', Object.fromEntries(coordinatorMap));
 
     const facilitiesWithCoordinators = facilities?.map(facility => ({
       ...facility,
