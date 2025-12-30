@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
 import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { MetricCard } from './metric-card';
 import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
@@ -41,6 +41,7 @@ interface CareCoordinationDashboardProps {
 export function CareCoordinationDashboard({ userId, userRole }: CareCoordinationDashboardProps) {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params?.slug as string;
   const { issues: realtimeIssues, isConnected, isLoading, refreshIssues } = useRealtimeIssues();
   const { totalUnread, latestConversation } = useUnreadMessages();
@@ -71,6 +72,38 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
       fetchMetrics();
     }
   }, [issues]);
+
+  // Handle issue query parameter from URL (e.g., from notification click)
+  useEffect(() => {
+    const issueId = searchParams.get('issue');
+    if (issueId && issues.length > 0) {
+      // Find the issue in the loaded issues
+      const issue = issues.find(i => i.id === issueId);
+      if (issue) {
+        setSelectedIssue(issue);
+        setIsDetailPanelOpen(true);
+        // Clear the query param from URL without triggering a reload
+        const url = new URL(window.location.href);
+        url.searchParams.delete('issue');
+        window.history.replaceState({}, '', url.toString());
+      } else {
+        // Issue not in active issues, try to fetch it directly
+        fetch(`/api/issues/${issueId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setSelectedIssue(data);
+              setIsDetailPanelOpen(true);
+              // Clear the query param from URL
+              const url = new URL(window.location.href);
+              url.searchParams.delete('issue');
+              window.history.replaceState({}, '', url.toString());
+            }
+          })
+          .catch(console.error);
+      }
+    }
+  }, [searchParams, issues]);
 
   const fetchMetrics = async () => {
     try {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,13 +11,18 @@ import {
   Heart,
   Calendar,
   FileText,
-  User,
   ExternalLink,
   Users,
   X,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import type { ConversationWithDetails } from '@/types/messages';
+import type { Issue } from '@/types/care-coordination';
+import { ISSUE_TYPE_COLORS } from '@/types/care-coordination';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -24,15 +30,70 @@ interface PatientInfoPaneProps {
   conversation: ConversationWithDetails | null;
   currentUserId: string;
   onClose?: () => void;
+  onIssueClick?: (issue: Issue) => void;
 }
 
 export function PatientInfoPane({
   conversation,
   currentUserId,
   onClose,
+  onIssueClick,
 }: PatientInfoPaneProps) {
   const params = useParams();
   const facilitySlug = params?.slug as string;
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [isLoadingIssues, setIsLoadingIssues] = useState(false);
+
+  // Fetch issues for the patient when conversation changes
+  useEffect(() => {
+    const fetchPatientIssues = async () => {
+      if (conversation?.type !== 'patient' || !conversation?.patient_id) {
+        setIssues([]);
+        return;
+      }
+
+      setIsLoadingIssues(true);
+      try {
+        const response = await fetch(`/api/issues?patient_id=${conversation.patient_id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Sort by created_at descending (most recent first)
+          const sortedIssues = (data.issues || data || []).sort(
+            (a: Issue, b: Issue) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setIssues(sortedIssues);
+        }
+      } catch (error) {
+        console.error('Failed to fetch patient issues:', error);
+      } finally {
+        setIsLoadingIssues(false);
+      }
+    };
+
+    fetchPatientIssues();
+  }, [conversation?.patient_id, conversation?.type]);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'resolved':
+        return <CheckCircle2 className="w-3 h-3 text-[#81B29A]" />;
+      case 'in_progress':
+        return <Clock className="w-3 h-3 text-[#F4A261]" />;
+      default:
+        return <AlertCircle className="w-3 h-3 text-[#E07A5F]" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'resolved':
+        return 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]';
+      case 'in_progress':
+        return 'bg-[#F4A261]/10 text-[#F4A261] border-[#F4A261]';
+      default:
+        return 'bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]';
+    }
+  };
 
   if (!conversation) {
     return (
@@ -135,6 +196,74 @@ export function PatientInfoPane({
                 </Link>
               )}
             </Card>
+          )}
+
+          {/* Patient Issues */}
+          {isPatientChat && (
+            <div>
+              <h4 className="font-medium text-sm text-[#1A1A1A] mb-3 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Issues ({issues.length})
+              </h4>
+
+              {isLoadingIssues ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : issues.length === 0 ? (
+                <div className="text-center py-4 text-sm text-muted-foreground bg-white rounded-lg">
+                  No issues for this patient
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {issues.map((issue) => (
+                    <div
+                      key={issue.id}
+                      onClick={() => onIssueClick?.(issue)}
+                      className="p-3 rounded-lg bg-white border border-transparent hover:border-[#2D7A7A] cursor-pointer transition-all hover:shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {getStatusIcon(issue.status)}
+                          <span className="text-xs font-medium text-muted-foreground">
+                            #{issue.issue_number}
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] shrink-0 ${getStatusColor(issue.status)}`}
+                        >
+                          {issue.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1.5 py-0"
+                          style={{
+                            backgroundColor: `${ISSUE_TYPE_COLORS[issue.issue_type] || '#6C757D'}20`,
+                            color: ISSUE_TYPE_COLORS[issue.issue_type] || '#6C757D',
+                          }}
+                        >
+                          {issue.issue_type}
+                        </Badge>
+                      </div>
+
+                      {issue.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
+                          {issue.description}
+                        </p>
+                      )}
+
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(issue.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Participants */}

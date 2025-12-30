@@ -16,7 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 import { formatDistanceToNow } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '../../../supabase/client';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { ConnectionStatus } from './connection-status';
@@ -25,6 +25,8 @@ export function NotificationCenter() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string;
   const supabase = createClient();
 
   // Get current user ID
@@ -50,15 +52,17 @@ export function NotificationCenter() {
 
     setIsOpen(false);
 
+    const basePath = slug ? `/${slug}/dashboard` : '/dashboard';
+
     // Handle message notifications - navigate to the conversation
     if (notification.type === 'message' && notification.metadata?.conversation_id) {
-      router.push(`/dashboard/messages?conversation=${notification.metadata.conversation_id}`);
+      router.push(`${basePath}/messages?conversation=${notification.metadata.conversation_id}`);
       return;
     }
 
-    // Handle issue-related notifications
+    // Handle issue-related notifications - navigate and open issue detail panel
     if (notification.related_issue_id) {
-      router.push(`/dashboard?issue=${notification.related_issue_id}`);
+      router.push(`${basePath}?issue=${notification.related_issue_id}`);
     }
   };
 
@@ -119,7 +123,8 @@ export function NotificationCenter() {
                 className="h-8 w-8"
                 onClick={() => {
                   setIsOpen(false);
-                  router.push('/dashboard/settings#notifications');
+                  const basePath = slug ? `/${slug}/dashboard` : '/dashboard';
+                  router.push(`${basePath}/settings#notifications`);
                 }}
               >
                 <Settings className="h-4 w-4" />

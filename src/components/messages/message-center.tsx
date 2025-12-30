@@ -13,9 +13,12 @@ import { ConversationList } from './conversation-list';
 import { MessageThread } from './message-thread';
 import { PatientInfoPane } from './patient-info-pane';
 import { NewConversationDialog } from './new-conversation-dialog';
+import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
 import { useRealtimeConversations } from '@/hooks/use-realtime-conversations';
 import { useRealtimeChatMessages } from '@/hooks/use-realtime-chat-messages';
 import type { ConversationWithDetails } from '@/types/messages';
+import type { Issue } from '@/types/care-coordination';
+import { useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 interface MessageCenterProps {
@@ -24,15 +27,36 @@ interface MessageCenterProps {
 }
 
 export function MessageCenter({ userId, initialConversationId }: MessageCenterProps) {
+  const params = useParams();
+  const slug = params?.slug as string;
   const [selectedConversation, setSelectedConversation] =
     useState<ConversationWithDetails | null>(null);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [isMobileListOpen, setIsMobileListOpen] = useState(false);
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [isIssueDetailOpen, setIsIssueDetailOpen] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
 
   const { conversations, isLoading: isLoadingConversations, refreshConversations } =
     useRealtimeConversations({ selectedConversationId: selectedConversation?.id });
+
+  // Fetch available users for issue assignment
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/users?all=true');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableUsers(Array.isArray(data.users) ? data.users : []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const {
     messages,
@@ -97,6 +121,53 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
     }
   }, [selectedConversation, refreshConversations]);
 
+  const handleIssueClick = useCallback((issue: Issue) => {
+    setSelectedIssue(issue);
+    setIsIssueDetailOpen(true);
+    // Close mobile info pane if open
+    setIsMobileInfoOpen(false);
+  }, []);
+
+  const handleResolveIssue = useCallback(async (issueId: string) => {
+    try {
+      const response = await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolved_by: userId,
+        }),
+      });
+
+      if (response.ok) {
+        setIsIssueDetailOpen(false);
+      }
+    } catch (error) {
+      console.error('Error resolving issue:', error);
+    }
+  }, [userId]);
+
+  const handleAssignIssue = useCallback(async (issueId: string, assigneeId: string) => {
+    try {
+      await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_to: assigneeId }),
+      });
+    } catch (error) {
+      console.error('Error assigning issue:', error);
+    }
+  }, []);
+
+  const handleStatusChange = useCallback(async (issueId: string, newStatus: string) => {
+    if (selectedIssue?.id === issueId) {
+      setSelectedIssue((prev) =>
+        prev ? { ...prev, status: newStatus as Issue['status'] } : null
+      );
+    }
+  }, [selectedIssue?.id]);
+
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Mobile Header */}
@@ -133,6 +204,7 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
                 conversation={selectedConversation}
                 currentUserId={userId}
                 onClose={() => setIsMobileInfoOpen(false)}
+                onIssueClick={handleIssueClick}
               />
             </SheetContent>
           </Sheet>
@@ -179,6 +251,7 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
             <PatientInfoPane
               conversation={selectedConversation}
               currentUserId={userId}
+              onIssueClick={handleIssueClick}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -206,6 +279,20 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
         onOpenChange={setIsNewConversationOpen}
         currentUserId={userId}
         onConversationCreated={handleConversationCreated}
+      />
+
+      {/* Issue Detail Panel */}
+      <IssueDetailPanel
+        issue={selectedIssue}
+        open={isIssueDetailOpen}
+        onOpenChange={setIsIssueDetailOpen}
+        onResolve={handleResolveIssue}
+        onAssign={handleAssignIssue}
+        onStatusChange={handleStatusChange}
+        currentUserId={userId}
+        userRole="coordinator"
+        availableUsers={availableUsers}
+        slug={slug}
       />
     </div>
   );
