@@ -81,14 +81,16 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users');
+      // Fetch all staff (coordinators and clinicians) for assignment dropdown
+      const response = await fetch('/api/users?all=true');
       if (!response.ok) {
         // Silently handle auth errors - user might not be logged in yet
         setAvailableUsers([]);
         return;
       }
-      const users = await response.json();
-      setAvailableUsers(Array.isArray(users) ? users : []);
+      const data = await response.json();
+      // API returns { users: [...] }
+      setAvailableUsers(Array.isArray(data.users) ? data.users : []);
     } catch (error) {
       // Silently fail for network errors during initial load
       setAvailableUsers([]);

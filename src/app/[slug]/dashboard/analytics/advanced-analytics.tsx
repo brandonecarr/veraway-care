@@ -7,10 +7,16 @@ import { ClinicianWorkloadHeatmap } from '@/components/care/clinician-workload-h
 import { IssueTypeDistribution } from '@/components/care/issue-type-distribution';
 import { AnalyticsExport } from '@/components/care/analytics-export';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, BarChart3 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, BarChart3, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format, subDays, subMonths } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+type PeriodType = '7' | '14' | '30' | '60' | '90' | 'bimonth' | 'biannual' | 'year' | 'custom';
 
 interface AdvancedAnalyticsProps {
   userId: string;
@@ -19,18 +25,49 @@ interface AdvancedAnalyticsProps {
 
 export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsProps) {
   const router = useRouter();
-  const [period, setPeriod] = useState<'7' | '30'>('30');
+  const [period, setPeriod] = useState<PeriodType>('30');
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
-    fetchAnalytics();
+    if (period !== 'custom') {
+      fetchAnalytics();
+    }
   }, [period]);
+
+  // Fetch when custom dates change
+  useEffect(() => {
+    if (period === 'custom' && customStartDate && customEndDate) {
+      fetchAnalytics();
+    }
+  }, [customStartDate, customEndDate, period]);
+
+  const getPeriodDays = (p: PeriodType): number => {
+    switch (p) {
+      case '7': return 7;
+      case '14': return 14;
+      case '30': return 30;
+      case '60': return 60;
+      case '90': return 90;
+      case 'bimonth': return 60; // 2 months
+      case 'biannual': return 180; // 6 months
+      case 'year': return 365;
+      default: return 30;
+    }
+  };
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/analytics?period=${period}`);
+      let url = `/api/analytics?period=${getPeriodDays(period)}`;
+
+      if (period === 'custom' && customStartDate && customEndDate) {
+        url = `/api/analytics?startDate=${format(customStartDate, 'yyyy-MM-dd')}&endDate=${format(customEndDate, 'yyyy-MM-dd')}`;
+      }
+
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAnalyticsData(data);
@@ -71,14 +108,82 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
           </div>
 
           {/* Controls - stacked on mobile, inline on desktop */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between pl-12 md:pl-14">
-            <Tabs value={period} onValueChange={(v) => setPeriod(v as '7' | '30')}>
-              <TabsList>
-                <TabsTrigger value="7">7 Days</TabsTrigger>
-                <TabsTrigger value="30">30 Days</TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div className="flex flex-col gap-3 pl-12 md:pl-14">
+            {/* Date Range Tabs */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Tabs value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
+                <TabsList className="flex-wrap h-auto gap-1">
+                  <TabsTrigger value="7" className="text-xs sm:text-sm">7 Days</TabsTrigger>
+                  <TabsTrigger value="14" className="text-xs sm:text-sm">14 Days</TabsTrigger>
+                  <TabsTrigger value="30" className="text-xs sm:text-sm">30 Days</TabsTrigger>
+                  <TabsTrigger value="60" className="text-xs sm:text-sm">60 Days</TabsTrigger>
+                  <TabsTrigger value="90" className="text-xs sm:text-sm">90 Days</TabsTrigger>
+                  <TabsTrigger value="bimonth" className="text-xs sm:text-sm">Bi-Month</TabsTrigger>
+                  <TabsTrigger value="biannual" className="text-xs sm:text-sm">Bi-Annual</TabsTrigger>
+                  <TabsTrigger value="year" className="text-xs sm:text-sm">Year</TabsTrigger>
+                  <TabsTrigger value="custom" className="text-xs sm:text-sm">Custom</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
+            {/* Custom Date Pickers - shown when Custom is selected */}
+            {period === 'custom' && (
+              <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-[#D4D4D4] rounded-lg">
+                <span className="text-sm text-muted-foreground">From:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "justify-start text-left font-normal min-w-[140px]",
+                        !customStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      disabled={(date) => date > new Date() || (customEndDate ? date > customEndDate : false)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span className="text-sm text-muted-foreground">To:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "justify-start text-left font-normal min-w-[140px]",
+                        !customEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      disabled={(date) => date > new Date() || (customStartDate ? date < customStartDate : false)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Action buttons */}
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

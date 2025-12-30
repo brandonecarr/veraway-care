@@ -21,10 +21,10 @@ export default async function AnalyticsPage({ params }: { params: { slug: string
     .eq('user_id', user.id)
     .maybeSingle();
 
-  const isCoordinator = roleData?.role === 'coordinator';
+  const userRole = roleData?.role || 'clinician';
 
-  // Only coordinators should see advanced analytics
-  if (!isCoordinator) {
+  // Coordinators and clinicians can see analytics (not after_hours)
+  if (userRole === 'after_hours') {
     redirect(`/${params.slug}/dashboard`);
   }
 
