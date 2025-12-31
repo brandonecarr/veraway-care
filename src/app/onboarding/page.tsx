@@ -93,12 +93,13 @@ export default function OnboardingPage() {
     setUserEmail(user.email || '');
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
-    // Fetch user's facility information with contact details
+    // Fetch user's facility information with contact details and onboarding status
     try {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select(`
           facility_id,
+          onboarding_completed_at,
           facilities(
             id,
             name,
@@ -118,7 +119,19 @@ export default function OnboardingPage() {
 
       if (userError) {
         console.error('Error fetching user data:', userError);
-      } else if (userData?.facilities) {
+      }
+
+      // If onboarding is already completed, redirect to dashboard
+      if (userData?.onboarding_completed_at && userData?.facilities) {
+        const facilityData = Array.isArray(userData.facilities)
+          ? userData.facilities[0]
+          : userData.facilities;
+        const dashboardUrl = facilityData?.slug ? `/${facilityData.slug}/dashboard` : '/dashboard';
+        router.push(dashboardUrl);
+        return;
+      }
+
+      if (userData?.facilities) {
         const facilityData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
@@ -331,6 +344,17 @@ export default function OnboardingPage() {
       if (error) {
         toast.error(error.message);
         return;
+      }
+
+      // Mark onboarding as completed
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ onboarding_completed_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Failed to mark onboarding as complete:', updateError);
+        // Don't block the user, just log the error
       }
 
       toast.success('Account setup complete! Redirecting to dashboard...');

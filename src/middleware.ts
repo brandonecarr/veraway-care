@@ -70,10 +70,10 @@ export async function middleware(request: NextRequest) {
     try {
       // If user is accessing /dashboard without a slug, redirect to facility-specific URL
       if (pathname.startsWith('/dashboard')) {
-        // Get user's facility slug - use maybeSingle to avoid errors if no row exists
+        // Get user's facility slug and onboarding status - use maybeSingle to avoid errors if no row exists
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, facilities(slug)')
+          .select('facility_id, onboarding_completed_at, facilities(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -100,6 +100,11 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/dev-dashboard', request.url));
         }
 
+        // Check if onboarding is completed - if not, redirect to onboarding
+        if (!userData?.onboarding_completed_at) {
+          return NextResponse.redirect(new URL('/onboarding', request.url));
+        }
+
         if (userData?.facilities) {
           const facility = Array.isArray(userData.facilities)
             ? userData.facilities[0]
@@ -112,7 +117,7 @@ export async function middleware(request: NextRequest) {
           }
         }
 
-        // If no facility found, user can't access dashboard
+        // If no facility found, redirect to onboarding
         return NextResponse.redirect(new URL('/onboarding', request.url));
       }
 
@@ -121,10 +126,10 @@ export async function middleware(request: NextRequest) {
       if (slugMatch) {
         const slug = slugMatch[1];
 
-        // Get user's facility slug to verify - use maybeSingle
+        // Get user's facility slug and onboarding status to verify - use maybeSingle
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, facilities(slug)')
+          .select('facility_id, onboarding_completed_at, facilities(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -132,6 +137,11 @@ export async function middleware(request: NextRequest) {
           console.error('Middleware: Error fetching user data for slug verification:', userError);
           // Don't block user, let them through
           return response;
+        }
+
+        // Check if onboarding is completed - if not, redirect to onboarding
+        if (!userData?.onboarding_completed_at) {
+          return NextResponse.redirect(new URL('/onboarding', request.url));
         }
 
         if (userData?.facilities) {
