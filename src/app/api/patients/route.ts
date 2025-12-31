@@ -60,9 +60,9 @@ export async function POST(request: Request) {
         mrn,
         first_name,
         last_name,
-        date_of_birth,
-        admission_date,
-        diagnosis,
+        date_of_birth: date_of_birth || null,
+        admission_date: admission_date || null,
+        diagnosis: diagnosis || null,
         status: status || 'active'
       }])
       .select()
