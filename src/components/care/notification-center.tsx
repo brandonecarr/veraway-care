@@ -60,6 +60,12 @@ export function NotificationCenter() {
       return;
     }
 
+    // Handle handoff/after-shift report notifications - navigate to after-shift reports page
+    if (notification.type === 'handoff' || notification.related_handoff_id) {
+      router.push(`${basePath}/after-shift-reports`);
+      return;
+    }
+
     // Handle issue-related notifications - navigate and open issue detail panel
     if (notification.related_issue_id) {
       router.push(`${basePath}?issue=${notification.related_issue_id}`);

@@ -86,12 +86,15 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     fetchUsers();
   }, []);
 
-  // Re-fetch metrics when issues change
+  // Re-fetch metrics when issues count changes (debounced to prevent rapid API calls)
   useEffect(() => {
     if (issues.length > 0) {
-      fetchMetrics();
+      const timeoutId = setTimeout(() => {
+        fetchMetrics();
+      }, 500); // Debounce 500ms to prevent rapid refetches from real-time updates
+      return () => clearTimeout(timeoutId);
     }
-  }, [issues]);
+  }, [issues.length]); // Only trigger when count changes, not on every array reference change
 
   // Handle issue query parameter from URL (e.g., from notification click)
   useEffect(() => {

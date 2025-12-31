@@ -141,12 +141,13 @@ export default function SettingsPage() {
         email: userData.email || '',
       });
 
-      // Get user role
+      // Get user role - filter by facility_id to get the correct role for this facility
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role, job_role')
         .eq('user_id', user.id)
-        .single();
+        .eq('facility_id', userData.facility_id)
+        .maybeSingle();
 
       setUserProfile({
         id: user.id,
