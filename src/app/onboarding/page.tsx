@@ -100,7 +100,7 @@ export default function OnboardingPage() {
         .select(`
           facility_id,
           onboarding_completed_at,
-          facilities(
+          facilities!users_organization_id_fkey(
             id,
             name,
             slug,

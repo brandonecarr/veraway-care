@@ -73,7 +73,7 @@ export async function middleware(request: NextRequest) {
         // Get user's facility slug and onboarding status - use maybeSingle to avoid errors if no row exists
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, onboarding_completed_at, facilities(slug)')
+          .select('facility_id, onboarding_completed_at, facilities!users_organization_id_fkey(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -129,7 +129,7 @@ export async function middleware(request: NextRequest) {
         // Get user's facility slug and onboarding status to verify - use maybeSingle
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, onboarding_completed_at, facilities(slug)')
+          .select('facility_id, onboarding_completed_at, facilities!users_organization_id_fkey(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
