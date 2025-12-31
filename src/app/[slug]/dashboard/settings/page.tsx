@@ -122,7 +122,7 @@ export default function SettingsPage() {
       return;
     }
 
-    // Get user profile and role
+    // Get user profile and role - use explicit foreign key to avoid ambiguous relationship error
     const { data: userData } = await supabase
       .from('users')
       .select(`
@@ -130,7 +130,7 @@ export default function SettingsPage() {
         name,
         email,
         facility_id,
-        facilities(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
+        facilities!users_organization_id_fkey(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
       `)
       .eq('id', user.id)
       .single();
