@@ -257,7 +257,7 @@ export function IssueDetailPanel({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl lg:max-w-2xl p-0 flex flex-col" side="right">
-        <SheetHeader className="p-6 pb-4">
+        <SheetHeader className="p-6 pb-4 pr-12">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
