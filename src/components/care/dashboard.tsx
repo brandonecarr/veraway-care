@@ -66,7 +66,17 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const openQuickReportModalRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
+  const issuesSectionRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+
+  // Helper to set filter and scroll to issues section
+  const setFilterAndScroll = useCallback((newFilter: 'all' | 'my' | 'open' | 'overdue') => {
+    setFilter(newFilter);
+    // Scroll to issues section after a brief delay to allow state update
+    setTimeout(() => {
+      issuesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }, []);
 
   // Sync issues state with real-time issues
   const issues = realtimeIssues;
@@ -391,7 +401,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
           >
             <Card
               className="bg-gradient-to-r from-[#E63946]/10 to-[#E63946]/5 border-[#E63946]/30 cursor-pointer hover:border-[#E63946]/50 transition-colors"
-              onClick={() => setFilter('overdue')}
+              onClick={() => setFilterAndScroll('overdue')}
             >
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -413,7 +423,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   className="shrink-0 border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/10 hover:text-[#E63946]"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setFilter('overdue');
+                    setFilterAndScroll('overdue');
                   }}
                 >
                   View Overdue
@@ -456,7 +466,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       value={metrics.openIssues}
                       subtitle={`of ${metrics.totalIssues} total`}
                       icon={Clock}
-                      onClick={() => setFilter('open')}
+                      onClick={() => setFilterAndScroll('open')}
                     />
                   </div>
                   <div className="w-[280px] flex-shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
@@ -465,7 +475,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       value={metrics.overdueIssues}
                       subtitle="Require immediate attention"
                       icon={AlertCircle}
-                      onClick={() => setFilter('overdue')}
+                      onClick={() => setFilterAndScroll('overdue')}
                       className="border-l-4 border-l-[hsl(var(--status-overdue))]"
                     />
                   </div>
@@ -498,7 +508,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   value={metrics.openIssues}
                   subtitle={`of ${metrics.totalIssues} total`}
                   icon={Clock}
-                  onClick={() => setFilter('open')}
+                  onClick={() => setFilterAndScroll('open')}
                 />
               </div>
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
@@ -507,7 +517,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   value={metrics.overdueIssues}
                   subtitle="Require immediate attention"
                   icon={AlertCircle}
-                  onClick={() => setFilter('overdue')}
+                  onClick={() => setFilterAndScroll('overdue')}
                   className="border-l-4 border-l-[hsl(var(--status-overdue))]"
                 />
               </div>
@@ -580,7 +590,8 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         )}
 
         {/* Issues List */}
-        <div 
+        <div
+          ref={issuesSectionRef}
           className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: '700ms' }}
         >
