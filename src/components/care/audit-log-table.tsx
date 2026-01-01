@@ -110,9 +110,9 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
         return null;
       case 'handoff_created':
       case 'after_shift_report_created':
-        // Link to after-shift reports
+        // Link directly to the specific report
         if (entry.details?.handoff_id) {
-          return `/${facilitySlug}/dashboard/after-shift-reports`;
+          return `/${facilitySlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`;
         }
         return null;
       case 'created':
@@ -129,12 +129,21 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
   };
 
   // Get patient name for display - handles both issue-based and patient_created entries
-  const getPatientDisplay = (entry: AuditLogEntry): { name: string; id?: string } | null => {
+  const getPatientDisplay = (entry: AuditLogEntry): { name: string; id?: string; isReport?: boolean } | null => {
     // For patient_created entries, get from details
     if (entry.action === 'patient_created' && entry.details) {
       return {
         name: `${entry.details.first_name || ''} ${entry.details.last_name || ''}`.trim() || 'Unknown Patient',
         id: entry.details.patient_id
+      };
+    }
+
+    // For after-shift report entries, show report info
+    if (entry.action === 'after_shift_report_created') {
+      const taggedCount = entry.details?.tagged_count || 0;
+      return {
+        name: `${taggedCount} issue${taggedCount !== 1 ? 's' : ''} tagged`,
+        isReport: true
       };
     }
 
@@ -687,6 +696,18 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                         {(() => {
                           const patientDisplay = getPatientDisplay(entry);
                           if (patientDisplay) {
+                            // For after-shift report entries, link to the specific report
+                            if (patientDisplay.isReport && entry.details?.handoff_id) {
+                              return (
+                                <Link
+                                  href={`/${facilitySlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`}
+                                  className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors"
+                                >
+                                  {patientDisplay.name}
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              );
+                            }
                             // For issue-related entries, clicking opens the issue detail panel
                             if (entry.issue?.id) {
                               return (

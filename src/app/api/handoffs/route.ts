@@ -97,23 +97,20 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Create audit log entries for each tagged issue (non-blocking)
-    if (tagged_issues && tagged_issues.length > 0) {
-      try {
-        const auditEntries = tagged_issues.map((issueId: string) => ({
-          issue_id: issueId,
-          user_id: user.id,
-          action: 'after_shift_report_created',
-          details: {
-            handoff_id: data.id,
-            tagged_count: tagged_issues.length
-          }
-        }));
-
-        await supabase.from('issue_audit_log').insert(auditEntries);
-      } catch (auditError) {
-        console.error('Failed to create audit log entries:', auditError);
-      }
+    // Create a single audit log entry for the report (non-blocking)
+    try {
+      await supabase.from('issue_audit_log').insert({
+        user_id: user.id,
+        action: 'after_shift_report_created',
+        details: {
+          handoff_id: data.id,
+          tagged_count: tagged_issues?.length || 0,
+          tagged_issues: tagged_issues || []
+        },
+        facility_id: currentUser.facility_id
+      });
+    } catch (auditError) {
+      console.error('Failed to create audit log entry:', auditError);
     }
 
     // Get all users in the same facility for notifications (non-blocking)

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,9 @@ import type { Handoff, Issue } from '@/types/care-coordination';
 
 export default function AfterShiftReportsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reportIdFromUrl = searchParams.get('report');
+  const reportRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [handoffs, setHandoffs] = useState<(Handoff & { taggedIssues?: Issue[] })[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,10 +91,27 @@ export default function AfterShiftReportsPage() {
 
       setHandoffs(handoffsWithIssues);
 
-      // Auto-expand the first active (non-archived) report
-      const firstActive = handoffsWithIssues.find(h => !h.is_archived);
-      if (firstActive) {
-        setExpandedId(firstActive.id);
+      // If there's a report ID in the URL, expand that report and switch to the correct tab
+      if (reportIdFromUrl) {
+        const targetReport = handoffsWithIssues.find(h => h.id === reportIdFromUrl);
+        if (targetReport) {
+          setExpandedId(targetReport.id);
+          // Switch to correct tab based on archive status
+          setActiveTab(targetReport.is_archived ? 'archived' : 'active');
+          // Scroll to the report after a short delay
+          setTimeout(() => {
+            const element = reportRefs.current[reportIdFromUrl];
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
+        }
+      } else {
+        // Auto-expand the first active (non-archived) report
+        const firstActive = handoffsWithIssues.find(h => !h.is_archived);
+        if (firstActive) {
+          setExpandedId(firstActive.id);
+        }
       }
     } catch (error) {
       setHandoffs([]);
@@ -199,9 +219,11 @@ export default function AfterShiftReportsPage() {
     return (
       <Card
         key={handoff.id}
+        ref={(el) => { reportRefs.current[handoff.id] = el; }}
         className={cn(
           'overflow-hidden transition-all',
-          isArchived && 'opacity-75'
+          isArchived && 'opacity-75',
+          reportIdFromUrl === handoff.id && 'ring-2 ring-[#2D7A7A] ring-offset-2'
         )}
       >
         {/* Header */}
