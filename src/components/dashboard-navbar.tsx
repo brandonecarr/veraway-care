@@ -19,7 +19,7 @@ import {
 } from './ui/sheet'
 import { Button } from './ui/button'
 import { Avatar, AvatarFallback } from './ui/avatar'
-import { UserCircle, Home, Users, FileText, Menu, BarChart3, Archive, MessageSquare, Settings, LogOut, User } from 'lucide-react'
+import { UserCircle, Home, Users, FileText, Menu, BarChart3, MessageSquare, Settings, LogOut, User } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { NotificationCenter } from './care/notification-center'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -91,7 +91,6 @@ export default function DashboardNavbar() {
     { path: '', label: 'Dashboard', icon: Home },
     { path: 'analytics', label: 'Analytics', icon: BarChart3 },
     { path: 'patients', label: 'Patients', icon: Users },
-    { path: 'archive', label: 'Archive', icon: Archive },
     { path: 'audit-log', label: 'Audit Log', icon: FileText },
     { path: 'after-shift-reports', label: 'Shift Reports', icon: FileText },
     { path: 'messages', label: 'Message Center', icon: MessageSquare },

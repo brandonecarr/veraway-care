@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import AdvancedAnalytics from './advanced-analytics';
+import DashboardNavbar from '@/components/dashboard-navbar';
+import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,5 +30,11 @@ export default async function AnalyticsPage({ params }: { params: { slug: string
     redirect(`/${params.slug}/dashboard`);
   }
 
-  return <AdvancedAnalytics userId={user.id} slug={params.slug} />;
+  return (
+    <>
+      <DashboardNavbar />
+      <AdvancedAnalytics userId={user.id} slug={params.slug} />
+      <MobileBottomNav />
+    </>
+  );
 }

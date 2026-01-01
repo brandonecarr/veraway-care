@@ -7,7 +7,7 @@ import { ClinicianWorkloadHeatmap } from '@/components/care/clinician-workload-h
 import { IssueTypeDistribution } from '@/components/care/issue-type-distribution';
 import { AnalyticsExport } from '@/components/care/analytics-export';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, BarChart3, Calendar } from 'lucide-react';
+import { RefreshCw, BarChart3, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -95,30 +95,9 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
     <div className="min-h-screen bg-[#FAFAF8] pb-20 md:pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="space-y-4">
-          {/* Back button and title */}
-          <div className="flex items-start gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push(`/${slug}/dashboard`)}
-              className="shrink-0 mt-1"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 md:gap-3">
-                <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-brand-teal shrink-0" />
-                <h1 className="text-2xl md:text-5xl font-display font-bold tracking-tight">
-                  Advanced Analytics
-                </h1>
-              </div>
-              <p className="text-sm md:text-body text-muted-foreground mt-1 md:mt-2">
-                Deep insights for operational decisions
-              </p>
-            </div>
-          </div>
-
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-2">Analytics</h1>
+          <p className="text-sm md:text-base text-[#666]">Deep insights for operational decisions</p>
         </div>
 
         {/* Controls Section - full width to match cards */}
