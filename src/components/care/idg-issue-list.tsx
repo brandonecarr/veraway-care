@@ -78,10 +78,12 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
   }
 
   const renderPatientGroup = (patientId: string, group: PatientGroup) => {
+    // Ensure group.issues is an array (handles race condition when switching groupBy)
+    const issuesList = Array.isArray(group?.issues) ? group.issues : [];
     const isExpanded = expandedGroups.has(patientId);
-    const urgentCount = group.issues.filter(i => i.priority === 'urgent').length;
-    const highCount = group.issues.filter(i => i.priority === 'high').length;
-    const overdueCount = group.issues.filter(i => i.is_overdue).length;
+    const urgentCount = issuesList.filter(i => i.priority === 'urgent').length;
+    const highCount = issuesList.filter(i => i.priority === 'high').length;
+    const overdueCount = issuesList.filter(i => i.is_overdue).length;
 
     return (
       <Card key={patientId} className="overflow-hidden bg-white">
@@ -96,15 +98,15 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-base truncate">
-                  {group.patient_name}
+                  {group?.patient_name || 'Unknown Patient'}
                 </h3>
                 <span className="text-sm text-muted-foreground font-mono">
-                  MRN: {group.patient_mrn}
+                  MRN: {group?.patient_mrn || 'N/A'}
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="outline" className="text-xs">
-                  {group.issues.length} {group.issues.length === 1 ? 'issue' : 'issues'}
+                  {issuesList.length} {issuesList.length === 1 ? 'issue' : 'issues'}
                 </Badge>
                 {urgentCount > 0 && (
                   <Badge className="bg-red-100 text-red-700 text-xs">
@@ -134,7 +136,7 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
 
         {isExpanded && (
           <div className="border-t border-[#D4D4D4] p-4 bg-[#FAFAF8]/50 space-y-3">
-            {group.issues.map(issue => (
+            {issuesList.map(issue => (
               <IDGIssueCard
                 key={issue.id}
                 issue={issue}
