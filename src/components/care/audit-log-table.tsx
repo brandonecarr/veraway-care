@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,22 +64,27 @@ const actionColors: Record<string, string> = {
   updated: 'bg-gray-500/10 text-gray-700',
   message_sent: 'bg-indigo-500/10 text-indigo-700',
   handoff_created: 'bg-amber-500/10 text-amber-700',
+  after_shift_report_created: 'bg-amber-500/10 text-amber-700',
   patient_created: 'bg-emerald-500/10 text-emerald-700',
 };
 
 const actionLabels: Record<string, string> = {
-  created: 'ISSUE_CREATED',
-  assigned: 'ASSIGNED',
-  status_changed: 'STATUS_CHANGED',
-  resolved: 'RESOLVED',
-  commented: 'COMMENTED',
-  updated: 'UPDATE_ADDED',
-  message_sent: 'MESSAGE_SENT',
-  handoff_created: 'HANDOFF_CREATED',
-  patient_created: 'PATIENT_CREATED',
+  created: 'Issue Created',
+  assigned: 'Assigned',
+  status_changed: 'Status Changed',
+  resolved: 'Resolved',
+  commented: 'Commented',
+  updated: 'Update Added',
+  message_sent: 'Message Sent',
+  handoff_created: 'Report Created',
+  after_shift_report_created: 'Report Created',
+  patient_created: 'Patient Created',
 };
 
 export function AuditLogTable({ issueId }: AuditLogTableProps) {
+  const pathname = usePathname();
+  const facilitySlug = pathname?.split('/')[1] || '';
+
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +98,56 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
   const [currentUserId, setCurrentUserId] = useState('');
   const [userRole, setUserRole] = useState('clinician');
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; email?: string; name?: string }>>([]);
+
+  // Get the link URL for an action based on its type
+  const getActionLink = (entry: AuditLogEntry): string | null => {
+    switch (entry.action) {
+      case 'patient_created':
+        // Link to patient page
+        if (entry.details?.patient_id) {
+          return `/${facilitySlug}/dashboard/patients?patient=${entry.details.patient_id}`;
+        }
+        return null;
+      case 'handoff_created':
+      case 'after_shift_report_created':
+        // Link to after-shift reports
+        if (entry.details?.handoff_id) {
+          return `/${facilitySlug}/dashboard/after-shift-reports`;
+        }
+        return null;
+      case 'created':
+      case 'assigned':
+      case 'status_changed':
+      case 'resolved':
+      case 'updated':
+      case 'message_sent':
+        // Link to issue via the patient column click (existing behavior)
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  // Get patient name for display - handles both issue-based and patient_created entries
+  const getPatientDisplay = (entry: AuditLogEntry): { name: string; id?: string } | null => {
+    // For patient_created entries, get from details
+    if (entry.action === 'patient_created' && entry.details) {
+      return {
+        name: `${entry.details.first_name || ''} ${entry.details.last_name || ''}`.trim() || 'Unknown Patient',
+        id: entry.details.patient_id
+      };
+    }
+
+    // For issue-related entries, get from the issue's patient
+    if (entry.issue?.patient) {
+      return {
+        name: `${entry.issue.patient.first_name} ${entry.issue.patient.last_name}`,
+        id: entry.issue.patient.id
+      };
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     fetchAuditLog();
@@ -252,13 +309,16 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
     setIsExporting(true);
     try {
       const headers = ['Timestamp', 'Patient', 'Action', 'User', 'Details'];
-      const rows = filteredEntries.map((entry) => [
-        format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm:ss'),
-        entry.issue?.patient ? `${entry.issue.patient.first_name} ${entry.issue.patient.last_name}` : 'N/A',
-        actionLabels[entry.action] || entry.action.toUpperCase(),
-        entry.user?.email || 'Unknown User',
-        formatDetails(entry.action, entry.details, entry.assigned_to_user),
-      ]);
+      const rows = filteredEntries.map((entry) => {
+        const patientDisplay = getPatientDisplay(entry);
+        return [
+          format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm:ss'),
+          patientDisplay?.name || 'N/A',
+          actionLabels[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          entry.user?.email || 'Unknown User',
+          formatDetails(entry.action, entry.details, entry.assigned_to_user),
+        ];
+      });
 
       const csv = [
         headers.join(','),
@@ -314,7 +374,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       const summaryData = [
         ['Total Entries', filteredEntries.length.toString()],
         ...Object.entries(actionCounts).map(([action, count]) => [
-          actionLabels[action] || action.toUpperCase(),
+          actionLabels[action] || action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           count.toString()
         ])
       ];
@@ -333,13 +393,16 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       doc.setFontSize(14);
       doc.text('Detailed Audit Trail', 14, 20);
 
-      const tableData = filteredEntries.map((entry) => [
-        format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm'),
-        entry.issue?.patient ? `${entry.issue.patient.first_name} ${entry.issue.patient.last_name}` : 'N/A',
-        actionLabels[entry.action] || entry.action.toUpperCase(),
-        entry.user?.name || entry.user?.email?.split('@')[0] || 'Unknown User',
-        formatDetails(entry.action, entry.details, entry.assigned_to_user).substring(0, 60)
-      ]);
+      const tableData = filteredEntries.map((entry) => {
+        const patientDisplay = getPatientDisplay(entry);
+        return [
+          format(new Date(entry.created_at), 'yyyy-MM-dd HH:mm'),
+          patientDisplay?.name || 'N/A',
+          actionLabels[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          entry.user?.name || entry.user?.email?.split('@')[0] || 'Unknown User',
+          formatDetails(entry.action, entry.details, entry.assigned_to_user).substring(0, 60)
+        ];
+      });
 
       autoTable(doc, {
         startY: 25,
@@ -422,6 +485,8 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
         return `Message: "${details.message?.substring(0, 50)}${details.message?.length > 50 ? '...' : ''}"`;
       case 'handoff_created':
         return `Shift: ${details.shift_start ? format(new Date(details.shift_start), 'MMM d h:mm a') : ''} - ${details.shift_end ? format(new Date(details.shift_end), 'h:mm a') : ''}, ${details.tagged_count || 0} issues tagged`;
+      case 'after_shift_report_created':
+        return `${details.tagged_count || 0} issues tagged in report`;
       case 'patient_created':
         return `Patient: ${details.first_name} ${details.last_name} (MRN: ${details.mrn || 'N/A'})`;
       default:
@@ -619,29 +684,83 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                     </TableCell>
                     {!issueId && (
                       <TableCell>
-                        {entry.issue?.patient ? (
-                          <button
-                            onClick={() => entry.issue?.id && handlePatientClick(entry.issue.id)}
-                            className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors cursor-pointer text-left"
-                          >
-                            {entry.issue.patient.first_name} {entry.issue.patient.last_name}
-                            <ExternalLink className="h-3 w-3" />
-                          </button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">N/A</span>
-                        )}
+                        {(() => {
+                          const patientDisplay = getPatientDisplay(entry);
+                          if (patientDisplay) {
+                            // For issue-related entries, clicking opens the issue detail panel
+                            if (entry.issue?.id) {
+                              return (
+                                <button
+                                  onClick={() => handlePatientClick(entry.issue!.id)}
+                                  className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors cursor-pointer text-left"
+                                >
+                                  {patientDisplay.name}
+                                  <ExternalLink className="h-3 w-3" />
+                                </button>
+                              );
+                            }
+                            // For patient_created entries, link to patient page
+                            if (entry.action === 'patient_created' && patientDisplay.id) {
+                              return (
+                                <Link
+                                  href={`/${facilitySlug}/dashboard/patients?patient=${patientDisplay.id}`}
+                                  className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors"
+                                >
+                                  {patientDisplay.name}
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              );
+                            }
+                            // Just display the name if no link is available
+                            return (
+                              <span className="text-sm font-medium">{patientDisplay.name}</span>
+                            );
+                          }
+                          return <span className="text-sm text-muted-foreground">N/A</span>;
+                        })()}
                       </TableCell>
                     )}
                     <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          'font-mono text-xs',
-                          actionColors[entry.action] || 'bg-gray-500/10 text-gray-700'
-                        )}
-                      >
-                        {actionLabels[entry.action] || entry.action.toUpperCase()}
-                      </Badge>
+                      {(() => {
+                        const actionLink = getActionLink(entry);
+                        const badgeContent = (
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              'text-xs',
+                              actionColors[entry.action] || 'bg-gray-500/10 text-gray-700',
+                              actionLink && 'cursor-pointer hover:opacity-80'
+                            )}
+                          >
+                            {actionLabels[entry.action] || entry.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </Badge>
+                        );
+
+                        // If there's a direct link for this action
+                        if (actionLink) {
+                          return (
+                            <Link href={actionLink} className="inline-flex items-center gap-1">
+                              {badgeContent}
+                              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                            </Link>
+                          );
+                        }
+
+                        // For issue-related actions, make the badge clickable to open issue detail
+                        if (entry.issue?.id && ['created', 'assigned', 'status_changed', 'resolved', 'updated', 'message_sent'].includes(entry.action)) {
+                          return (
+                            <button
+                              onClick={() => handlePatientClick(entry.issue!.id)}
+                              className="inline-flex items-center gap-1"
+                            >
+                              {badgeContent}
+                              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          );
+                        }
+
+                        return badgeContent;
+                      })()}
                     </TableCell>
                     <TableCell className="text-sm">
                       {entry.user?.name ||
