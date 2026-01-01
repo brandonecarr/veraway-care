@@ -148,10 +148,12 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
   };
 
   const renderIssueTypeGroup = (issueType: string, typeIssues: IDGIssue[]) => {
+    // Ensure typeIssues is an array
+    const issuesList = Array.isArray(typeIssues) ? typeIssues : [];
     const isExpanded = expandedGroups.has(issueType);
-    const urgentCount = typeIssues.filter(i => i.priority === 'urgent').length;
-    const highCount = typeIssues.filter(i => i.priority === 'high').length;
-    const overdueCount = typeIssues.filter(i => i.is_overdue).length;
+    const urgentCount = issuesList.filter(i => i.priority === 'urgent').length;
+    const highCount = issuesList.filter(i => i.priority === 'high').length;
+    const overdueCount = issuesList.filter(i => i.is_overdue).length;
 
     const issueTypeColors: Record<string, string> = {
       'Change in Condition': 'bg-[#2D7A7A]/10 text-[#2D7A7A]',
@@ -181,7 +183,7 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
-                {typeIssues.length} {typeIssues.length === 1 ? 'issue' : 'issues'}
+                {issuesList.length} {issuesList.length === 1 ? 'issue' : 'issues'}
               </Badge>
               {urgentCount > 0 && (
                 <Badge className="bg-red-100 text-red-700 text-xs">
@@ -210,7 +212,7 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
 
         {isExpanded && (
           <div className="border-t border-[#D4D4D4] p-4 bg-[#FAFAF8]/50 space-y-3">
-            {typeIssues.map(issue => (
+            {issuesList.map(issue => (
               <IDGIssueCard
                 key={issue.id}
                 issue={issue}
