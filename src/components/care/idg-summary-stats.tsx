@@ -2,6 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { FileText, AlertTriangle, AlertCircle, Clock, UserPlus, Heart } from 'lucide-react';
 
 interface IDGSummaryStatsProps {
@@ -23,13 +24,31 @@ interface IDGSummaryStatsProps {
 export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Card key={i} className="p-4 bg-white border-[#D4D4D4]">
-            <Skeleton className="h-16 w-full" />
-          </Card>
-        ))}
-      </div>
+      <>
+        {/* Mobile: Horizontal scroll loading */}
+        <div className="md:hidden -mx-4">
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 px-4 pb-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="w-[280px] flex-shrink-0">
+                  <Card className="p-4 bg-white border-[#D4D4D4]">
+                    <Skeleton className="h-16 w-full" />
+                  </Card>
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+        {/* Desktop: Grid loading */}
+        <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="p-4 bg-white border-[#D4D4D4]">
+              <Skeleton className="h-16 w-full" />
+            </Card>
+          ))}
+        </div>
+      </>
     );
   }
 
@@ -79,22 +98,51 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {stats.map((stat) => (
-        <Card key={stat.label} className="p-4 bg-white border-[#D4D4D4]">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${stat.bgColor}`}>
-              <stat.icon className={`w-5 h-5 ${stat.color}`} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
-                {stat.value}
-              </p>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-            </div>
+    <>
+      {/* Mobile: Horizontal scroll for stats */}
+      <div className="md:hidden -mx-4">
+        <ScrollArea className="w-full whitespace-nowrap">
+          <div className="flex gap-4 px-4 pb-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="w-[280px] flex-shrink-0">
+                <Card className="p-4 bg-white border-[#D4D4D4]">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full ${stat.bgColor}`}>
+                      <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ))}
           </div>
-        </Card>
-      ))}
-    </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+
+      {/* Desktop: Grid layout for stats */}
+      <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-4">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="p-4 bg-white border-[#D4D4D4]">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${stat.bgColor}`}>
+                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
+                  {stat.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
   );
 }
