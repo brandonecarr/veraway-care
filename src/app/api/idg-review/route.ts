@@ -15,7 +15,7 @@ const IDG_ISSUE_TYPES = [
 ];
 
 // Disciplines available for IDG attendance
-export const IDG_DISCIPLINES = [
+const IDG_DISCIPLINES = [
   'Physician/NP',
   'RN Case Manager',
   'Social Worker',
@@ -28,7 +28,7 @@ export const IDG_DISCIPLINES = [
 ];
 
 // IDG Disposition options
-export const IDG_DISPOSITIONS = [
+const IDG_DISPOSITIONS = [
   { value: 'monitoring_only', label: 'Monitoring Only' },
   { value: 'plan_in_place', label: 'Plan in Place' },
   { value: 'escalated', label: 'Escalated' },
