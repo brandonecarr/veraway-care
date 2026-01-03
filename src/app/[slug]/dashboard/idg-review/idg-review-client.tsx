@@ -171,6 +171,42 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
 
+  // Helper to update an issue in both issues and grouped state
+  const updateIssueInState = (issueId: string, updates: Partial<IDGIssue>) => {
+    // Update issues array
+    setIssues(prev => prev.map(issue =>
+      issue.id === issueId ? { ...issue, ...updates } : issue
+    ));
+
+    // Update grouped state based on current groupBy mode
+    setGrouped(prev => {
+      const newGrouped = { ...prev };
+      if (groupBy === 'patient') {
+        // Grouped by patient: { patientId: { patient_id, patient_name, patient_mrn, issues: [...] } }
+        for (const key in newGrouped) {
+          if (newGrouped[key]?.issues) {
+            newGrouped[key] = {
+              ...newGrouped[key],
+              issues: newGrouped[key].issues.map((issue: IDGIssue) =>
+                issue.id === issueId ? { ...issue, ...updates } : issue
+              )
+            };
+          }
+        }
+      } else {
+        // Grouped by issue_type: { issueType: [...issues] }
+        for (const key in newGrouped) {
+          if (Array.isArray(newGrouped[key])) {
+            newGrouped[key] = newGrouped[key].map((issue: IDGIssue) =>
+              issue.id === issueId ? { ...issue, ...updates } : issue
+            );
+          }
+        }
+      }
+      return newGrouped;
+    });
+  };
+
   const handleIssueClick = (issue: IDGIssue) => {
     // Transform to match Issue type for detail panel
     const fullIssue = {
@@ -204,12 +240,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         throw new Error('Failed to update MD review flag');
       }
 
-      // Update local state optimistically
-      setIssues(prev => prev.map(issue =>
-        issue.id === issueId
-          ? { ...issue, flagged_for_md_review: flagged }
-          : issue
-      ));
+      // Update local state
+      updateIssueInState(issueId, { flagged_for_md_review: flagged });
 
       toast.success(flagged ? 'Flagged for MD Review' : 'MD Review flag removed', {
         description: `Issue has been ${flagged ? 'flagged for' : 'removed from'} MD review.`,
@@ -232,12 +264,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         throw new Error('Failed to update disposition');
       }
 
-      // Update local state optimistically
-      setIssues(prev => prev.map(issue =>
-        issue.id === issueId
-          ? { ...issue, idg_disposition: disposition }
-          : issue
-      ));
+      // Update local state
+      updateIssueInState(issueId, { idg_disposition: disposition });
 
       const dispositionLabel = dispositions.find(d => d.value === disposition)?.label || disposition;
       toast.success('Disposition updated', {
