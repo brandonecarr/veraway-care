@@ -282,7 +282,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { issueId, flaggedForMDReview, disposition } = body;
+    const { issueId, flaggedForMD, disposition } = body;
 
     if (!issueId) {
       return NextResponse.json({ error: 'issueId is required' }, { status: 400 });
@@ -294,7 +294,7 @@ export async function PATCH(request: Request) {
       p_facility_id: userData?.facility_id,
       p_user_id: user.id,
       p_disposition: disposition || null,
-      p_flagged_for_md: flaggedForMDReview !== undefined ? flaggedForMDReview : null
+      p_flagged_for_md: flaggedForMD !== undefined ? flaggedForMD : null
     });
 
     if (error) {
@@ -304,9 +304,9 @@ export async function PATCH(request: Request) {
         .upsert({
           issue_id: issueId,
           facility_id: userData?.facility_id,
-          flagged_for_md_review: flaggedForMDReview,
-          flagged_for_md_review_at: flaggedForMDReview !== undefined ? new Date().toISOString() : undefined,
-          flagged_for_md_review_by: flaggedForMDReview !== undefined ? user.id : undefined,
+          flagged_for_md_review: flaggedForMD,
+          flagged_for_md_review_at: flaggedForMD !== undefined ? new Date().toISOString() : undefined,
+          flagged_for_md_review_by: flaggedForMD !== undefined ? user.id : undefined,
           idg_disposition: disposition,
           disposition_set_at: disposition ? new Date().toISOString() : undefined,
           disposition_set_by: disposition ? user.id : undefined,
