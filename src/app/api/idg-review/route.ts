@@ -55,7 +55,7 @@ interface IDGIssue {
   reporter_name: string;
   hours_open: number;
   is_overdue: boolean;
-  idg_reason: string;
+  idg_reasons: string[];
   actions_taken?: any[];
   outstanding_next_steps?: any[];
   // IDG-specific fields
@@ -496,6 +496,18 @@ async function fallbackQuery(
     const isIdgType = IDG_ISSUE_TYPES.includes(issue.issue_type);
     const isOverdue = hoursOpen > thresholdHours;
 
+    // Build array of all applicable IDG reasons
+    const idgReasons: string[] = [];
+    if (isHighPriority) {
+      idgReasons.push(issue.priority === 'urgent' ? 'Urgent Priority' : 'High Priority');
+    }
+    if (isIdgType) {
+      idgReasons.push('IDG Issue Type');
+    }
+    if (isOverdue) {
+      idgReasons.push(`Unresolved > ${thresholdHours}h`);
+    }
+
     return {
       id: issue.id,
       issue_number: issue.issue_number,
@@ -515,7 +527,7 @@ async function fallbackQuery(
       reporter_name: issue.reporter?.name || issue.reporter?.email?.split('@')[0] || 'Unknown',
       hours_open: Math.round(hoursOpen * 10) / 10,
       is_overdue: isOverdue,
-      idg_reason: isHighPriority ? 'High/Urgent Priority' : isIdgType ? 'IDG Issue Type' : `Unresolved > ${thresholdHours}h`,
+      idg_reasons: idgReasons,
       actions_taken: [],
       outstanding_next_steps: [],
       flagged_for_md_review: false,

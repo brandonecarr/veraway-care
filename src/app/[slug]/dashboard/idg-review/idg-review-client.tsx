@@ -40,7 +40,7 @@ interface IDGIssue {
   assignee_job_role: string | null;
   hours_open: number;
   is_overdue: boolean;
-  idg_reason: string;
+  idg_reasons: string[];
   actions_taken?: any[];
   outstanding_next_steps?: any[];
   flagged_for_md_review?: boolean;

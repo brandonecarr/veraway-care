@@ -26,7 +26,7 @@ interface IDGIssue {
   assignee_job_role: string | null;
   hours_open: number;
   is_overdue: boolean;
-  idg_reason: string;
+  idg_reasons: string[];
   actions_taken?: any[];
   outstanding_next_steps?: any[];
   flagged_for_md_review?: boolean;
@@ -189,11 +189,17 @@ export function IDGIssueCard({
           </div>
         </div>
 
-        {/* IDG Reason Badge */}
-        <div onClick={onClick} className="cursor-pointer">
-          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
-            IDG Reason: {issue.idg_reason}
-          </Badge>
+        {/* IDG Reason Badges */}
+        <div onClick={onClick} className="cursor-pointer flex flex-wrap gap-1">
+          {issue.idg_reasons.map((reason, index) => (
+            <Badge
+              key={index}
+              variant="outline"
+              className="bg-amber-50 text-amber-700 border-amber-200 text-xs"
+            >
+              {reason}
+            </Badge>
+          ))}
         </div>
 
         {/* Actions & Next Steps */}
