@@ -313,8 +313,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
   return (
-    <main className="min-h-screen bg-[#FAFAF8] p-4 md:p-6 pb-24 md:pb-6">
-      <div className="container mx-auto space-y-6">
+    <main className="min-h-screen bg-[#FAFAF8] pb-24 md:pb-6">
+      <div className="container mx-auto px-4 md:px-6 py-6 md:py-12 space-y-6 md:space-y-12">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
