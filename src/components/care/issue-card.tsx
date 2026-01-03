@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useState } from "react";
 import { Issue } from "@/types/care-coordination";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,6 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
-import { useState } from "react";
 
 interface IssueCardProps {
   issue: Issue;
@@ -17,7 +17,11 @@ interface IssueCardProps {
   onResolve?: () => void;
 }
 
-export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCardProps) {
+/**
+ * IssueCard - Memoized to prevent re-renders when parent state changes
+ * Only re-renders when issue data or callbacks change
+ */
+export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCardProps) {
   const isAnimatingOut = (issue as any)._isAnimatingOut;
   const [swipeOffset, setSwipeOffset] = useState(0);
 
@@ -112,11 +116,9 @@ export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCa
             <h3 className="text-card-header font-semibold text-foreground truncate font-space">
               {issue.patient?.first_name} {issue.patient?.last_name}
             </h3>
-            {issue.description && (
-              <p className="text-body text-muted-foreground line-clamp-2 mt-1">
-                {issue.description}
-              </p>
-            )}
+            <p className="text-body text-muted-foreground line-clamp-2 mt-1 min-h-[2.5rem]">
+              {issue.description || '\u00A0'}
+            </p>
           </div>
           <Badge
             variant={isOverdue() ? "destructive" : "outline"}
@@ -161,4 +163,4 @@ export function IssueCard({ issue, onClick, onMessageClick, onResolve }: IssueCa
     </Card>
     </div>
   );
-}
+});

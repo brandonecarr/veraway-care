@@ -13,11 +13,6 @@ export const metadata: Metadata = {
   title: "Care Coordination Platform",
   description: "Issue tracking and care coordination for hospice agencies",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Care Coord",
-  },
   formatDetection: {
     telephone: false,
   },
@@ -29,7 +24,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#2D7A7A",
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({
@@ -40,11 +35,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* PWA Meta Tags for iOS/iPadOS */}
+        {/* Theme color for status bar - light mode */}
+        <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#FFFFFF" />
+
+        {/* PWA Meta Tags for iOS - status bar style */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Care Coord" />
+
+        {/* Android/Chrome PWA */}
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="msapplication-navbutton-color" content="#FFFFFF" />
+        <meta name="msapplication-TileColor" content="#FFFFFF" />
         
         {/* Apple Touch Icons */}
         <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />

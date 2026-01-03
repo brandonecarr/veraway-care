@@ -326,3 +326,28 @@
     }
   }
 }
+
+/* Sonner Toast Notification Overrides */
+[data-sonner-toast] {
+  --normal-bg: #ffffff !important;
+  --normal-text: #1A1A1A !important;
+  --normal-border: #e5e5e5 !important;
+}
+
+[data-sonner-toast] [data-title] {
+  color: #1A1A1A !important;
+  font-weight: 500 !important;
+}
+
+[data-sonner-toast] [data-description] {
+  color: #555555 !important;
+  opacity: 1 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-description],
+[data-sonner-toast][data-type="info"] [data-description],
+[data-sonner-toast][data-type="warning"] [data-description],
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #555555 !important;
+  opacity: 1 !important;
+}

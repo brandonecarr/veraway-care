@@ -18,7 +18,7 @@ export default async function AuditLogPage({ params }: { params: { slug: string 
     return redirect('/sign-in');
   }
 
-  // Check if user is coordinator
+  // Get user's facility
   const { data: userData } = await supabase
     .from('users')
     .select('facility_id')
@@ -27,19 +27,6 @@ export default async function AuditLogPage({ params }: { params: { slug: string 
 
   if (!userData?.facility_id) {
     redirect('/sign-in');
-  }
-
-  const { data: roleData } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('facility_id', userData.facility_id)
-    .single();
-
-  const isCoordinator = roleData?.role === 'coordinator';
-
-  if (!isCoordinator) {
-    return redirect(`/${params.slug}/dashboard`);
   }
 
   // Get audit stats for the header

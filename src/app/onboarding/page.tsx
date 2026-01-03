@@ -93,13 +93,15 @@ export default function OnboardingPage() {
     setUserEmail(user.email || '');
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
-    // Fetch user's facility information with contact details
+    // Fetch user's facility information with contact details and onboarding status
     try {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select(`
+          name,
           facility_id,
-          facilities(
+          onboarding_completed_at,
+          facilities!users_organization_id_fkey(
             id,
             name,
             slug,
@@ -118,7 +120,24 @@ export default function OnboardingPage() {
 
       if (userError) {
         console.error('Error fetching user data:', userError);
-      } else if (userData?.facilities) {
+      }
+
+      // Pre-fill user name from database if available, otherwise use metadata
+      if (userData?.name) {
+        setUserName(userData.name);
+      }
+
+      // If onboarding is already completed, redirect to dashboard
+      if (userData?.onboarding_completed_at && userData?.facilities) {
+        const facilityData = Array.isArray(userData.facilities)
+          ? userData.facilities[0]
+          : userData.facilities;
+        const dashboardUrl = facilityData?.slug ? `/${facilityData.slug}/dashboard` : '/dashboard';
+        router.push(dashboardUrl);
+        return;
+      }
+
+      if (userData?.facilities) {
         const facilityData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
@@ -163,6 +182,11 @@ export default function OnboardingPage() {
 
   const handleStep1Submit = async () => {
     // Validate required fields
+    if (!userName.trim()) {
+      toast.error('Please enter your full name');
+      return;
+    }
+
     if (!facilityForm.address_line1 || !facilityForm.city || !facilityForm.state || !facilityForm.zip_code) {
       toast.error('Please fill in all required facility information');
       return;
@@ -171,6 +195,20 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
+      const supabase = createClient();
+
+      // Save the user's name to the users table
+      const { error: nameError } = await supabase
+        .from('users')
+        .update({ name: userName.trim() })
+        .eq('id', userId);
+
+      if (nameError) {
+        console.error('Error saving name:', nameError);
+        toast.error('Failed to save your name');
+        return;
+      }
+
       const response = await fetch('/api/onboarding/update-facility', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,6 +311,11 @@ export default function OnboardingPage() {
 
   // Clinician-specific: Confirm job role (Step 1 for clinicians)
   const handleClinicianJobRoleSubmit = async () => {
+    if (!userName.trim()) {
+      toast.error('Please enter your full name');
+      return;
+    }
+
     if (!currentClinician.job_role) {
       toast.error('Please select your job role');
       return;
@@ -282,6 +325,18 @@ export default function OnboardingPage() {
 
     try {
       const supabase = createClient();
+
+      // Save the user's name to the users table
+      const { error: nameError } = await supabase
+        .from('users')
+        .update({ name: userName.trim() })
+        .eq('id', userId);
+
+      if (nameError) {
+        console.error('Error saving name:', nameError);
+        toast.error('Failed to save your name');
+        return;
+      }
 
       // Update the user's job role in user_roles table
       const { error } = await supabase
@@ -296,11 +351,11 @@ export default function OnboardingPage() {
         return;
       }
 
-      toast.success('Job role confirmed');
+      toast.success('Profile updated');
       setCurrentStep(2); // Move to password step (which is step 2 for clinicians)
     } catch (error) {
-      console.error('Error updating job role:', error);
-      toast.error('Failed to update job role');
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
     } finally {
       setIsSubmitting(false);
     }
@@ -331,6 +386,17 @@ export default function OnboardingPage() {
       if (error) {
         toast.error(error.message);
         return;
+      }
+
+      // Mark onboarding as completed
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ onboarding_completed_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Failed to mark onboarding as complete:', updateError);
+        // Don't block the user, just log the error
       }
 
       toast.success('Account setup complete! Redirecting to dashboard...');
@@ -472,6 +538,18 @@ export default function OnboardingPage() {
 
             <div className="space-y-4">
               <div>
+                <Label htmlFor="coordinator_name">Your Full Name *</Label>
+                <Input
+                  id="coordinator_name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="e.g., John Smith"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="address_line1">Address Line 1 *</Label>
                 <Input
                   id="address_line1"
@@ -572,13 +650,25 @@ export default function OnboardingPage() {
         {currentStep === 1 && userRole === 'clinician' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Confirm Your Job Role</h2>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Complete Your Profile</h2>
               <p className="text-sm text-[#666] mb-4">
-                Please confirm your job role to complete your profile
+                Please provide your information to complete your profile
               </p>
             </div>
 
             <div className="space-y-4">
+              <div>
+                <Label htmlFor="clinician_full_name">Your Full Name *</Label>
+                <Input
+                  id="clinician_full_name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="e.g., Jane Smith"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
               <div>
                 <Label htmlFor="clinician_job_role">Job Role *</Label>
                 <Select

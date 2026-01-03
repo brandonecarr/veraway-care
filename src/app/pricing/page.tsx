@@ -13,7 +13,7 @@ export default async function Pricing() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         user = authUser;
         
-        const { data: plansData } = await supabase.functions.invoke('supabase-functions-get-plans');
+        const { data: plansData } = await supabase.functions.invoke('get-plans');
         plans = plansData;
     } catch (error) {
         console.error('Error initializing supabase:', error);

@@ -41,6 +41,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for required environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    if (!process.env.SUPABASE_SERVICE_KEY) {
+      console.error('❌ SUPABASE_SERVICE_KEY is not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    console.log('📧 Using Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('📧 Service key exists:', !!process.env.SUPABASE_SERVICE_KEY);
+
     // Use service role key for admin operations
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

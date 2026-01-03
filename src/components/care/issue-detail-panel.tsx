@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Clock, User, MessageSquare, CheckCircle2, Send, UserCircle, History, PlayCircle, FileText } from 'lucide-react';
+import { User, CheckCircle2, UserCircle, History, FileText, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -24,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import type { Issue, IssueMessage } from '@/types/care-coordination';
+import type { Issue } from '@/types/care-coordination';
 
 interface IssueDetailPanelProps {
   issue: Issue | null;
@@ -37,6 +38,7 @@ interface IssueDetailPanelProps {
   currentUserId: string;
   userRole: string;
   availableUsers?: Array<{ id: string; email?: string; name?: string }>;
+  slug?: string;
 }
 
 export function IssueDetailPanel({
@@ -49,13 +51,11 @@ export function IssueDetailPanel({
   onAddUpdate,
   currentUserId,
   userRole,
-  availableUsers = []
+  availableUsers = [],
+  slug
 }: IssueDetailPanelProps) {
-  const [messages, setMessages] = useState<IssueMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const router = useRouter();
   const [selectedUser, setSelectedUser] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [auditHistory, setAuditHistory] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
   const [updateNote, setUpdateNote] = useState('');
@@ -63,7 +63,7 @@ export function IssueDetailPanel({
   const [localStatus, setLocalStatus] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [patientConversationId, setPatientConversationId] = useState<string | null>(null);
 
   // Use local status if set, otherwise use issue status
   const currentStatus = localStatus || issue?.status;
@@ -77,22 +77,13 @@ export function IssueDetailPanel({
   useEffect(() => {
     if (!open) {
       setUpdateNote('');
-      setNewMessage('');
     }
   }, [open]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   useEffect(() => {
     if (issue?.id) {
-      fetchMessages();
       fetchAuditHistory();
+      fetchPatientConversation();
       // Set the selected user to current assignee when issue changes
       if (issue.assigned_to) {
         setSelectedUser(issue.assigned_to);
@@ -102,61 +93,27 @@ export function IssueDetailPanel({
     }
   }, [issue?.id, issue?.assigned_to]);
 
-  const fetchMessages = async () => {
-    if (!issue) return;
-    
-    setIsLoadingMessages(true);
+  const fetchPatientConversation = async () => {
+    if (!issue?.patient_id) return;
+
     try {
-      const response = await fetch(`/api/issues/${issue.id}/messages`);
-      const data = await response.json();
-      setMessages(data);
+      const response = await fetch(`/api/conversations/by-patient/${issue.patient_id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPatientConversationId(data.conversation?.id || null);
+      } else {
+        setPatientConversationId(null);
+      }
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Failed to load messages');
-    } finally {
-      setIsLoadingMessages(false);
+      console.error('Error fetching patient conversation:', error);
+      setPatientConversationId(null);
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!issue || !newMessage.trim()) return;
-
-    const optimisticMessage = {
-      id: `temp-${Date.now()}`,
-      issue_id: issue.id,
-      user_id: currentUserId,
-      message: newMessage.trim(),
-      created_at: new Date().toISOString(),
-      user: { id: currentUserId, email: 'You', name: 'You' }
-    };
-
-    // Optimistic update
-    setMessages(prev => [...prev, optimisticMessage as any]);
-    setNewMessage('');
-    setIsSending(true);
-
-    try {
-      const response = await fetch(`/api/issues/${issue.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: optimisticMessage.message })
-      });
-
-      if (response.ok) {
-        // Fetch updated messages to get the real message with proper ID
-        await fetchMessages();
-        toast.success('Message sent');
-      } else {
-        // Remove optimistic message on error
-        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
-        toast.error('Failed to send message');
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
-      toast.error('Failed to send message');
-    } finally {
-      setIsSending(false);
+  const handleOpenPatientMessage = () => {
+    if (patientConversationId && slug) {
+      router.push(`/${slug}/dashboard/messages?conversation=${patientConversationId}`);
+      onOpenChange(false);
     }
   };
 
@@ -300,7 +257,7 @@ export function IssueDetailPanel({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl lg:max-w-2xl p-0 flex flex-col" side="right">
-        <SheetHeader className="p-6 pb-4">
+        <SheetHeader className="p-6 pb-4 pr-12">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
@@ -382,6 +339,17 @@ export function IssueDetailPanel({
                   </ScrollArea>
                 </DialogContent>
               </Dialog>
+              {patientConversationId && slug && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-2 text-[#2D7A7A] hover:text-[#236060] hover:bg-[#2D7A7A]/10"
+                  onClick={handleOpenPatientMessage}
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="text-xs">Patient Group Message</span>
+                </Button>
+              )}
             </div>
           </div>
         </SheetHeader>
@@ -506,76 +474,6 @@ export function IssueDetailPanel({
               </>
             )}
 
-            {/* Messages */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Communication ({messages.length})
-              </h3>
-              
-              {isLoadingMessages ? (
-                <div className="text-sm text-muted-foreground text-center py-8">
-                  Loading messages...
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No messages yet. Start the conversation.
-                    </p>
-                  ) : (
-                    <>
-                      {messages.map((message) => (
-                        <div key={message.id} className="flex gap-3 animate-in fade-in duration-200">
-                          <Avatar className="w-8 h-8 shrink-0">
-                            <AvatarFallback className="text-xs bg-[#2D7A7A]/10 text-[#2D7A7A] font-medium">
-                              {message.user?.email?.[0]?.toUpperCase() || message.user?.name?.[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 space-y-1 min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-[#1A1A1A]">
-                                {message.user?.name || message.user?.email?.split('@')[0] || 'Unknown'}
-                              </span>
-                              <span className="text-xs text-[#999] font-mono">
-                                {format(new Date(message.created_at), 'MMM d, HH:mm')}
-                              </span>
-                            </div>
-                            <p className="text-sm text-[#666] whitespace-pre-wrap break-words">{message.message}</p>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={messagesEndRef} />
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message... (Shift+Enter for new line)"
-                  rows={3}
-                  className="resize-none border-[#D4D4D4] text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  disabled={isSending}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || isSending}
-                  size="icon"
-                  className="shrink-0 h-auto bg-[#2D7A7A] hover:bg-[#236060]"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
           </div>
         </ScrollArea>
 
@@ -615,32 +513,6 @@ export function IssueDetailPanel({
 
           {canResolve && currentStatus !== 'resolved' && (
             <div className="flex gap-3">
-              {/* Status Toggle Button */}
-              {currentStatus === 'open' && (
-                <Button
-                  variant="outline"
-                  className="flex-1 border-blue-500 text-blue-700 hover:bg-blue-50"
-                  size="lg"
-                  onClick={() => handleStatusChange('in_progress')}
-                  disabled={isUpdatingStatus}
-                >
-                  <PlayCircle className="w-4 h-4 mr-2" />
-                  {isUpdatingStatus ? 'Updating...' : 'Start Progress'}
-                </Button>
-              )}
-              {currentStatus === 'in_progress' && (
-                <Button
-                  variant="outline"
-                  className="flex-1 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
-                  size="lg"
-                  onClick={() => handleStatusChange('open')}
-                  disabled={isUpdatingStatus}
-                >
-                  <Clock className="w-4 h-4 mr-2" />
-                  {isUpdatingStatus ? 'Updating...' : 'Back To Open'}
-                </Button>
-              )}
-              
               {/* Resolve Button */}
               <AlertDialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
                 <AlertDialogTrigger asChild>

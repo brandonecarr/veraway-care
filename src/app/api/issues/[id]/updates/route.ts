@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../../supabase/server';
+import { notifyIssueUpdate, getUserFacilityId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
@@ -15,6 +16,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id: issueId } = await params;
     const body = await request.json();
     const { note } = body;
 
@@ -26,7 +28,7 @@ export async function POST(
     const { error } = await supabase
       .from('issue_audit_log')
       .insert({
-        issue_id: params.id,
+        issue_id: issueId,
         user_id: user.id,
         action: 'updated',
         details: {
@@ -35,6 +37,26 @@ export async function POST(
       });
 
     if (error) throw error;
+
+    // Fetch issue and patient details for the notification
+    const { data: issue } = await supabase
+      .from('issues')
+      .select('issue_number, patient:patients(first_name, last_name)')
+      .eq('id', issueId)
+      .single();
+
+    // Send notifications to all facility users (fire and forget)
+    const facilityId = await getUserFacilityId(user.id);
+    if (facilityId && issue && issue.patient) {
+      const patient = Array.isArray(issue.patient) ? issue.patient[0] : issue.patient;
+      notifyIssueUpdate(user.id, facilityId, {
+        id: issueId,
+        issue_number: issue.issue_number,
+      }, {
+        first_name: patient.first_name,
+        last_name: patient.last_name,
+      }, note).catch((err) => console.error('Failed to send issue update notification:', err));
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

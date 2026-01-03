@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../supabase/server';
 import { getPatients } from '@/lib/care-coordination';
+import { notifyNewPatient, getUserFacilityId } from '@/lib/notifications';
 import type { Patient } from '@/types/care-coordination';
 
 export const dynamic = 'force-dynamic';
@@ -59,9 +60,9 @@ export async function POST(request: Request) {
         mrn,
         first_name,
         last_name,
-        date_of_birth,
-        admission_date,
-        diagnosis,
+        date_of_birth: date_of_birth || null,
+        admission_date: admission_date || null,
+        diagnosis: diagnosis || null,
         status: status || 'active'
       }])
       .select()
@@ -83,6 +84,17 @@ export async function POST(request: Request) {
           mrn
         }
       });
+
+    // Send notifications to all facility users (fire and forget)
+    const facilityId = await getUserFacilityId(user.id);
+    if (facilityId) {
+      notifyNewPatient(user.id, facilityId, {
+        id: data.id,
+        first_name,
+        last_name,
+        mrn,
+      }).catch((err) => console.error('Failed to send patient notification:', err));
+    }
 
     return NextResponse.json(data, { status: 201 });
   } catch (error: any) {

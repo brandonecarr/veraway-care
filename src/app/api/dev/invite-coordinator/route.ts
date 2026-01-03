@@ -15,6 +15,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check for required environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    if (!process.env.SUPABASE_SERVICE_KEY) {
+      console.error('❌ SUPABASE_SERVICE_KEY is not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    console.log('📧 Invite coordinator - Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('📧 Service key exists:', !!process.env.SUPABASE_SERVICE_KEY);
+
     // Use service role key for admin operations
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,22 +91,27 @@ export async function POST(request: Request) {
     }
 
     // Ensure user exists in public.users table
-    const { data: existingPublicUser } = await supabaseAdmin
+    const { data: existingPublicUser, error: checkUserError } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to avoid error when no rows
+
+    console.log('Checking existing public user:', { existingPublicUser, checkUserError });
 
     if (!existingPublicUser) {
       // Create user in public.users table
-      const { error: createUserError } = await supabaseAdmin
+      console.log('Creating user in public.users:', { id: userId, email, name, facility_id });
+      const { data: createdUser, error: createUserError } = await supabaseAdmin
         .from('users')
         .insert({
           id: userId,
           email,
           name,
           facility_id,
-        });
+        })
+        .select()
+        .single();
 
       if (createUserError) {
         console.error('Create public user error:', createUserError);
@@ -102,12 +120,16 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
+      console.log('Created user in public.users:', createdUser);
     } else {
-      // Update user's facility
-      const { error: updateError } = await supabaseAdmin
+      // Update user's facility and name
+      console.log('Updating existing user:', { userId, facility_id, name });
+      const { data: updatedUser, error: updateError } = await supabaseAdmin
         .from('users')
-        .update({ facility_id })
-        .eq('id', userId);
+        .update({ facility_id, name })
+        .eq('id', userId)
+        .select()
+        .single();
 
       if (updateError) {
         console.error('Update user facility error:', updateError);
@@ -116,17 +138,24 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
+      console.log('Updated user:', updatedUser);
     }
 
     // Set user role as coordinator (delete existing first, then insert)
     // First, delete any existing role for this user in this facility
-    await supabaseAdmin
+    console.log('Deleting existing roles for user:', userId, 'in facility:', facility_id);
+    const { error: deleteError } = await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
       .eq('facility_id', facility_id);
 
+    if (deleteError) {
+      console.error('Delete existing role error:', deleteError);
+    }
+
     // Now insert the coordinator role
+    console.log('Inserting coordinator role:', { user_id: userId, role: 'coordinator', facility_id });
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
@@ -144,7 +173,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Role set successfully:', roleData);
+    console.log('Role created successfully:', roleData);
 
     // If user existed but hasn't registered yet, resend the invite
     if (userExists && !userAlreadyRegistered) {

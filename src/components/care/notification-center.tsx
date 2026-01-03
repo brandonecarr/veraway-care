@@ -16,7 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 import { formatDistanceToNow } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '../../../supabase/client';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { ConnectionStatus } from './connection-status';
@@ -25,6 +25,8 @@ export function NotificationCenter() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string;
   const supabase = createClient();
 
   // Get current user ID
@@ -44,13 +46,29 @@ export function NotificationCenter() {
   } = useRealtimeNotifications(userId);
 
   const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
+    if (!notification.is_read) {
       markAsRead(notification.id);
     }
 
+    setIsOpen(false);
+
+    const basePath = slug ? `/${slug}/dashboard` : '/dashboard';
+
+    // Handle message notifications - navigate to the conversation
+    if (notification.type === 'message' && notification.metadata?.conversation_id) {
+      router.push(`${basePath}/messages?conversation=${notification.metadata.conversation_id}`);
+      return;
+    }
+
+    // Handle handoff/after-shift report notifications - navigate to after-shift reports page
+    if (notification.type === 'handoff' || notification.related_handoff_id) {
+      router.push(`${basePath}/after-shift-reports`);
+      return;
+    }
+
+    // Handle issue-related notifications - navigate and open issue detail panel
     if (notification.related_issue_id) {
-      setIsOpen(false);
-      router.push(`/dashboard?issue=${notification.related_issue_id}`);
+      router.push(`${basePath}?issue=${notification.related_issue_id}`);
     }
   };
 
@@ -111,7 +129,8 @@ export function NotificationCenter() {
                 className="h-8 w-8"
                 onClick={() => {
                   setIsOpen(false);
-                  router.push('/dashboard/settings#notifications');
+                  const basePath = slug ? `/${slug}/dashboard` : '/dashboard';
+                  router.push(`${basePath}/settings#notifications`);
                 }}
               >
                 <Settings className="h-4 w-4" />
@@ -140,7 +159,7 @@ export function NotificationCenter() {
                     p-4 rounded-lg border cursor-pointer transition-all duration-200
                     hover:shadow-card-hover hover:border-brand-teal touch-manipulation
                     ${
-                      !notification.read
+                      !notification.is_read
                         ? 'bg-brand-teal/5 border-l-4 border-l-brand-teal'
                         : 'bg-white hover:bg-muted/30'
                     }
@@ -154,9 +173,9 @@ export function NotificationCenter() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-medium text-body text-brand-charcoal">
-                          {notification.type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Notification'}
+                          {notification.title || notification.type?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Notification'}
                         </h4>
-                        {!notification.read && (
+                        {!notification.is_read && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -173,6 +192,11 @@ export function NotificationCenter() {
                       <p className="text-body text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
+                      {notification.type === 'message' && notification.metadata?.sender_name && (
+                        <p className="text-metadata text-muted-foreground mt-2">
+                          From: {notification.metadata.sender_name}
+                        </p>
+                      )}
                       {notification.issue?.patient && (
                         <p className="text-metadata text-muted-foreground mt-2">
                           Patient: {notification.issue.patient.first_name}{' '}

@@ -1,23 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
-import { Clock, AlertCircle, CheckCircle2, TrendingUp, MessageSquare, X, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { MetricCard } from './metric-card';
 import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
-import { CommunicationPanel } from './communication-panel';
-import { MobileCommunicationSheet } from './mobile-communication-sheet';
 import { AfterShiftReportModal } from './after-shift-report-modal';
 import { AfterShiftReportBanner } from './after-shift-report-banner';
-import { ClinicianResponsiveness } from './clinician-responsiveness';
 import { ReportGenerator } from './report-generator';
-import { IssuesByTypeChart } from './issues-by-type-chart';
 import { IssueCard } from './issue-card';
 import { ConnectionStatus } from './connection-status';
 import { IssueCardSkeleton, MetricCardSkeleton, ChartSkeleton } from './loading-skeletons';
+
+// Dynamic imports for chart components to reduce initial bundle size
+const IssuesByTypeChart = dynamic(
+  () => import('./issues-by-type-chart').then((mod) => mod.IssuesByTypeChart),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const ClinicianResponsiveness = dynamic(
+  () => import('./clinician-responsiveness').then((mod) => mod.ClinicianResponsiveness),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
 import { ErrorBoundary } from '@/components/error-boundary';
 import type { Issue, DashboardMetrics } from '@/types/care-coordination';
 import { toast } from 'sonner';
@@ -29,6 +38,7 @@ import { cn } from '@/lib/utils';
 import { ISSUE_TYPE_COLORS } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeIssues } from '@/hooks/use-realtime-issues';
+import { useUnreadMessages } from '@/hooks/use-unread-messages';
 
 const ITEMS_PER_PAGE_DESKTOP = 6; // 3 columns x 2 rows
 const ITEMS_PER_PAGE_MOBILE = 5;
@@ -39,12 +49,15 @@ interface CareCoordinationDashboardProps {
 }
 
 export function CareCoordinationDashboard({ userId, userRole }: CareCoordinationDashboardProps) {
+  const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const slug = params?.slug as string;
   const { issues: realtimeIssues, isConnected, isLoading, refreshIssues } = useRealtimeIssues();
+  const { totalUnread, latestConversation } = useUnreadMessages();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
-  const [isCommunicationPanelOpen, setIsCommunicationPanelOpen] = useState(false);
-  const [communicationIssue, setCommunicationIssue] = useState<Issue | null>(null);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'my' | 'open' | 'overdue'>('all');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -53,7 +66,17 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const openQuickReportModalRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
+  const issuesSectionRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+
+  // Helper to set filter and scroll to issues section
+  const setFilterAndScroll = useCallback((newFilter: 'all' | 'my' | 'open' | 'overdue') => {
+    setFilter(newFilter);
+    // Scroll to issues section after a brief delay to allow state update
+    setTimeout(() => {
+      issuesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }, []);
 
   // Sync issues state with real-time issues
   const issues = realtimeIssues;
@@ -63,12 +86,47 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     fetchUsers();
   }, []);
 
-  // Re-fetch metrics when issues change
+  // Re-fetch metrics when issues count changes (debounced to prevent rapid API calls)
   useEffect(() => {
     if (issues.length > 0) {
-      fetchMetrics();
+      const timeoutId = setTimeout(() => {
+        fetchMetrics();
+      }, 500); // Debounce 500ms to prevent rapid refetches from real-time updates
+      return () => clearTimeout(timeoutId);
     }
-  }, [issues]);
+  }, [issues.length]); // Only trigger when count changes, not on every array reference change
+
+  // Handle issue query parameter from URL (e.g., from notification click)
+  useEffect(() => {
+    const issueId = searchParams.get('issue');
+    if (issueId && issues.length > 0) {
+      // Find the issue in the loaded issues
+      const issue = issues.find(i => i.id === issueId);
+      if (issue) {
+        setSelectedIssue(issue);
+        setIsDetailPanelOpen(true);
+        // Clear the query param from URL without triggering a reload
+        const url = new URL(window.location.href);
+        url.searchParams.delete('issue');
+        window.history.replaceState({}, '', url.toString());
+      } else {
+        // Issue not in active issues, try to fetch it directly
+        fetch(`/api/issues/${issueId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setSelectedIssue(data);
+              setIsDetailPanelOpen(true);
+              // Clear the query param from URL
+              const url = new URL(window.location.href);
+              url.searchParams.delete('issue');
+              window.history.replaceState({}, '', url.toString());
+            }
+          })
+          .catch(console.error);
+      }
+    }
+  }, [searchParams, issues]);
 
   const fetchMetrics = async () => {
     try {
@@ -81,14 +139,16 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users');
+      // Fetch all staff (coordinators and clinicians) for assignment dropdown
+      const response = await fetch('/api/users?all=true');
       if (!response.ok) {
         // Silently handle auth errors - user might not be logged in yet
         setAvailableUsers([]);
         return;
       }
-      const users = await response.json();
-      setAvailableUsers(Array.isArray(users) ? users : []);
+      const data = await response.json();
+      // API returns { users: [...] }
+      setAvailableUsers(Array.isArray(data.users) ? data.users : []);
     } catch (error) {
       // Silently fail for network errors during initial load
       setAvailableUsers([]);
@@ -239,20 +299,52 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     <main className="w-full min-h-screen pb-24 md:pb-24 bg-grain">
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12 space-y-6 md:space-y-12">
         {/* Header */}
-        <div 
+        <div
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in-up"
           style={{ animationDelay: '0ms' }}
         >
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight">
-                Care Coordination
-              </h1>
-              <ConnectionStatus isConnected={isConnected} />
+          <div className="flex items-center gap-4 flex-1">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight">
+                  Care Coordination
+                </h1>
+                <ConnectionStatus isConnected={isConnected} />
+              </div>
+              <p className="text-body text-muted-foreground mt-1 md:mt-2">
+                {userRole === 'coordinator' ? 'Coordinator View' : userRole === 'after_hours' ? 'After-Hours View' : 'Clinician View'}
+              </p>
             </div>
-            <p className="text-body text-muted-foreground mt-1 md:mt-2">
-              {userRole === 'coordinator' ? 'Coordinator View' : userRole === 'after_hours' ? 'After-Hours View' : 'Clinician View'}
-            </p>
+
+            {/* New Message Notification Card */}
+            {totalUnread > 0 && latestConversation && (
+              <Card
+                className="ml-auto bg-gradient-to-r from-[#2D7A7A]/10 to-[#2D7A7A]/5 border-[#2D7A7A]/30 cursor-pointer hover:border-[#2D7A7A]/50 hover:shadow-md transition-all hidden md:block"
+                onClick={() => router.push(`/${slug}/dashboard/messages?conversation=${latestConversation.id}`)}
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#2D7A7A]/20">
+                    <MessageSquare className="w-5 h-5 text-[#2D7A7A]" />
+                  </div>
+                  <div className="max-w-[200px]">
+                    <p className="font-semibold text-[#2D7A7A] text-sm">
+                      {totalUnread} New {totalUnread === 1 ? 'Message' : 'Messages'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {latestConversation.name ||
+                        (latestConversation.type === 'patient'
+                          ? `Patient: ${latestConversation.patient?.first_name || 'Unknown'} ${latestConversation.patient?.last_name || ''}`
+                          : 'Direct Message'
+                        )
+                      }
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="bg-[#2D7A7A] text-white text-xs">
+                    View
+                  </Badge>
+                </div>
+              </Card>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {userRole === 'coordinator' && (
@@ -260,6 +352,39 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
             )}
           </div>
         </div>
+
+        {/* Mobile New Message Notification */}
+        {totalUnread > 0 && latestConversation && (
+          <div className="md:hidden animate-in fade-in slide-in-from-top-4 duration-500">
+            <Card
+              className="bg-gradient-to-r from-[#2D7A7A]/10 to-[#2D7A7A]/5 border-[#2D7A7A]/30 cursor-pointer hover:border-[#2D7A7A]/50 transition-colors"
+              onClick={() => router.push(`/${slug}/dashboard/messages?conversation=${latestConversation.id}`)}
+            >
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#2D7A7A]/20">
+                    <MessageSquare className="w-5 h-5 text-[#2D7A7A]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#2D7A7A]">
+                      {totalUnread} New {totalUnread === 1 ? 'Message' : 'Messages'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Tap to view in Message Center
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-[#2D7A7A]/30 text-[#2D7A7A] hover:bg-[#2D7A7A]/10 hover:text-[#2D7A7A]"
+                >
+                  View
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* After Shift Report Banner */}
         {(userRole === 'after_hours' || userRole === 'coordinator') && (
@@ -269,6 +394,46 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
               setIsDetailPanelOpen(true);
             }}
           />
+        )}
+
+        {/* Overdue Issues Alert Banner */}
+        {metrics && metrics.overdueIssues > 0 && (
+          <div
+            className="animate-in fade-in slide-in-from-top-4 duration-500"
+            style={{ animationDelay: '50ms' }}
+          >
+            <Card
+              className="bg-gradient-to-r from-[#E63946]/10 to-[#E63946]/5 border-[#E63946]/30 cursor-pointer hover:border-[#E63946]/50 transition-colors"
+              onClick={() => setFilterAndScroll('overdue')}
+            >
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-[#E63946]/20">
+                    <AlertCircle className="w-5 h-5 text-[#E63946]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#E63946]">
+                      {metrics.overdueIssues} {metrics.overdueIssues === 1 ? 'Issue' : 'Issues'} Overdue
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      These issues have been open for more than 24 hours and require immediate attention
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-[#E63946]/30 text-[#E63946] hover:bg-[#E63946]/10 hover:text-[#E63946]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterAndScroll('overdue');
+                  }}
+                >
+                  View Overdue
+                </Button>
+              </div>
+            </Card>
+          </div>
         )}
 
         {/* Bento Grid Layout - Primary Metrics */}
@@ -304,7 +469,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       value={metrics.openIssues}
                       subtitle={`of ${metrics.totalIssues} total`}
                       icon={Clock}
-                      onClick={() => setFilter('open')}
+                      onClick={() => setFilterAndScroll('open')}
                     />
                   </div>
                   <div className="w-[280px] flex-shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
@@ -313,7 +478,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       value={metrics.overdueIssues}
                       subtitle="Require immediate attention"
                       icon={AlertCircle}
-                      onClick={() => setFilter('overdue')}
+                      onClick={() => setFilterAndScroll('overdue')}
                       className="border-l-4 border-l-[hsl(var(--status-overdue))]"
                     />
                   </div>
@@ -346,7 +511,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   value={metrics.openIssues}
                   subtitle={`of ${metrics.totalIssues} total`}
                   icon={Clock}
-                  onClick={() => setFilter('open')}
+                  onClick={() => setFilterAndScroll('open')}
                 />
               </div>
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
@@ -355,7 +520,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   value={metrics.overdueIssues}
                   subtitle="Require immediate attention"
                   icon={AlertCircle}
-                  onClick={() => setFilter('overdue')}
+                  onClick={() => setFilterAndScroll('overdue')}
                   className="border-l-4 border-l-[hsl(var(--status-overdue))]"
                 />
               </div>
@@ -428,7 +593,8 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         )}
 
         {/* Issues List */}
-        <div 
+        <div
+          ref={issuesSectionRef}
           className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: '700ms' }}
         >
@@ -496,10 +662,28 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       setSelectedIssue(issue);
                       setIsDetailPanelOpen(true);
                     }}
-                    onMessageClick={(e) => {
+                    onMessageClick={async (e) => {
                       e.stopPropagation();
-                      setCommunicationIssue(issue);
-                      setIsCommunicationPanelOpen(true);
+                      // Navigate to Message Center with patient's group chat
+                      if (issue.patient_id) {
+                        try {
+                          const response = await fetch(`/api/conversations/by-patient/${issue.patient_id}`);
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.conversation?.id) {
+                              router.push(`/${slug}/dashboard/messages?conversation=${data.conversation.id}`);
+                            } else {
+                              router.push(`/${slug}/dashboard/messages`);
+                            }
+                          } else {
+                            router.push(`/${slug}/dashboard/messages`);
+                          }
+                        } catch (error) {
+                          router.push(`/${slug}/dashboard/messages`);
+                        }
+                      } else {
+                        router.push(`/${slug}/dashboard/messages`);
+                      }
                     }}
                     onResolve={() => handleResolveIssue(issue.id)}
                   />
@@ -593,6 +777,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
       {/* Floating Action Button with Quick Report Modal */}
       <QuickReportModal
         userId={userId}
+        userRole={userRole}
         onSuccess={() => {
           refreshIssues();
         }}
@@ -611,51 +796,8 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         currentUserId={userId}
         userRole={userRole}
         availableUsers={availableUsers}
+        slug={slug}
       />
-
-      {/* Floating Communication Panel - Desktop */}
-      {isCommunicationPanelOpen && !isMobile && (
-        <div className="fixed bottom-24 right-6 z-40 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <CommunicationPanel
-            issue={communicationIssue}
-            currentUserId={userId}
-            onClose={() => {
-              setIsCommunicationPanelOpen(false);
-              setCommunicationIssue(null);
-            }}
-            defaultExpanded={true}
-            position="right"
-          />
-        </div>
-      )}
-
-      {/* Mobile Communication Bottom Sheet */}
-      {isMobile && (
-        <MobileCommunicationSheet
-          issue={communicationIssue}
-          currentUserId={userId}
-          open={isCommunicationPanelOpen}
-          onOpenChange={(open) => {
-            setIsCommunicationPanelOpen(open);
-            if (!open) setCommunicationIssue(null);
-          }}
-        />
-      )}
-
-      {/* Quick Message Button - shows when communication panel is closed but an issue is selected */}
-      {!isCommunicationPanelOpen && selectedIssue && (
-        <Button
-          onClick={() => {
-            setCommunicationIssue(selectedIssue);
-            setIsCommunicationPanelOpen(true);
-          }}
-          className="fixed bottom-24 right-24 md:right-24 z-40 h-12 w-12 rounded-full bg-[#2D7A7A] hover:bg-[#236060] shadow-lg active:scale-95 transition-transform touch-manipulation"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </Button>
-      )}
-
-
     </main>
   );
 }

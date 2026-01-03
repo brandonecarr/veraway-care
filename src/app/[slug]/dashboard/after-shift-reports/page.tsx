@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, User, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, CheckCircle2, Archive } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { FileText, User, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, CheckCircle2, Archive, CalendarIcon, X } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format, isSameDay, formatDistanceToNow } from 'date-fns';
 import DashboardNavbar from '@/components/dashboard-navbar';
 import { MobileBottomNav } from '@/components/care/mobile-bottom-nav';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
@@ -18,6 +20,9 @@ import type { Handoff, Issue } from '@/types/care-coordination';
 
 export default function AfterShiftReportsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reportIdFromUrl = searchParams.get('report');
+  const reportRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [handoffs, setHandoffs] = useState<(Handoff & { taggedIssues?: Issue[] })[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +31,7 @@ export default function AfterShiftReportsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     const initUser = async () => {
@@ -85,10 +91,27 @@ export default function AfterShiftReportsPage() {
 
       setHandoffs(handoffsWithIssues);
 
-      // Auto-expand the first active (non-archived) report
-      const firstActive = handoffsWithIssues.find(h => !h.is_archived);
-      if (firstActive) {
-        setExpandedId(firstActive.id);
+      // If there's a report ID in the URL, expand that report and switch to the correct tab
+      if (reportIdFromUrl) {
+        const targetReport = handoffsWithIssues.find(h => h.id === reportIdFromUrl);
+        if (targetReport) {
+          setExpandedId(targetReport.id);
+          // Switch to correct tab based on archive status
+          setActiveTab(targetReport.is_archived ? 'archived' : 'active');
+          // Scroll to the report after a short delay
+          setTimeout(() => {
+            const element = reportRefs.current[reportIdFromUrl];
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
+        }
+      } else {
+        // Auto-expand the first active (non-archived) report
+        const firstActive = handoffsWithIssues.find(h => !h.is_archived);
+        if (firstActive) {
+          setExpandedId(firstActive.id);
+        }
       }
     } catch (error) {
       setHandoffs([]);
@@ -196,9 +219,11 @@ export default function AfterShiftReportsPage() {
     return (
       <Card
         key={handoff.id}
+        ref={(el) => { reportRefs.current[handoff.id] = el; }}
         className={cn(
           'overflow-hidden transition-all',
-          isArchived && 'opacity-75'
+          isArchived && 'opacity-75',
+          reportIdFromUrl === handoff.id && 'ring-2 ring-[#2D7A7A] ring-offset-2'
         )}
       >
         {/* Header */}
@@ -397,22 +422,86 @@ export default function AfterShiftReportsPage() {
 
             {/* Archived Reports */}
             <TabsContent value="archived" className="space-y-4">
+              {/* Date Filter */}
+              <div className="flex items-center gap-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "PPP") : "Select a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {selectedDate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedDate(undefined)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
               {isLoading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map((i) => (
                     <Card key={i} className="h-32 animate-pulse bg-muted" />
                   ))}
                 </div>
-              ) : handoffs.filter(h => h.is_archived).length === 0 ? (
-                <Card className="p-12 text-center">
-                  <Archive className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">No archived reports</p>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {handoffs.filter(h => h.is_archived).map((handoff) => renderReportCard(handoff, true))}
-                </div>
-              )}
+              ) : (() => {
+                const archivedReports = handoffs.filter(h => h.is_archived);
+                const filteredReports = selectedDate
+                  ? archivedReports.filter(h => isSameDay(new Date(h.created_at), selectedDate))
+                  : archivedReports;
+
+                if (archivedReports.length === 0) {
+                  return (
+                    <Card className="p-12 text-center">
+                      <Archive className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground">No archived reports</p>
+                    </Card>
+                  );
+                }
+
+                if (filteredReports.length === 0) {
+                  return (
+                    <Card className="p-12 text-center">
+                      <CalendarIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground">No reports for {format(selectedDate!, "MMMM d, yyyy")}</p>
+                      <Button
+                        variant="link"
+                        className="mt-2"
+                        onClick={() => setSelectedDate(undefined)}
+                      >
+                        View all archived reports
+                      </Button>
+                    </Card>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {filteredReports.map((handoff) => renderReportCard(handoff, true))}
+                  </div>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>
