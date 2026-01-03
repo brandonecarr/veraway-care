@@ -191,7 +191,7 @@ export function IDGIssueCard({
 
         {/* IDG Reason Badges */}
         <div onClick={onClick} className="cursor-pointer flex flex-wrap gap-1">
-          {issue.idg_reasons.map((reason, index) => (
+          {(issue.idg_reasons || []).map((reason, index) => (
             <Badge
               key={index}
               variant="outline"

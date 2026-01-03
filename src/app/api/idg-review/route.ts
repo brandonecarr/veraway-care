@@ -114,7 +114,33 @@ export async function GET(request: Request) {
       // Fallback to direct query
       idgIssues = await fallbackQuery(supabase, weekStart, weekEnd, thresholdHours);
     } else {
-      idgIssues = rpcData || [];
+      // Transform RPC data to ensure idg_reasons is an array
+      idgIssues = (rpcData || []).map((issue: any) => {
+        // Convert idg_reason string to idg_reasons array if needed
+        let idgReasons: string[] = issue.idg_reasons || [];
+        if (!idgReasons.length && issue.idg_reason) {
+          // Parse from single reason string - build array based on issue properties
+          const reasons: string[] = [];
+          const isHighPriority = ['high', 'urgent'].includes(issue.priority);
+          const isIdgType = IDG_ISSUE_TYPES.includes(issue.issue_type);
+          const isOverdue = issue.is_overdue;
+
+          if (isHighPriority) {
+            reasons.push(issue.priority === 'urgent' ? 'Urgent Priority' : 'High Priority');
+          }
+          if (isIdgType) {
+            reasons.push('IDG Issue Type');
+          }
+          if (isOverdue) {
+            reasons.push(`Unresolved > ${thresholdHours}h`);
+          }
+          idgReasons = reasons.length > 0 ? reasons : [issue.idg_reason];
+        }
+        return {
+          ...issue,
+          idg_reasons: idgReasons
+        };
+      });
     }
 
     // Get actions and messages for these issues
