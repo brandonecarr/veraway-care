@@ -190,7 +190,8 @@ export function IDGIssueCard({
         </div>
 
         {/* IDG Reason Badges */}
-        <div onClick={onClick} className="cursor-pointer flex flex-wrap gap-1">
+        <div onClick={onClick} className="cursor-pointer flex items-center flex-wrap gap-1">
+          <span className="text-xs font-medium text-muted-foreground mr-1">Reason For IDG:</span>
           {(issue.idg_reasons || []).map((reason, index) => (
             <Badge
               key={index}

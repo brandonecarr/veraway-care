@@ -129,7 +129,7 @@ export async function GET(request: Request) {
             reasons.push(issue.priority === 'urgent' ? 'Urgent Priority' : 'High Priority');
           }
           if (isIdgType) {
-            reasons.push('IDG Issue Type');
+            reasons.push(issue.issue_type);
           }
           if (isOverdue) {
             reasons.push(`Unresolved > ${thresholdHours}h`);
@@ -528,7 +528,7 @@ async function fallbackQuery(
       idgReasons.push(issue.priority === 'urgent' ? 'Urgent Priority' : 'High Priority');
     }
     if (isIdgType) {
-      idgReasons.push('IDG Issue Type');
+      idgReasons.push(issue.issue_type);
     }
     if (isOverdue) {
       idgReasons.push(`Unresolved > ${thresholdHours}h`);
