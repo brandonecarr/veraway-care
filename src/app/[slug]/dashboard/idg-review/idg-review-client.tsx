@@ -11,13 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Download, Users, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Users, FileText, CheckCircle2 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { IDGSummaryStats } from '@/components/care/idg-summary-stats';
 import { IDGIssueList } from '@/components/care/idg-issue-list';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
+import { IDGCompletionModal } from '@/components/care/idg-completion-modal';
 import { generateIDGPDF } from '@/components/care/idg-pdf-export';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 interface IDGReviewClientProps {
   slug: string;
@@ -41,6 +43,9 @@ interface IDGIssue {
   idg_reason: string;
   actions_taken?: any[];
   outstanding_next_steps?: any[];
+  flagged_for_md_review?: boolean;
+  idg_disposition?: string | null;
+  reviewed_in_idg?: boolean;
 }
 
 interface IDGSummary {
@@ -56,9 +61,17 @@ interface IDGSummary {
     in_progress: number;
   };
   overdue: number;
+  admissions?: number;
+  deaths?: number;
   byIssueType: Record<string, number>;
   weekRange: { start: string; end: string };
   thresholdHours: number;
+}
+
+interface PreviousReview {
+  completed_at: string;
+  disciplines_present: string[];
+  total_issues_reviewed: number;
 }
 
 export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
@@ -81,6 +94,12 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
+  // IDG completion state
+  const [disciplines, setDisciplines] = useState<string[]>([]);
+  const [dispositions, setDispositions] = useState<{ value: string; label: string }[]>([]);
+  const [previousReview, setPreviousReview] = useState<PreviousReview | null>(null);
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
 
   const weekStart = format(currentWeekStart, 'yyyy-MM-dd');
   const weekEnd = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
@@ -127,6 +146,9 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       setIssues(data.issues || []);
       setGrouped(data.grouped || {});
       setSummary(data.summary || null);
+      setDisciplines(data.disciplines || []);
+      setDispositions(data.dispositions || []);
+      setPreviousReview(data.previousReview || null);
     } catch (error) {
       console.error('Error fetching IDG data:', error);
       setIssues([]);
@@ -170,6 +192,95 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     setIsDetailPanelOpen(true);
   };
 
+  const handleFlagForMD = async (issueId: string, flagged: boolean) => {
+    try {
+      const response = await fetch('/api/idg-review', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, flaggedForMD: flagged })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update MD review flag');
+      }
+
+      // Update local state optimistically
+      setIssues(prev => prev.map(issue =>
+        issue.id === issueId
+          ? { ...issue, flagged_for_md_review: flagged }
+          : issue
+      ));
+
+      toast.success(flagged ? 'Flagged for MD Review' : 'MD Review flag removed', {
+        description: `Issue has been ${flagged ? 'flagged for' : 'removed from'} MD review.`,
+      });
+    } catch (error) {
+      console.error('Error updating MD review flag:', error);
+      toast.error('Failed to update MD review flag. Please try again.');
+    }
+  };
+
+  const handleDispositionChange = async (issueId: string, disposition: string) => {
+    try {
+      const response = await fetch('/api/idg-review', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, disposition })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update disposition');
+      }
+
+      // Update local state optimistically
+      setIssues(prev => prev.map(issue =>
+        issue.id === issueId
+          ? { ...issue, idg_disposition: disposition }
+          : issue
+      ));
+
+      const dispositionLabel = dispositions.find(d => d.value === disposition)?.label || disposition;
+      toast.success('Disposition updated', {
+        description: `Issue disposition set to "${dispositionLabel}".`,
+      });
+    } catch (error) {
+      console.error('Error updating disposition:', error);
+      toast.error('Failed to update disposition. Please try again.');
+    }
+  };
+
+  const handleCompleteIDGReview = async (disciplinesPresent: string[]) => {
+    try {
+      const response = await fetch('/api/idg-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStart,
+          weekEnd,
+          disciplinesPresent,
+          issueIds: issues.map(i => i.id),
+          admissionsCount: summary?.admissions || 0,
+          deathsCount: summary?.deaths || 0
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete IDG review');
+      }
+
+      toast.success('IDG Review Completed', {
+        description: `Review recorded with ${disciplinesPresent.length} disciplines present and ${issues.length} issues reviewed.`,
+      });
+
+      // Refresh data to show updated status
+      fetchIDGData();
+    } catch (error) {
+      console.error('Error completing IDG review:', error);
+      toast.error('Failed to complete IDG review. Please try again.');
+      throw error; // Re-throw so modal knows it failed
+    }
+  };
+
   const isCurrentWeek = format(currentWeekStart, 'yyyy-MM-dd') ===
     format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
@@ -190,29 +301,40 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             </p>
           </div>
 
-          <Button
-            variant="outline"
-            className="flex items-center gap-2 w-fit"
-            disabled={isExporting || isLoading || issues.length === 0}
-            onClick={async () => {
-              if (!summary) return;
-              setIsExporting(true);
-              try {
-                await generateIDGPDF({
-                  issues,
-                  summary,
-                  weekStart,
-                  weekEnd,
-                  groupBy
-                });
-              } finally {
-                setIsExporting(false);
-              }
-            }}
-          >
-            <Download className="w-4 h-4" />
-            {isExporting ? 'Exporting...' : 'Export PDF'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 w-fit"
+              disabled={isExporting || isLoading || issues.length === 0}
+              onClick={async () => {
+                if (!summary) return;
+                setIsExporting(true);
+                try {
+                  await generateIDGPDF({
+                    issues,
+                    summary,
+                    weekStart,
+                    weekEnd,
+                    groupBy
+                  });
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+            >
+              <Download className="w-4 h-4" />
+              {isExporting ? 'Exporting...' : 'Export PDF'}
+            </Button>
+
+            <Button
+              className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
+              disabled={isLoading || issues.length === 0}
+              onClick={() => setIsCompletionModalOpen(true)}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              IDG Review Completed
+            </Button>
+          </div>
         </div>
 
         {/* Controls */}
@@ -306,6 +428,9 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
           grouped={grouped}
           groupBy={groupBy}
           onIssueClick={handleIssueClick}
+          onFlagForMD={handleFlagForMD}
+          onDispositionChange={handleDispositionChange}
+          dispositions={dispositions}
         />
       </div>
 
@@ -330,6 +455,20 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         currentUserId={currentUser?.id || ''}
         userRole="coordinator"
         availableUsers={availableUsers}
+      />
+
+      {/* IDG Completion Modal */}
+      <IDGCompletionModal
+        open={isCompletionModalOpen}
+        onOpenChange={setIsCompletionModalOpen}
+        onComplete={handleCompleteIDGReview}
+        weekStart={weekStart}
+        weekEnd={weekEnd}
+        disciplines={disciplines}
+        issueCount={issues.length}
+        admissionsCount={summary?.admissions || 0}
+        deathsCount={summary?.deaths || 0}
+        previousReview={previousReview}
       />
     </main>
   );

@@ -2,8 +2,16 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { format } from 'date-fns';
-import { Clock, User, MessageSquare, Activity } from 'lucide-react';
+import { Clock, User, MessageSquare, Activity, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface IDGIssue {
@@ -21,11 +29,17 @@ interface IDGIssue {
   idg_reason: string;
   actions_taken?: any[];
   outstanding_next_steps?: any[];
+  flagged_for_md_review?: boolean;
+  idg_disposition?: string | null;
+  reviewed_in_idg?: boolean;
 }
 
 interface IDGIssueCardProps {
   issue: IDGIssue;
   onClick?: () => void;
+  onFlagForMD?: (issueId: string, flagged: boolean) => void;
+  onDispositionChange?: (issueId: string, disposition: string) => void;
+  dispositions?: { value: string; label: string }[];
 }
 
 const priorityColors: Record<string, string> = {
@@ -55,7 +69,21 @@ const issueTypeColors: Record<string, string> = {
   'Not Following Plan-of-Care': '#F2CC8F'
 };
 
-export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
+const dispositionColors: Record<string, string> = {
+  monitoring_only: 'bg-blue-50 text-blue-700 border-blue-200',
+  plan_in_place: 'bg-green-50 text-green-700 border-green-200',
+  escalated: 'bg-red-50 text-red-700 border-red-200',
+  pending_md_input: 'bg-purple-50 text-purple-700 border-purple-200',
+  resolved: 'bg-gray-50 text-gray-700 border-gray-200'
+};
+
+export function IDGIssueCard({
+  issue,
+  onClick,
+  onFlagForMD,
+  onDispositionChange,
+  dispositions = []
+}: IDGIssueCardProps) {
   const formatHoursOpen = (hours: number) => {
     if (hours < 24) {
       return `${Math.round(hours)}h`;
@@ -83,18 +111,33 @@ export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
     return message.length > 80 ? message.substring(0, 80) + '...' : message;
   };
 
+  const handleFlagChange = (checked: boolean) => {
+    if (onFlagForMD) {
+      onFlagForMD(issue.id, checked);
+    }
+  };
+
+  const handleDispositionChange = (value: string) => {
+    if (onDispositionChange) {
+      onDispositionChange(issue.id, value);
+    }
+  };
+
   return (
     <Card
       className={cn(
-        'p-4 bg-white border-[#D4D4D4] hover:shadow-md transition-all cursor-pointer',
-        issue.is_overdue && 'border-l-4 border-l-red-500'
+        'p-4 bg-white border-[#D4D4D4] hover:shadow-md transition-all',
+        issue.is_overdue && 'border-l-4 border-l-red-500',
+        issue.reviewed_in_idg && 'border-l-4 border-l-green-500'
       )}
-      onClick={onClick}
     >
       <div className="space-y-3">
         {/* Header Row */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div
+            className="flex items-center gap-2 flex-wrap cursor-pointer flex-1"
+            onClick={onClick}
+          >
             <span className="font-mono text-sm text-muted-foreground">
               #{issue.issue_number}
             </span>
@@ -103,6 +146,12 @@ export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
               style={{ backgroundColor: issueTypeColors[issue.issue_type] || '#666' }}
             />
             <span className="font-medium text-sm">{issue.issue_type}</span>
+            {issue.reviewed_in_idg && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                Reviewed
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Badge variant="outline" className={priorityColors[issue.priority]}>
@@ -115,7 +164,10 @@ export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
         </div>
 
         {/* Meta Row */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <div
+          className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground cursor-pointer"
+          onClick={onClick}
+        >
           <div className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
             <span>
@@ -138,14 +190,17 @@ export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
         </div>
 
         {/* IDG Reason Badge */}
-        <div>
+        <div onClick={onClick} className="cursor-pointer">
           <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
             IDG Reason: {issue.idg_reason}
           </Badge>
         </div>
 
         {/* Actions & Next Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[#D4D4D4]">
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[#D4D4D4] cursor-pointer"
+          onClick={onClick}
+        >
           <div>
             <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground mb-1">
               <Activity className="w-3 h-3" />
@@ -165,6 +220,62 @@ export function IDGIssueCard({ issue, onClick }: IDGIssueCardProps) {
             </p>
           </div>
         </div>
+
+        {/* IDG Controls - Step 4: Coordinator preparation */}
+        {(onFlagForMD || onDispositionChange) && (
+          <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#D4D4D4]">
+            {/* MD Review Toggle */}
+            {onFlagForMD && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  id={`md-review-${issue.id}`}
+                  checked={issue.flagged_for_md_review || false}
+                  onCheckedChange={handleFlagChange}
+                  className="data-[state=checked]:bg-purple-600"
+                />
+                <label
+                  htmlFor={`md-review-${issue.id}`}
+                  className="text-xs font-medium text-muted-foreground flex items-center gap-1 cursor-pointer"
+                >
+                  <Stethoscope className="w-3 h-3" />
+                  Flag for MD Review
+                </label>
+              </div>
+            )}
+
+            {/* Disposition Dropdown */}
+            {onDispositionChange && dispositions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Disposition:</span>
+                <Select
+                  value={issue.idg_disposition || ''}
+                  onValueChange={handleDispositionChange}
+                >
+                  <SelectTrigger className="h-7 w-[140px] text-xs">
+                    <SelectValue placeholder="Set disposition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dispositions.map((d) => (
+                      <SelectItem key={d.value} value={d.value} className="text-xs">
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Show current disposition badge if set */}
+            {issue.idg_disposition && (
+              <Badge
+                variant="outline"
+                className={cn('text-xs', dispositionColors[issue.idg_disposition])}
+              >
+                {dispositions.find(d => d.value === issue.idg_disposition)?.label || issue.idg_disposition}
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );

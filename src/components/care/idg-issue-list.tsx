@@ -25,6 +25,9 @@ interface IDGIssue {
   idg_reason: string;
   actions_taken?: any[];
   outstanding_next_steps?: any[];
+  flagged_for_md_review?: boolean;
+  idg_disposition?: string | null;
+  reviewed_in_idg?: boolean;
 }
 
 interface PatientGroup {
@@ -39,9 +42,20 @@ interface IDGIssueListProps {
   grouped: Record<string, any>;
   groupBy: 'patient' | 'issue_type';
   onIssueClick?: (issue: IDGIssue) => void;
+  onFlagForMD?: (issueId: string, flagged: boolean) => void;
+  onDispositionChange?: (issueId: string, disposition: string) => void;
+  dispositions?: { value: string; label: string }[];
 }
 
-export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssueListProps) {
+export function IDGIssueList({
+  issues,
+  grouped,
+  groupBy,
+  onIssueClick,
+  onFlagForMD,
+  onDispositionChange,
+  dispositions = []
+}: IDGIssueListProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = (key: string) => {
@@ -141,6 +155,9 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
                 key={issue.id}
                 issue={issue}
                 onClick={() => onIssueClick?.(issue)}
+                onFlagForMD={onFlagForMD}
+                onDispositionChange={onDispositionChange}
+                dispositions={dispositions}
               />
             ))}
           </div>
@@ -219,6 +236,9 @@ export function IDGIssueList({ issues, grouped, groupBy, onIssueClick }: IDGIssu
                 key={issue.id}
                 issue={issue}
                 onClick={() => onIssueClick?.(issue)}
+                onFlagForMD={onFlagForMD}
+                onDispositionChange={onDispositionChange}
+                dispositions={dispositions}
               />
             ))}
           </div>
