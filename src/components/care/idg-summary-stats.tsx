@@ -31,8 +31,12 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
             <div className="flex gap-4 px-4 pb-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="w-[280px] flex-shrink-0">
-                  <Card className="p-4 bg-white border-[#D4D4D4]">
-                    <Skeleton className="h-16 w-full" />
+                  <Card className="p-4 md:p-6">
+                    <div className="flex items-start justify-between mb-3 md:mb-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-9 w-9 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-10 w-16" />
                   </Card>
                 </div>
               ))}
@@ -43,8 +47,12 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
         {/* Desktop: Grid loading */}
         <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="p-4 bg-white border-[#D4D4D4]">
-              <Skeleton className="h-16 w-full" />
+            <Card key={i} className="p-4 md:p-6">
+              <div className="flex items-start justify-between mb-3 md:mb-4">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-9 w-9 rounded-lg" />
+              </div>
+              <Skeleton className="h-10 w-16" />
             </Card>
           ))}
         </div>
@@ -105,17 +113,19 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
           <div className="flex gap-4 px-4 pb-4">
             {stats.map((stat) => (
               <div key={stat.label} className="w-[280px] flex-shrink-0">
-                <Card className="p-4 bg-white border-[#D4D4D4]">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${stat.bgColor}`}>
-                      <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                <Card className="p-4 md:p-6 transition-all duration-200 border shadow-card">
+                  <div className="flex items-start justify-between mb-3 md:mb-4">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {stat.label}
+                    </h3>
+                    <div className={`p-1.5 md:p-2 rounded-lg ${stat.bgColor}`}>
+                      <stat.icon className={`w-4 h-4 md:w-5 md:h-5 ${stat.color}`} />
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
-                        {stat.value}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    </div>
+                  </div>
+                  <div className="space-y-1 md:space-y-2">
+                    <p className="text-metric-hero-mobile md:text-metric-hero font-display">
+                      {stat.value}
+                    </p>
                   </div>
                 </Card>
               </div>
@@ -128,17 +138,19 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
       {/* Desktop: Grid layout for stats */}
       <div className="hidden md:grid grid-cols-3 lg:grid-cols-6 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.label} className="p-4 bg-white border-[#D4D4D4]">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${stat.bgColor}`}>
-                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+          <Card key={stat.label} className="p-4 md:p-6 transition-all duration-200 border shadow-card">
+            <div className="flex items-start justify-between mb-3 md:mb-4">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {stat.label}
+              </h3>
+              <div className={`p-1.5 md:p-2 rounded-lg ${stat.bgColor}`}>
+                <stat.icon className={`w-4 h-4 md:w-5 md:h-5 ${stat.color}`} />
               </div>
-              <div>
-                <p className="text-2xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>
-                  {stat.value}
-                </p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-              </div>
+            </div>
+            <div className="space-y-1 md:space-y-2">
+              <p className="text-metric-hero-mobile md:text-metric-hero font-display">
+                {stat.value}
+              </p>
             </div>
           </Card>
         ))}
