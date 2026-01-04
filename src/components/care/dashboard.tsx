@@ -223,8 +223,9 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     } else if (filter === 'overdue') {
       filtered = issues.filter(i => {
         if (i.status === 'resolved') return false;
-        const createdAt = new Date(i.created_at);
-        const hoursSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+        // Use last_activity_at if available (reset when update is added), otherwise fall back to created_at
+        const lastActivity = new Date(i.last_activity_at || i.created_at);
+        const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
         return hoursSince > 24;
       });
     }

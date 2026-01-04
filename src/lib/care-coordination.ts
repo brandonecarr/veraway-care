@@ -283,8 +283,18 @@ export async function getAuditLog(issueId?: string) {
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const supabase = await createClient();
 
+  // Get the current user's ID
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
   // Use database function for optimal performance
-  const { data, error } = await supabase.rpc('get_dashboard_metrics');
+  // Pass user ID so the function can filter by facility and use last_activity_at for overdue calc
+  const { data, error } = await supabase.rpc('get_dashboard_metrics', {
+    p_user_id: user.id
+  });
 
   if (error) throw error;
 
