@@ -143,6 +143,15 @@ export default function SettingsPage() {
 
       // Get user role - filter by hospice_id to get the correct role for this hospice
       console.log('Settings: Fetching role for user:', user.id, 'hospice:', userData.hospice_id);
+
+      // First, get ALL roles for this user to diagnose issues
+      const { data: allRoles, error: allRolesError } = await supabase
+        .from('user_roles')
+        .select('role, job_role, hospice_id')
+        .eq('user_id', user.id);
+
+      console.log('Settings: ALL roles for user:', { allRoles, allRolesError });
+
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role, job_role')
@@ -150,7 +159,7 @@ export default function SettingsPage() {
         .eq('hospice_id', userData.hospice_id)
         .maybeSingle();
 
-      console.log('Settings: Role query result:', { roleData, roleError });
+      console.log('Settings: Filtered role result:', { roleData, roleError });
 
       setUserProfile({
         id: user.id,
