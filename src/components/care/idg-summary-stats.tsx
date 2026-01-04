@@ -3,20 +3,16 @@
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { FileText, AlertTriangle, AlertCircle, Clock, UserPlus, Heart } from 'lucide-react';
+import { FileText, AlertTriangle, Users, UserPlus, UserMinus, Heart } from 'lucide-react';
 
 interface IDGSummaryStatsProps {
   data?: {
-    totalIssues: number;
-    byPriority: {
-      urgent: number;
-      high: number;
-      normal: number;
-      low: number;
-    };
-    overdue: number;
-    admissions?: number;
-    deaths?: number;
+    totalActivePatients: number;
+    admissionsThisWeek: number;
+    dischargesThisWeek: number;
+    deathsThisWeek: number;
+    totalIssuesIncluded: number;
+    highPriorityOverdueCount: number;
   };
   isLoading: boolean;
 }
@@ -62,46 +58,46 @@ export function IDGSummaryStats({ data, isLoading }: IDGSummaryStatsProps) {
 
   const stats = [
     {
-      label: 'Total Issues',
-      value: data?.totalIssues ?? 0,
-      icon: FileText,
+      label: 'Active Patients',
+      value: data?.totalActivePatients ?? 0,
+      icon: Users,
       color: 'text-[#2D7A7A]',
       bgColor: 'bg-[#2D7A7A]/10'
     },
     {
-      label: 'Urgent',
-      value: data?.byPriority.urgent ?? 0,
-      icon: AlertTriangle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100'
-    },
-    {
-      label: 'High Priority',
-      value: data?.byPriority.high ?? 0,
-      icon: AlertCircle,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100'
-    },
-    {
-      label: 'Overdue',
-      value: data?.overdue ?? 0,
-      icon: Clock,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-100'
-    },
-    {
       label: 'Admissions',
-      value: data?.admissions ?? 0,
+      value: data?.admissionsThisWeek ?? 0,
       icon: UserPlus,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100'
     },
     {
+      label: 'Discharges',
+      value: data?.dischargesThisWeek ?? 0,
+      icon: UserMinus,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100'
+    },
+    {
       label: 'Deaths',
-      value: data?.deaths ?? 0,
+      value: data?.deathsThisWeek ?? 0,
       icon: Heart,
       color: 'text-gray-600',
       bgColor: 'bg-gray-100'
+    },
+    {
+      label: 'Issues in IDG',
+      value: data?.totalIssuesIncluded ?? 0,
+      icon: FileText,
+      color: 'text-[#2D7A7A]',
+      bgColor: 'bg-[#2D7A7A]/10'
+    },
+    {
+      label: 'High/Overdue',
+      value: data?.highPriorityOverdueCount ?? 0,
+      icon: AlertTriangle,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100'
     }
   ];
 

@@ -53,8 +53,9 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
 
   const isOverdue = () => {
     if (issue.status === "resolved") return false;
-    const createdAt = new Date(issue.created_at);
-    const hoursSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+    // Use last_activity_at if available, otherwise fall back to created_at
+    const lastActivity = new Date(issue.last_activity_at || issue.created_at);
+    const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
     return hoursSince > 24;
   };
 

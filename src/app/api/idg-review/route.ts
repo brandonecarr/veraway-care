@@ -92,27 +92,28 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const weekStart = searchParams.get('weekStart');
-    const weekEnd = searchParams.get('weekEnd');
+    // Support both old (weekStart/weekEnd) and new (fromDate/toDate) params
+    const fromDate = searchParams.get('fromDate') || searchParams.get('weekStart');
+    const toDate = searchParams.get('toDate') || searchParams.get('weekEnd');
     const thresholdHours = parseInt(searchParams.get('threshold') || '24');
     const groupBy = searchParams.get('groupBy') || 'patient';
 
-    if (!weekStart || !weekEnd) {
-      return NextResponse.json({ error: 'weekStart and weekEnd are required' }, { status: 400 });
+    if (!fromDate || !toDate) {
+      return NextResponse.json({ error: 'fromDate and toDate are required' }, { status: 400 });
     }
 
     // Try RPC function first, fall back to direct query if not available
     let idgIssues: IDGIssue[] = [];
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_idg_issues', {
-      p_week_start: weekStart,
-      p_week_end: weekEnd,
+      p_week_start: fromDate,
+      p_week_end: toDate,
       p_threshold_hours: thresholdHours
     });
 
     if (rpcError) {
       // Fallback to direct query
-      idgIssues = await fallbackQuery(supabase, weekStart, weekEnd, thresholdHours);
+      idgIssues = await fallbackQuery(supabase, fromDate, toDate, thresholdHours);
     } else {
       // Transform RPC data to ensure idg_reasons is an array
       idgIssues = (rpcData || []).map((issue: any) => {
@@ -203,35 +204,98 @@ export async function GET(request: Request) {
     // Group issues
     const grouped = groupIssues(idgIssues, groupBy);
 
-    // Get admissions and deaths counts
+    // Get patient counts for the new summary stats
+    let totalActivePatients = 0;
     let admissionsCount = 0;
+    let dischargesCount = 0;
     let deathsCount = 0;
 
-    // Count deaths from the issues
-    deathsCount = idgIssues.filter(i => i.issue_type === 'Death').length;
-
-    // Try to get admissions count from patients table
     if (userData?.facility_id) {
-      const { count } = await supabase
+      // Get total active patients
+      const { count: activeCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
         .eq('facility_id', userData.facility_id)
-        .gte('created_at', weekStart)
-        .lte('created_at', weekEnd)
         .eq('status', 'active');
 
-      admissionsCount = count || 0;
+      totalActivePatients = activeCount || 0;
+
+      // Get admissions in date range (using admitted_date)
+      const { count: admissions } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('facility_id', userData.facility_id)
+        .gte('admitted_date', fromDate)
+        .lte('admitted_date', toDate);
+
+      admissionsCount = admissions || 0;
+
+      // Get discharges in date range (using discharge_date)
+      const { count: discharges } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('facility_id', userData.facility_id)
+        .gte('discharge_date', fromDate)
+        .lte('discharge_date', toDate);
+
+      dischargesCount = discharges || 0;
+
+      // Get deaths in date range (using death_date)
+      const { count: deaths } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('facility_id', userData.facility_id)
+        .gte('death_date', fromDate)
+        .lte('death_date', toDate);
+
+      deathsCount = deaths || 0;
     }
 
-    // Check if this week has been reviewed already
+    // Get patients with benefit periods expiring within 14 days
+    let expiringBenefitPeriods: any[] = [];
+    if (userData?.facility_id) {
+      // Get active patients with benefit period and admitted_date
+      const { data: patientsData } = await supabase
+        .from('patients')
+        .select('id, first_name, last_name, mrn, admitted_date, benefit_period')
+        .eq('facility_id', userData.facility_id)
+        .eq('status', 'active')
+        .not('admitted_date', 'is', null)
+        .not('benefit_period', 'is', null);
+
+      if (patientsData) {
+        // Calculate days remaining for each patient and filter for ≤14 days
+        const now = new Date();
+        expiringBenefitPeriods = patientsData
+          .map(patient => {
+            const admittedDate = new Date(patient.admitted_date);
+            const daysInPeriod = patient.benefit_period <= 2 ? 90 : 60;
+            const endDate = new Date(admittedDate.getTime() + daysInPeriod * 24 * 60 * 60 * 1000);
+            const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+
+            return {
+              patient_id: patient.id,
+              patient_name: `${patient.first_name} ${patient.last_name}`,
+              patient_mrn: patient.mrn,
+              benefit_period: patient.benefit_period,
+              days_remaining: daysRemaining,
+              end_date: endDate.toISOString()
+            };
+          })
+          .filter(p => p.days_remaining <= 14)
+          .sort((a, b) => a.days_remaining - b.days_remaining);
+      }
+    }
+
+    // Check if this date range has been reviewed already
     let previousReview = null;
     if (userData?.facility_id) {
       const { data: reviewData } = await supabase
         .from('idg_reviews')
         .select('*')
         .eq('facility_id', userData.facility_id)
-        .eq('week_start', weekStart)
-        .eq('week_end', weekEnd)
+        .eq('week_start', fromDate)
+        .eq('week_end', toDate)
         .order('completed_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -239,8 +303,21 @@ export async function GET(request: Request) {
       previousReview = reviewData;
     }
 
-    // Calculate summary statistics
+    // Calculate high priority and overdue count
+    const highPriorityOverdueCount = idgIssues.filter(i =>
+      ['high', 'urgent'].includes(i.priority) || i.is_overdue
+    ).length;
+
+    // Calculate summary statistics (new format for IDG summary stats)
     const summary = {
+      // New stats for updated UI
+      totalActivePatients,
+      admissionsThisWeek: admissionsCount,
+      dischargesThisWeek: dischargesCount,
+      deathsThisWeek: deathsCount,
+      totalIssuesIncluded: 0, // Will be set by client after issue selection
+      highPriorityOverdueCount,
+      // Keep legacy stats for backwards compatibility
       totalIssues: idgIssues.length,
       byPriority: {
         urgent: idgIssues.filter(i => i.priority === 'urgent').length,
@@ -253,14 +330,13 @@ export async function GET(request: Request) {
         in_progress: idgIssues.filter(i => i.status === 'in_progress').length
       },
       overdue: idgIssues.filter(i => i.is_overdue).length,
-      admissions: admissionsCount,
-      deaths: deathsCount,
       flaggedForMD: idgIssues.filter(i => i.flagged_for_md_review).length,
+      expiringBenefitPeriods: expiringBenefitPeriods.length,
       byIssueType: IDG_ISSUE_TYPES.reduce((acc, type) => {
         acc[type] = idgIssues.filter(i => i.issue_type === type).length;
         return acc;
       }, {} as Record<string, number>),
-      weekRange: { start: weekStart, end: weekEnd },
+      dateRange: { start: fromDate, end: toDate },
       thresholdHours
     };
 
@@ -268,6 +344,7 @@ export async function GET(request: Request) {
       issues: idgIssues,
       grouped,
       summary,
+      expiringBenefitPeriods,
       previousReview,
       disciplines: IDG_DISCIPLINES,
       dispositions: IDG_DISPOSITIONS,
@@ -381,9 +458,25 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { weekStart, weekEnd, disciplinesPresent, issueIds, admissionsCount, deathsCount } = body;
+    const {
+      weekStart,
+      weekEnd,
+      fromDate: bodyFromDate,
+      toDate: bodyToDate,
+      disciplinesPresent,
+      issueIds,
+      selectedIssueIds,
+      meetingStartedAt,
+      admissionsCount,
+      deathsCount
+    } = body;
 
-    if (!weekStart || !weekEnd || !disciplinesPresent || !issueIds) {
+    // Support both old and new parameter names
+    const finalFromDate = bodyFromDate || weekStart;
+    const finalToDate = bodyToDate || weekEnd;
+    const finalIssueIds = selectedIssueIds || issueIds;
+
+    if (!finalFromDate || !finalToDate || !disciplinesPresent || !finalIssueIds) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -392,10 +485,10 @@ export async function POST(request: Request) {
       p_facility_id: userData?.facility_id,
       p_user_id: user.id,
       p_user_role: roleData?.role || 'coordinator',
-      p_week_start: weekStart,
-      p_week_end: weekEnd,
+      p_week_start: finalFromDate,
+      p_week_end: finalToDate,
       p_disciplines_present: disciplinesPresent,
-      p_issue_ids: issueIds,
+      p_issue_ids: finalIssueIds,
       p_admissions_count: admissionsCount || 0,
       p_deaths_count: deathsCount || 0
     });
@@ -406,14 +499,16 @@ export async function POST(request: Request) {
         .from('idg_reviews')
         .insert({
           facility_id: userData?.facility_id,
-          week_start: weekStart,
-          week_end: weekEnd,
+          week_start: finalFromDate,
+          week_end: finalToDate,
           completed_by: user.id,
           completed_by_role: roleData?.role || 'coordinator',
           disciplines_present: disciplinesPresent,
-          total_issues_reviewed: issueIds.length,
+          total_issues_reviewed: finalIssueIds.length,
           admissions_count: admissionsCount || 0,
-          deaths_count: deathsCount || 0
+          deaths_count: deathsCount || 0,
+          meeting_started_at: meetingStartedAt || null,
+          selected_issue_ids: finalIssueIds
         })
         .select()
         .single();
@@ -424,8 +519,8 @@ export async function POST(request: Request) {
       }
 
       // Mark issues as reviewed
-      if (reviewData && issueIds.length > 0) {
-        for (const issueId of issueIds) {
+      if (reviewData && finalIssueIds.length > 0) {
+        for (const issueId of finalIssueIds) {
           await supabase
             .from('idg_issue_status')
             .upsert({
