@@ -48,7 +48,9 @@ interface IDGIssueSelectionModalProps {
   issues: IDGIssue[];
   fromDate: string;
   toDate: string;
-  facilitySlug: string;
+  hospiceSlug: string;
+  /** @deprecated Use hospiceSlug instead */
+  facilitySlug?: string;
 }
 
 export function IDGIssueSelectionModal({
@@ -58,8 +60,11 @@ export function IDGIssueSelectionModal({
   issues,
   fromDate,
   toDate,
-  facilitySlug
+  hospiceSlug,
+  facilitySlug,
 }: IDGIssueSelectionModalProps) {
+  // Support backwards compatibility - use hospiceSlug, fallback to facilitySlug
+  const slug = hospiceSlug || facilitySlug || '';
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set());
   const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set());
   const [showCensus, setShowCensus] = useState(false);
@@ -78,10 +83,10 @@ export function IDGIssueSelectionModal({
 
   // Fetch all patients when census is toggled on
   useEffect(() => {
-    if (showCensus && facilitySlug) {
+    if (showCensus && slug) {
       fetchAllPatients();
     }
-  }, [showCensus, facilitySlug]);
+  }, [showCensus, slug]);
 
   const fetchAllPatients = async () => {
     setIsLoadingPatients(true);

@@ -3,10 +3,10 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, Users, FileText, Archive, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useFacilityPath } from '@/hooks/use-facility-slug';
+import { useHospicePath } from '@/hooks/use-hospice-slug';
 
 interface NavItem {
-  path: string; // Relative path without facility slug
+  path: string; // Relative path without hospice slug
   icon: typeof Home;
   label: string;
 }
@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
 export function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const getPath = useFacilityPath();
+  const getPath = useHospicePath();
 
   return (
     <nav

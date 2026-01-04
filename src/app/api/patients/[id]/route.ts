@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../supabase/server';
-import { notifyPatientUpdate, getUserFacilityId } from '@/lib/notifications';
+import { notifyPatientUpdate, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,11 +74,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId) {
       const changedFields = Object.keys(updateData).join(', ');
-      notifyPatientUpdate(user.id, facilityId, {
+      notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,
         last_name: data.last_name,
@@ -136,11 +136,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId) {
       const changedFields = Object.keys(updateData).join(', ');
-      notifyPatientUpdate(user.id, facilityId, {
+      notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,
         last_name: data.last_name,

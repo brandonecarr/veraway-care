@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Building2, User, ChevronRight, CheckCircle2, UserPlus, Lock, X, Mail, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface FacilityInfo {
+interface HospiceInfo {
   id: string;
   name: string;
   slug: string;
@@ -51,10 +51,10 @@ export default function OnboardingPage() {
   const [userName, setUserName] = useState('');
   const [userId, setUserId] = useState('');
   const [userRole, setUserRole] = useState<'coordinator' | 'clinician'>('coordinator');
-  const [facility, setFacility] = useState<FacilityInfo | null>(null);
+  const [hospice, setHospice] = useState<HospiceInfo | null>(null);
 
-  // Step 1: Facility information
-  const [facilityForm, setFacilityForm] = useState({
+  // Step 1: Hospice information
+  const [hospiceForm, setHospiceForm] = useState({
     address_line1: '',
     address_line2: '',
     city: '',
@@ -93,13 +93,13 @@ export default function OnboardingPage() {
     setUserEmail(user.email || '');
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
-    // Fetch user's facility information with contact details and onboarding status
+    // Fetch user's hospice information with contact details and onboarding status
     try {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select(`
           name,
-          facility_id,
+          hospice_id,
           onboarding_completed_at,
           facilities!users_organization_id_fkey(
             id,
@@ -129,29 +129,29 @@ export default function OnboardingPage() {
 
       // If onboarding is already completed, redirect to dashboard
       if (userData?.onboarding_completed_at && userData?.facilities) {
-        const facilityData = Array.isArray(userData.facilities)
+        const hospiceData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
-        const dashboardUrl = facilityData?.slug ? `/${facilityData.slug}/dashboard` : '/dashboard';
+        const dashboardUrl = hospiceData?.slug ? `/${hospiceData.slug}/dashboard` : '/dashboard';
         router.push(dashboardUrl);
         return;
       }
 
       if (userData?.facilities) {
-        const facilityData = Array.isArray(userData.facilities)
+        const hospiceData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
-        setFacility(facilityData as FacilityInfo);
+        setHospice(hospiceData as HospiceInfo);
 
-        // Pre-fill facility form with existing data
-        setFacilityForm({
-          address_line1: facilityData.address_line1 || '',
-          address_line2: facilityData.address_line2 || '',
-          city: facilityData.city || '',
-          state: facilityData.state || '',
-          zip_code: facilityData.zip_code || '',
-          phone: facilityData.phone || '',
-          email: facilityData.email || '',
+        // Pre-fill hospice form with existing data
+        setHospiceForm({
+          address_line1: hospiceData.address_line1 || '',
+          address_line2: hospiceData.address_line2 || '',
+          city: hospiceData.city || '',
+          state: hospiceData.state || '',
+          zip_code: hospiceData.zip_code || '',
+          phone: hospiceData.phone || '',
+          email: hospiceData.email || '',
         });
       }
 
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
         .from('user_roles')
         .select('role, job_role')
         .eq('user_id', user.id)
-        .eq('facility_id', userData?.facility_id)
+        .eq('hospice_id', userData?.hospice_id)
         .single();
 
       if (roleData?.role) {
@@ -174,7 +174,7 @@ export default function OnboardingPage() {
         }
       }
     } catch (error) {
-      console.error('Error fetching facility data:', error);
+      console.error('Error fetching hospice data:', error);
     }
 
     setIsLoading(false);
@@ -187,8 +187,8 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (!facilityForm.address_line1 || !facilityForm.city || !facilityForm.state || !facilityForm.zip_code) {
-      toast.error('Please fill in all required facility information');
+    if (!hospiceForm.address_line1 || !hospiceForm.city || !hospiceForm.state || !hospiceForm.zip_code) {
+      toast.error('Please fill in all required hospice information');
       return;
     }
 
@@ -209,27 +209,27 @@ export default function OnboardingPage() {
         return;
       }
 
-      const response = await fetch('/api/onboarding/update-facility', {
+      const response = await fetch('/api/onboarding/update-hospice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          facility_id: facility?.id,
-          ...facilityForm,
+          hospice_id: hospice?.id,
+          ...hospiceForm,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || 'Failed to update facility information');
+        toast.error(data.error || 'Failed to update hospice information');
         return;
       }
 
-      toast.success('Facility information verified');
+      toast.success('Hospice information verified');
       setCurrentStep(2);
     } catch (error) {
-      console.error('Error updating facility:', error);
-      toast.error('Failed to update facility information');
+      console.error('Error updating hospice:', error);
+      toast.error('Failed to update hospice information');
     } finally {
       setIsSubmitting(false);
     }
@@ -282,7 +282,7 @@ export default function OnboardingPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            facility_id: facility?.id,
+            hospice_id: hospice?.id,
             ...clinician,
           }),
         })
@@ -343,7 +343,7 @@ export default function OnboardingPage() {
         .from('user_roles')
         .update({ job_role: currentClinician.job_role })
         .eq('user_id', userId)
-        .eq('facility_id', facility?.id);
+        .eq('hospice_id', hospice?.id);
 
       if (error) {
         console.error('Error updating job role:', error);
@@ -401,8 +401,8 @@ export default function OnboardingPage() {
 
       toast.success('Account setup complete! Redirecting to dashboard...');
 
-      // Redirect to facility-specific dashboard
-      const dashboardUrl = facility?.slug ? `/${facility.slug}/dashboard` : '/dashboard';
+      // Redirect to hospice-specific dashboard
+      const dashboardUrl = hospice?.slug ? `/${hospice.slug}/dashboard` : '/dashboard';
       setTimeout(() => {
         router.push(dashboardUrl);
       }, 1500);
@@ -424,7 +424,7 @@ export default function OnboardingPage() {
 
   // Different steps for coordinators vs clinicians
   const coordinatorSteps = [
-    { number: 1, title: 'Verify Facility', icon: Building2 },
+    { number: 1, title: 'Verify Hospice', icon: Building2 },
     { number: 2, title: 'Invite Clinicians', icon: UserPlus },
     { number: 3, title: 'Set Password', icon: Lock },
   ];
@@ -509,30 +509,30 @@ export default function OnboardingPage() {
             </div>
 
             {/* Divider */}
-            {facility && <div className="border-t border-[#2D7A7A]/10" />}
+            {hospice && <div className="border-t border-[#2D7A7A]/10" />}
 
-            {/* Facility Section */}
-            {facility && (
+            {/* Hospice Section */}
+            {hospice && (
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 bg-[#2D7A7A] rounded-lg flex-shrink-0">
                   <Building2 className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-[#666] uppercase tracking-wide font-semibold">Facility</p>
-                  <p className="font-semibold text-[#1A1A1A] truncate">{facility.name}</p>
+                  <p className="text-xs text-[#666] uppercase tracking-wide font-semibold">Hospice</p>
+                  <p className="font-semibold text-[#1A1A1A] truncate">{hospice.name}</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Step 1: Verify Facility Information (Coordinators) OR Confirm Job Role (Clinicians) */}
+        {/* Step 1: Verify Hospice Information (Coordinators) OR Confirm Job Role (Clinicians) */}
         {currentStep === 1 && userRole === 'coordinator' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Verify Facility Information</h2>
+              <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Verify Hospice Information</h2>
               <p className="text-sm text-[#666] mb-4">
-                Please verify and complete your facility's contact information
+                Please verify and complete your hospice's contact information
               </p>
             </div>
 
@@ -553,8 +553,8 @@ export default function OnboardingPage() {
                 <Label htmlFor="address_line1">Address Line 1 *</Label>
                 <Input
                   id="address_line1"
-                  value={facilityForm.address_line1}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, address_line1: e.target.value })}
+                  value={hospiceForm.address_line1}
+                  onChange={(e) => setHospiceForm({ ...hospiceForm, address_line1: e.target.value })}
                   placeholder="e.g., 123 Main Street"
                   className="mt-1"
                   required
@@ -565,8 +565,8 @@ export default function OnboardingPage() {
                 <Label htmlFor="address_line2">Address Line 2</Label>
                 <Input
                   id="address_line2"
-                  value={facilityForm.address_line2}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, address_line2: e.target.value })}
+                  value={hospiceForm.address_line2}
+                  onChange={(e) => setHospiceForm({ ...hospiceForm, address_line2: e.target.value })}
                   placeholder="e.g., Suite 100"
                   className="mt-1"
                 />
@@ -577,8 +577,8 @@ export default function OnboardingPage() {
                   <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
-                    value={facilityForm.city}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, city: e.target.value })}
+                    value={hospiceForm.city}
+                    onChange={(e) => setHospiceForm({ ...hospiceForm, city: e.target.value })}
                     placeholder="e.g., Boston"
                     className="mt-1"
                     required
@@ -589,8 +589,8 @@ export default function OnboardingPage() {
                   <Label htmlFor="state">State *</Label>
                   <Input
                     id="state"
-                    value={facilityForm.state}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, state: e.target.value })}
+                    value={hospiceForm.state}
+                    onChange={(e) => setHospiceForm({ ...hospiceForm, state: e.target.value })}
                     placeholder="e.g., MA"
                     className="mt-1"
                     required
@@ -602,8 +602,8 @@ export default function OnboardingPage() {
                 <Label htmlFor="zip_code">ZIP Code *</Label>
                 <Input
                   id="zip_code"
-                  value={facilityForm.zip_code}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, zip_code: e.target.value })}
+                  value={hospiceForm.zip_code}
+                  onChange={(e) => setHospiceForm({ ...hospiceForm, zip_code: e.target.value })}
                   placeholder="e.g., 02101"
                   className="mt-1"
                   required
@@ -615,21 +615,21 @@ export default function OnboardingPage() {
                 <Input
                   id="phone"
                   type="tel"
-                  value={facilityForm.phone}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
+                  value={hospiceForm.phone}
+                  onChange={(e) => setHospiceForm({ ...hospiceForm, phone: e.target.value })}
                   placeholder="e.g., (617) 555-0100"
                   className="mt-1"
                 />
               </div>
 
               <div>
-                <Label htmlFor="facility_email">Facility Email</Label>
+                <Label htmlFor="hospice_email">Hospice Email</Label>
                 <Input
-                  id="facility_email"
+                  id="hospice_email"
                   type="email"
-                  value={facilityForm.email}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, email: e.target.value })}
-                  placeholder="e.g., contact@facility.com"
+                  value={hospiceForm.email}
+                  onChange={(e) => setHospiceForm({ ...hospiceForm, email: e.target.value })}
+                  placeholder="e.g., contact@hospice.com"
                   className="mt-1"
                 />
               </div>
@@ -709,7 +709,7 @@ export default function OnboardingPage() {
             <div>
               <h2 className="text-xl font-semibold mb-2 text-[#1A1A1A]">Invite Your Team</h2>
               <p className="text-sm text-[#666] mb-4">
-                Add clinicians to your facility. You can add more team members later from the dashboard.
+                Add clinicians to your hospice. You can add more team members later from the dashboard.
               </p>
             </div>
 

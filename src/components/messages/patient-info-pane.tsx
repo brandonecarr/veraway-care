@@ -40,7 +40,7 @@ export function PatientInfoPane({
   onIssueClick,
 }: PatientInfoPaneProps) {
   const params = useParams();
-  const facilitySlug = params?.slug as string;
+  const hospiceSlug = params?.slug as string;
   const [issues, setIssues] = useState<Issue[]>([]);
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
 
@@ -183,8 +183,8 @@ export function PatientInfoPane({
                 </div>
               </div>
 
-              {facilitySlug && (
-                <Link href={`/${facilitySlug}/dashboard/patients/${patient.id}`}>
+              {hospiceSlug && (
+                <Link href={`/${hospiceSlug}/dashboard/patients/${patient.id}`}>
                   <Button
                     variant="outline"
                     size="sm"

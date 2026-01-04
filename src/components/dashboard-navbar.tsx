@@ -23,7 +23,7 @@ import { UserCircle, Home, Users, FileText, Menu, BarChart3, MessageSquare, Sett
 import { useRouter, usePathname } from 'next/navigation'
 import { NotificationCenter } from './care/notification-center'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { useFacilityPath } from '@/hooks/use-facility-slug'
+import { useHospicePath } from '@/hooks/use-hospice-slug'
 
 interface UserInfo {
   name: string;
@@ -39,7 +39,7 @@ export default function DashboardNavbar() {
   const isMobile = useIsMobile()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
-  const getPath = useFacilityPath()
+  const getPath = useHospicePath()
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -48,7 +48,7 @@ export default function DashboardNavbar() {
 
       const { data: userData } = await supabase
         .from('users')
-        .select('name, email, facility_id')
+        .select('name, email, hospice_id')
         .eq('id', user.id)
         .single();
 
@@ -57,7 +57,7 @@ export default function DashboardNavbar() {
           .from('user_roles')
           .select('role, job_role')
           .eq('user_id', user.id)
-          .eq('facility_id', userData.facility_id)
+          .eq('hospice_id', userData.hospice_id)
           .maybeSingle();
 
         setUserInfo({

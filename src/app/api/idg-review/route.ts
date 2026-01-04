@@ -73,10 +73,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's facility
+    // Get user's hospice
     const { data: userData } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
@@ -210,12 +210,12 @@ export async function GET(request: Request) {
     let dischargesCount = 0;
     let deathsCount = 0;
 
-    if (userData?.facility_id) {
+    if (userData?.hospice_id) {
       // Get total active patients
       const { count: activeCount } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .eq('status', 'active');
 
       totalActivePatients = activeCount || 0;
@@ -224,7 +224,7 @@ export async function GET(request: Request) {
       const { count: admissions } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .gte('admitted_date', fromDate)
         .lte('admitted_date', toDate);
 
@@ -234,7 +234,7 @@ export async function GET(request: Request) {
       const { count: discharges } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .gte('discharge_date', fromDate)
         .lte('discharge_date', toDate);
 
@@ -244,7 +244,7 @@ export async function GET(request: Request) {
       const { count: deaths } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .gte('death_date', fromDate)
         .lte('death_date', toDate);
 
@@ -253,12 +253,12 @@ export async function GET(request: Request) {
 
     // Get patients with benefit periods expiring within 14 days
     let expiringBenefitPeriods: any[] = [];
-    if (userData?.facility_id) {
+    if (userData?.hospice_id) {
       // Get active patients with benefit period and admitted_date
       const { data: patientsData } = await supabase
         .from('patients')
         .select('id, first_name, last_name, mrn, admitted_date, benefit_period')
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .eq('status', 'active')
         .not('admitted_date', 'is', null)
         .not('benefit_period', 'is', null);
@@ -289,11 +289,11 @@ export async function GET(request: Request) {
 
     // Check if this date range has been reviewed already
     let previousReview = null;
-    if (userData?.facility_id) {
+    if (userData?.hospice_id) {
       const { data: reviewData } = await supabase
         .from('idg_reviews')
         .select('*')
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .eq('week_start', fromDate)
         .eq('week_end', toDate)
         .order('completed_at', { ascending: false })
@@ -366,10 +366,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's facility
+    // Get user's hospice
     const { data: userData } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
@@ -394,7 +394,7 @@ export async function PATCH(request: Request) {
     // Update the IDG issue status
     const { data, error } = await supabase.rpc('update_idg_issue_disposition', {
       p_issue_id: issueId,
-      p_facility_id: userData?.facility_id,
+      p_hospice_id: userData?.hospice_id,
       p_user_id: user.id,
       p_disposition: disposition || null,
       p_flagged_for_md: flaggedForMD !== undefined ? flaggedForMD : null
@@ -406,7 +406,7 @@ export async function PATCH(request: Request) {
         .from('idg_issue_status')
         .upsert({
           issue_id: issueId,
-          facility_id: userData?.facility_id,
+          hospice_id: userData?.hospice_id,
           flagged_for_md_review: flaggedForMD,
           flagged_for_md_review_at: flaggedForMD !== undefined ? new Date().toISOString() : undefined,
           flagged_for_md_review_by: flaggedForMD !== undefined ? user.id : undefined,
@@ -439,10 +439,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's facility
+    // Get user's hospice
     const { data: userData } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
@@ -482,7 +482,7 @@ export async function POST(request: Request) {
 
     // Try RPC first
     const { data, error } = await supabase.rpc('complete_idg_review', {
-      p_facility_id: userData?.facility_id,
+      p_hospice_id: userData?.hospice_id,
       p_user_id: user.id,
       p_user_role: roleData?.role || 'coordinator',
       p_week_start: finalFromDate,
@@ -498,7 +498,7 @@ export async function POST(request: Request) {
       const { data: reviewData, error: insertError } = await supabase
         .from('idg_reviews')
         .insert({
-          facility_id: userData?.facility_id,
+          hospice_id: userData?.hospice_id,
           week_start: finalFromDate,
           week_end: finalToDate,
           completed_by: user.id,
@@ -525,7 +525,7 @@ export async function POST(request: Request) {
             .from('idg_issue_status')
             .upsert({
               issue_id: issueId,
-              facility_id: userData?.facility_id,
+              hospice_id: userData?.hospice_id,
               reviewed_in_idg: true,
               reviewed_in_idg_at: new Date().toISOString(),
               idg_review_id: reviewData.id,

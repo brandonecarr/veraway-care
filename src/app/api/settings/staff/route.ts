@@ -17,16 +17,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's facility and verify they're a coordinator
+    // Get user's hospice and verify they're a coordinator
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData?.facility_id) {
+    if (userError || !userData?.hospice_id) {
       return NextResponse.json(
-        { error: 'User not found or not associated with a facility' },
+        { error: 'User not found or not associated with a hospice' },
         { status: 404 }
       );
     }
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('facility_id', userData.facility_id)
+      .eq('hospice_id', userData.hospice_id)
       .single();
 
     if (roleData?.role !== 'coordinator') {
@@ -57,11 +57,11 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get all users in the facility
+    // Get all users in the hospice
     const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, name, email, created_at')
-      .eq('facility_id', userData.facility_id);
+      .eq('hospice_id', userData.hospice_id);
 
     if (!users) {
       return NextResponse.json([]);
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const { data: roles } = await supabaseAdmin
       .from('user_roles')
       .select('user_id, role, job_role')
-      .eq('facility_id', userData.facility_id);
+      .eq('hospice_id', userData.hospice_id);
 
     const staffWithStatus = users
       .map(u => {

@@ -63,17 +63,17 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Handle facility-specific routing
+  // Handle hospice-specific routing
   if (user) {
     const pathname = request.nextUrl.pathname;
 
     try {
-      // If user is accessing /dashboard without a slug, redirect to facility-specific URL
+      // If user is accessing /dashboard without a slug, redirect to hospice-specific URL
       if (pathname.startsWith('/dashboard')) {
-        // Get user's facility slug and onboarding status - use maybeSingle to avoid errors if no row exists
+        // Get user's hospice slug and onboarding status - use maybeSingle to avoid errors if no row exists
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, onboarding_completed_at, facilities!users_organization_id_fkey(slug)')
+          .select('hospice_id, onboarding_completed_at, hospices!users_organization_id_fkey(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -105,31 +105,31 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/onboarding', request.url));
         }
 
-        if (userData?.facilities) {
-          const facility = Array.isArray(userData.facilities)
-            ? userData.facilities[0]
-            : userData.facilities;
+        if (userData?.hospices) {
+          const hospice = Array.isArray(userData.hospices)
+            ? userData.hospices[0]
+            : userData.hospices;
 
-          if (facility?.slug) {
-            // Redirect to facility-specific URL
-            const newPath = pathname.replace('/dashboard', `/${facility.slug}/dashboard`);
+          if (hospice?.slug) {
+            // Redirect to hospice-specific URL
+            const newPath = pathname.replace('/dashboard', `/${hospice.slug}/dashboard`);
             return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
           }
         }
 
-        // If no facility found, redirect to onboarding
+        // If no hospice found, redirect to onboarding
         return NextResponse.redirect(new URL('/onboarding', request.url));
       }
 
-      // If accessing /:slug/dashboard, verify the slug matches user's facility
+      // If accessing /:slug/dashboard, verify the slug matches user's hospice
       const slugMatch = pathname.match(/^\/([^\/]+)\/dashboard/);
       if (slugMatch) {
         const slug = slugMatch[1];
 
-        // Get user's facility slug and onboarding status to verify - use maybeSingle
+        // Get user's hospice slug and onboarding status to verify - use maybeSingle
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('facility_id, onboarding_completed_at, facilities!users_organization_id_fkey(slug)')
+          .select('hospice_id, onboarding_completed_at, hospices!users_organization_id_fkey(slug)')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -144,15 +144,15 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/onboarding', request.url));
         }
 
-        if (userData?.facilities) {
-          const facility = Array.isArray(userData.facilities)
-            ? userData.facilities[0]
-            : userData.facilities;
+        if (userData?.hospices) {
+          const hospice = Array.isArray(userData.hospices)
+            ? userData.hospices[0]
+            : userData.hospices;
 
-          // Verify slug matches user's facility
-          if (facility?.slug && facility.slug !== slug) {
-            // Redirect to correct facility slug
-            const newPath = pathname.replace(`/${slug}/`, `/${facility.slug}/`);
+          // Verify slug matches user's hospice
+          if (hospice?.slug && hospice.slug !== slug) {
+            // Redirect to correct hospice slug
+            const newPath = pathname.replace(`/${slug}/`, `/${hospice.slug}/`);
             return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
           }
         }
@@ -164,7 +164,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Protected routes - require authentication for facility-specific dashboard routes
+  // Protected routes - require authentication for hospice-specific dashboard routes
   if (request.nextUrl.pathname.match(/^\/[^\/]+\/dashboard/) && !user) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }

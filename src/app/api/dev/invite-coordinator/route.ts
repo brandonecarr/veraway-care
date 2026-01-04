@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, name, facility_id } = body;
+    const { email, name, hospice_id } = body;
 
-    if (!email || !name || !facility_id) {
+    if (!email || !name || !hospice_id) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, name, facility_id' },
+        { error: 'Missing required fields: email, name, hospice_id' },
         { status: 400 }
       );
     }
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       userAlreadyRegistered = !!userExists.last_sign_in_at;
 
       if (userAlreadyRegistered) {
-        console.log('User already registered, adding to facility');
+        console.log('User already registered, adding to hospice');
       } else {
         console.log('User exists but not registered, will resend invite');
       }
@@ -101,14 +101,14 @@ export async function POST(request: Request) {
 
     if (!existingPublicUser) {
       // Create user in public.users table
-      console.log('Creating user in public.users:', { id: userId, email, name, facility_id });
+      console.log('Creating user in public.users:', { id: userId, email, name, hospice_id });
       const { data: createdUser, error: createUserError } = await supabaseAdmin
         .from('users')
         .insert({
           id: userId,
           email,
           name,
-          facility_id,
+          hospice_id,
         })
         .select()
         .single();
@@ -122,19 +122,19 @@ export async function POST(request: Request) {
       }
       console.log('Created user in public.users:', createdUser);
     } else {
-      // Update user's facility and name
-      console.log('Updating existing user:', { userId, facility_id, name });
+      // Update user's hospice and name
+      console.log('Updating existing user:', { userId, hospice_id, name });
       const { data: updatedUser, error: updateError } = await supabaseAdmin
         .from('users')
-        .update({ facility_id, name })
+        .update({ hospice_id, name })
         .eq('id', userId)
         .select()
         .single();
 
       if (updateError) {
-        console.error('Update user facility error:', updateError);
+        console.error('Update user hospice error:', updateError);
         return NextResponse.json(
-          { error: 'Failed to update user facility' },
+          { error: 'Failed to update user hospice' },
           { status: 500 }
         );
       }
@@ -142,26 +142,26 @@ export async function POST(request: Request) {
     }
 
     // Set user role as coordinator (delete existing first, then insert)
-    // First, delete any existing role for this user in this facility
-    console.log('Deleting existing roles for user:', userId, 'in facility:', facility_id);
+    // First, delete any existing role for this user in this hospice
+    console.log('Deleting existing roles for user:', userId, 'in hospice:', hospice_id);
     const { error: deleteError } = await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('facility_id', facility_id);
+      .eq('hospice_id', hospice_id);
 
     if (deleteError) {
       console.error('Delete existing role error:', deleteError);
     }
 
     // Now insert the coordinator role
-    console.log('Inserting coordinator role:', { user_id: userId, role: 'coordinator', facility_id });
+    console.log('Inserting coordinator role:', { user_id: userId, role: 'coordinator', hospice_id });
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: userId,
         role: 'coordinator',
-        facility_id,
+        hospice_id,
       })
       .select();
 
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
 
     let message = 'Coordinator invited successfully';
     if (userAlreadyRegistered) {
-      message = 'Coordinator added to facility successfully';
+      message = 'Coordinator added to hospice successfully';
     } else if (userExists) {
       message = 'Invite resent successfully';
     }

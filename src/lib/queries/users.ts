@@ -13,11 +13,11 @@ interface UsersResponse {
 }
 
 /**
- * Fetch all facility users
+ * Fetch all hospice users
  * Used for: issue assignment, message recipients, participant lists
  * Cached for 5 minutes (users don't change frequently)
  */
-async function fetchFacilityUsers(): Promise<User[]> {
+async function fetchHospiceUsers(): Promise<User[]> {
   const response = await fetch('/api/users?all=true');
   if (!response.ok) {
     throw new Error('Failed to fetch users');
@@ -35,13 +35,13 @@ async function fetchFacilityUsers(): Promise<User[]> {
 }
 
 /**
- * Hook to get all facility users with automatic caching
+ * Hook to get all hospice users with automatic caching
  * Replaces multiple independent fetch calls with a single cached query
  */
-export function useFacilityUsers() {
+export function useHospiceUsers() {
   return useQuery({
-    queryKey: ['facility-users'],
-    queryFn: fetchFacilityUsers,
+    queryKey: ['hospice-users'],
+    queryFn: fetchHospiceUsers,
     staleTime: 5 * 60 * 1000, // 5 minutes - users don't change often
   });
 }
@@ -51,10 +51,13 @@ export function useFacilityUsers() {
  * More efficient than a separate API call when we already have the users
  */
 export function useUser(userId: string | null) {
-  const { data: users, ...rest } = useFacilityUsers();
+  const { data: users, ...rest } = useHospiceUsers();
 
   return {
     ...rest,
     data: userId ? users?.find((u) => u.id === userId) : undefined,
   };
 }
+
+// Re-export with legacy names for backwards compatibility
+export const useFacilityUsers = useHospiceUsers;

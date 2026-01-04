@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { facility_id, old_email, new_email, new_name } = body;
+    const { hospice_id, old_email, new_email, new_name } = body;
 
-    if (!facility_id || !old_email || !new_email || !new_name) {
+    if (!hospice_id || !old_email || !new_email || !new_name) {
       return NextResponse.json(
-        { error: 'Missing required fields: facility_id, old_email, new_email, new_name' },
+        { error: 'Missing required fields: hospice_id, old_email, new_email, new_name' },
         { status: 400 }
       );
     }

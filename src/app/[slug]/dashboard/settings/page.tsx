@@ -27,7 +27,7 @@ interface UserProfile {
   job_role?: string;
 }
 
-interface FacilityInfo {
+interface HospiceInfo {
   id: string;
   name: string;
   slug: string;
@@ -73,7 +73,7 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [facility, setFacility] = useState<FacilityInfo | null>(null);
+  const [hospice, setHospice] = useState<HospiceInfo | null>(null);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [isCoordinator, setIsCoordinator] = useState(false);
 
@@ -83,8 +83,8 @@ export default function SettingsPage() {
     email: '',
   });
 
-  // Facility form
-  const [facilityForm, setFacilityForm] = useState({
+  // Hospice form
+  const [hospiceForm, setHospiceForm] = useState({
     name: '',
     address_line1: '',
     address_line2: '',
@@ -129,7 +129,7 @@ export default function SettingsPage() {
         id,
         name,
         email,
-        facility_id,
+        hospice_id,
         facilities!users_organization_id_fkey(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
       `)
       .eq('id', user.id)
@@ -141,12 +141,12 @@ export default function SettingsPage() {
         email: userData.email || '',
       });
 
-      // Get user role - filter by facility_id to get the correct role for this facility
+      // Get user role - filter by hospice_id to get the correct role for this hospice
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role, job_role')
         .eq('user_id', user.id)
-        .eq('facility_id', userData.facility_id)
+        .eq('hospice_id', userData.hospice_id)
         .maybeSingle();
 
       setUserProfile({
@@ -159,27 +159,27 @@ export default function SettingsPage() {
 
       setIsCoordinator(roleData?.role === 'coordinator');
 
-      // Get facility info
+      // Get hospice info
       if (userData.facilities) {
-        const facilityData = Array.isArray(userData.facilities)
+        const hospiceData = Array.isArray(userData.facilities)
           ? userData.facilities[0]
           : userData.facilities;
 
-        setFacility(facilityData);
-        setFacilityForm({
-          name: facilityData.name || '',
-          address_line1: facilityData.address_line1 || '',
-          address_line2: facilityData.address_line2 || '',
-          city: facilityData.city || '',
-          state: facilityData.state || '',
-          zip_code: facilityData.zip_code || '',
-          phone: facilityData.phone || '',
-          email: facilityData.email || '',
+        setHospice(hospiceData);
+        setHospiceForm({
+          name: hospiceData.name || '',
+          address_line1: hospiceData.address_line1 || '',
+          address_line2: hospiceData.address_line2 || '',
+          city: hospiceData.city || '',
+          state: hospiceData.state || '',
+          zip_code: hospiceData.zip_code || '',
+          phone: hospiceData.phone || '',
+          email: hospiceData.email || '',
         });
 
         // Get staff members if coordinator
         if (roleData?.role === 'coordinator') {
-          loadStaffMembers(userData.facility_id);
+          loadStaffMembers(userData.hospice_id);
         }
       }
     }
@@ -187,7 +187,7 @@ export default function SettingsPage() {
     setIsLoading(false);
   };
 
-  const loadStaffMembers = async (facilityId: string) => {
+  const loadStaffMembers = async (hospiceId: string) => {
     try {
       const response = await fetch('/api/settings/staff');
       if (response.ok) {
@@ -228,7 +228,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveFacility = async () => {
+  const handleSaveHospice = async () => {
     setIsSaving(true);
 
     try {
@@ -237,24 +237,24 @@ export default function SettingsPage() {
       const { error } = await supabase
         .from('facilities')
         .update({
-          name: facilityForm.name,
-          address_line1: facilityForm.address_line1,
-          address_line2: facilityForm.address_line2,
-          city: facilityForm.city,
-          state: facilityForm.state,
-          zip_code: facilityForm.zip_code,
-          phone: facilityForm.phone,
-          email: facilityForm.email,
+          name: hospiceForm.name,
+          address_line1: hospiceForm.address_line1,
+          address_line2: hospiceForm.address_line2,
+          city: hospiceForm.city,
+          state: hospiceForm.state,
+          zip_code: hospiceForm.zip_code,
+          phone: hospiceForm.phone,
+          email: hospiceForm.email,
         })
-        .eq('id', facility?.id);
+        .eq('id', hospice?.id);
 
       if (error) throw error;
 
-      toast.success('Facility information updated successfully');
+      toast.success('Hospice information updated successfully');
       loadUserData();
     } catch (error) {
-      console.error('Error updating facility:', error);
-      toast.error('Failed to update facility information');
+      console.error('Error updating hospice:', error);
+      toast.error('Failed to update hospice information');
     } finally {
       setIsSaving(false);
     }
@@ -273,7 +273,7 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          facility_id: facility?.id,
+          hospice_id: hospice?.id,
           ...staffInviteForm,
         }),
       });
@@ -287,8 +287,8 @@ export default function SettingsPage() {
 
       toast.success('Clinician invited successfully');
       setStaffInviteForm({ name: '', email: '', job_role: '' });
-      if (facility?.id) {
-        loadStaffMembers(facility.id);
+      if (hospice?.id) {
+        loadStaffMembers(hospice.id);
       }
     } catch (error) {
       console.error('Error inviting clinician:', error);
@@ -306,7 +306,7 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          facility_id: facility?.id,
+          hospice_id: hospice?.id,
           email: staffEmail,
         }),
       });
@@ -335,17 +335,17 @@ export default function SettingsPage() {
     try {
       const supabase = createClient();
 
-      // Remove user from facility
+      // Remove user from hospice
       const { error } = await supabase
         .from('users')
-        .update({ facility_id: null })
+        .update({ hospice_id: null })
         .eq('id', staffId);
 
       if (error) throw error;
 
       toast.success('Staff member removed');
-      if (facility?.id) {
-        loadStaffMembers(facility.id);
+      if (hospice?.id) {
+        loadStaffMembers(hospice.id);
       }
     } catch (error) {
       console.error('Error removing staff:', error);
@@ -376,7 +376,7 @@ export default function SettingsPage() {
 
   const navItems = [
     { id: 'profile', label: 'Profile', icon: User, visible: true },
-    { id: 'facility', label: 'Facility Profile', icon: Building2, visible: isCoordinator },
+    { id: 'hospice', label: 'Hospice Profile', icon: Building2, visible: isCoordinator },
     { id: 'staff', label: 'Staff', icon: Users, visible: isCoordinator },
     { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
     { id: 'subscription', label: 'Subscription', icon: CreditCard, visible: isCoordinator },
@@ -403,7 +403,7 @@ export default function SettingsPage() {
         <div className="mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-2">Settings</h1>
           <p className="text-sm md:text-base text-gray-600">
-            Manage your account, facility, and preferences
+            Manage your account, hospice, and preferences
           </p>
         </div>
 
@@ -482,17 +482,17 @@ export default function SettingsPage() {
               </Card>
             )}
 
-            {/* Facility Profile Section */}
-            {activeTab === 'facility' && isCoordinator && (
+            {/* Hospice Profile Section */}
+            {activeTab === 'hospice' && isCoordinator && (
               <Card className="p-6">
-                <h2 className="text-2xl font-semibold mb-6">Facility Profile</h2>
+                <h2 className="text-2xl font-semibold mb-6">Hospice Profile</h2>
                 <div className="space-y-4 max-w-2xl">
                   <div>
-                    <Label htmlFor="facility_name">Facility Name</Label>
+                    <Label htmlFor="hospice_name">Hospice Name</Label>
                     <Input
-                      id="facility_name"
-                      value={facilityForm.name}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
+                      id="hospice_name"
+                      value={hospiceForm.name}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, name: e.target.value })}
                       className="mt-1"
                     />
                   </div>
@@ -501,8 +501,8 @@ export default function SettingsPage() {
                     <Label htmlFor="address1">Address Line 1</Label>
                     <Input
                       id="address1"
-                      value={facilityForm.address_line1}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, address_line1: e.target.value })}
+                      value={hospiceForm.address_line1}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, address_line1: e.target.value })}
                       className="mt-1"
                     />
                   </div>
@@ -511,8 +511,8 @@ export default function SettingsPage() {
                     <Label htmlFor="address2">Address Line 2</Label>
                     <Input
                       id="address2"
-                      value={facilityForm.address_line2}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, address_line2: e.target.value })}
+                      value={hospiceForm.address_line2}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, address_line2: e.target.value })}
                       className="mt-1"
                     />
                   </div>
@@ -522,8 +522,8 @@ export default function SettingsPage() {
                       <Label htmlFor="city">City</Label>
                       <Input
                         id="city"
-                        value={facilityForm.city}
-                        onChange={(e) => setFacilityForm({ ...facilityForm, city: e.target.value })}
+                        value={hospiceForm.city}
+                        onChange={(e) => setHospiceForm({ ...hospiceForm, city: e.target.value })}
                         className="mt-1"
                       />
                     </div>
@@ -532,8 +532,8 @@ export default function SettingsPage() {
                       <Label htmlFor="state">State</Label>
                       <Input
                         id="state"
-                        value={facilityForm.state}
-                        onChange={(e) => setFacilityForm({ ...facilityForm, state: e.target.value })}
+                        value={hospiceForm.state}
+                        onChange={(e) => setHospiceForm({ ...hospiceForm, state: e.target.value })}
                         className="mt-1"
                       />
                     </div>
@@ -543,8 +543,8 @@ export default function SettingsPage() {
                     <Label htmlFor="zip">ZIP Code</Label>
                     <Input
                       id="zip"
-                      value={facilityForm.zip_code}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, zip_code: e.target.value })}
+                      value={hospiceForm.zip_code}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, zip_code: e.target.value })}
                       className="mt-1"
                     />
                   </div>
@@ -554,25 +554,25 @@ export default function SettingsPage() {
                     <Input
                       id="phone"
                       type="tel"
-                      value={facilityForm.phone}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, phone: e.target.value })}
+                      value={hospiceForm.phone}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, phone: e.target.value })}
                       className="mt-1"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="facility_email">Facility Email</Label>
+                    <Label htmlFor="hospice_email">Hospice Email</Label>
                     <Input
-                      id="facility_email"
+                      id="hospice_email"
                       type="email"
-                      value={facilityForm.email}
-                      onChange={(e) => setFacilityForm({ ...facilityForm, email: e.target.value })}
+                      value={hospiceForm.email}
+                      onChange={(e) => setHospiceForm({ ...hospiceForm, email: e.target.value })}
                       className="mt-1"
                     />
                   </div>
 
                   <Button
-                    onClick={handleSaveFacility}
+                    onClick={handleSaveHospice}
                     disabled={isSaving}
                     className="bg-[#2D7A7A] hover:bg-[#236060]"
                   >
@@ -713,7 +713,7 @@ export default function SettingsPage() {
                   <div className="p-6 bg-[#FAFAF8] rounded-lg border border-[#E0E0E0]">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-xl font-semibold capitalize">{facility?.name}</h3>
+                        <h3 className="text-xl font-semibold capitalize">{hospice?.name}</h3>
                         <p className="text-gray-600">Current Plan</p>
                       </div>
                       <div className="text-right">

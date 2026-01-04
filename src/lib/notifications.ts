@@ -20,23 +20,26 @@ export type NotificationType =
   | 'status_change'
   | 'overdue';
 
-export interface FacilityNotificationPayload {
+export interface HospiceNotificationPayload {
   type: NotificationType;
   title: string;
   message: string;
   senderId: string;
-  facilityId: string;
+  hospiceId: string;
   metadata?: Record<string, unknown>;
   relatedIssueId?: string;
   relatedPatientId?: string;
   url?: string;
 }
 
+// Backwards compatibility alias
+export type FacilityNotificationPayload = HospiceNotificationPayload;
+
 /**
- * Get all user IDs for a facility except the sender
+ * Get all user IDs for a hospice except the sender
  */
-async function getFacilityUserIds(
-  facilityId: string,
+async function getHospiceUserIds(
+  hospiceId: string,
   excludeUserId: string
 ): Promise<string[]> {
   const adminClient = getAdminClient();
@@ -44,11 +47,11 @@ async function getFacilityUserIds(
   const { data: users, error } = await adminClient
     .from('users')
     .select('id')
-    .eq('facility_id', facilityId)
+    .eq('hospice_id', hospiceId)
     .neq('id', excludeUserId);
 
   if (error) {
-    console.error('Error fetching facility users:', error);
+    console.error('Error fetching hospice users:', error);
     return [];
   }
 
@@ -56,18 +59,18 @@ async function getFacilityUserIds(
 }
 
 /**
- * Send notifications to all facility users (except sender)
+ * Send notifications to all hospice users (except sender)
  * Creates in-app notifications and sends push notifications
  */
-export async function sendFacilityNotification(
-  payload: FacilityNotificationPayload
+export async function sendHospiceNotification(
+  payload: HospiceNotificationPayload
 ): Promise<{ success: boolean; recipientCount: number }> {
   try {
     const adminClient = getAdminClient();
 
-    // Get all facility users except the sender
-    const recipientIds = await getFacilityUserIds(
-      payload.facilityId,
+    // Get all hospice users except the sender
+    const recipientIds = await getHospiceUserIds(
+      payload.hospiceId,
       payload.senderId
     );
 
@@ -116,30 +119,36 @@ export async function sendFacilityNotification(
 
     return { success: true, recipientCount: recipientIds.length };
   } catch (error) {
-    console.error('Error sending facility notification:', error);
+    console.error('Error sending hospice notification:', error);
     return { success: false, recipientCount: 0 };
   }
 }
 
+// Backwards compatibility alias
+export const sendFacilityNotification = sendHospiceNotification;
+
 /**
- * Get the facility ID for a user
+ * Get the hospice ID for a user
  */
-export async function getUserFacilityId(userId: string): Promise<string | null> {
+export async function getUserHospiceId(userId: string): Promise<string | null> {
   const adminClient = getAdminClient();
 
   const { data, error } = await adminClient
     .from('users')
-    .select('facility_id')
+    .select('hospice_id')
     .eq('id', userId)
     .single();
 
-  if (error || !data?.facility_id) {
-    console.error('Error getting user facility:', error);
+  if (error || !data?.hospice_id) {
+    console.error('Error getting user hospice:', error);
     return null;
   }
 
-  return data.facility_id;
+  return data.hospice_id;
 }
+
+// Backwards compatibility alias
+export const getUserFacilityId = getUserHospiceId;
 
 /**
  * Get user name for display in notifications
@@ -161,17 +170,17 @@ export async function getUserName(userId: string): Promise<string> {
  */
 export async function notifyNewPatient(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   patient: { id: string; first_name: string; last_name: string; mrn: string }
 ): Promise<void> {
   const senderName = await getUserName(senderId);
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: 'new_patient',
     title: 'New Patient Added',
     message: `${senderName} added ${patient.first_name} ${patient.last_name} (MRN: ${patient.mrn})`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedPatientId: patient.id,
     url: '/dashboard',
     metadata: {
@@ -187,18 +196,18 @@ export async function notifyNewPatient(
  */
 export async function notifyPatientUpdate(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   patient: { id: string; first_name: string; last_name: string; mrn: string },
   changes?: string
 ): Promise<void> {
   const senderName = await getUserName(senderId);
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: 'patient_update',
     title: 'Patient Updated',
     message: `${senderName} updated ${patient.first_name} ${patient.last_name}${changes ? `: ${changes}` : ''}`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedPatientId: patient.id,
     url: '/dashboard',
     metadata: {
@@ -215,7 +224,7 @@ export async function notifyPatientUpdate(
  */
 export async function notifyNewIssue(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   issue: {
     id: string;
     issue_number: number;
@@ -226,12 +235,12 @@ export async function notifyNewIssue(
 ): Promise<void> {
   const senderName = await getUserName(senderId);
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: 'new_issue',
     title: `New Issue: ${issue.issue_type}`,
     message: `${senderName} reported an issue for ${patient.first_name} ${patient.last_name}`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedIssueId: issue.id,
     url: `/dashboard?issue=${issue.id}`,
     metadata: {
@@ -249,19 +258,19 @@ export async function notifyNewIssue(
  */
 export async function notifyIssueUpdate(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   issue: { id: string; issue_number: number },
   patient: { first_name: string; last_name: string },
   note: string
 ): Promise<void> {
   const senderName = await getUserName(senderId);
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: 'issue_update',
     title: 'Issue Update Added',
     message: `${senderName} added a note to Issue #${issue.issue_number} (${patient.first_name} ${patient.last_name})`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedIssueId: issue.id,
     url: `/dashboard?issue=${issue.id}`,
     metadata: {
@@ -278,7 +287,7 @@ export async function notifyIssueUpdate(
  */
 export async function notifyIssueStatusChange(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   issue: { id: string; issue_number: number },
   patient: { first_name: string; last_name: string },
   oldStatus: string,
@@ -287,14 +296,14 @@ export async function notifyIssueStatusChange(
   const senderName = await getUserName(senderId);
   const isResolved = newStatus === 'resolved';
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: isResolved ? 'issue_resolved' : 'status_change',
     title: isResolved ? 'Issue Resolved' : 'Issue Status Changed',
     message: isResolved
       ? `${senderName} resolved Issue #${issue.issue_number} (${patient.first_name} ${patient.last_name})`
       : `${senderName} changed Issue #${issue.issue_number} to ${newStatus.replace('_', ' ')}`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedIssueId: issue.id,
     url: `/dashboard?issue=${issue.id}`,
     metadata: {
@@ -312,7 +321,7 @@ export async function notifyIssueStatusChange(
  */
 export async function notifyIssueAssigned(
   senderId: string,
-  facilityId: string,
+  hospiceId: string,
   issue: { id: string; issue_number: number },
   patient: { first_name: string; last_name: string },
   assigneeId: string
@@ -320,12 +329,12 @@ export async function notifyIssueAssigned(
   const senderName = await getUserName(senderId);
   const assigneeName = await getUserName(assigneeId);
 
-  await sendFacilityNotification({
+  await sendHospiceNotification({
     type: 'issue_assigned',
     title: 'Issue Assigned',
     message: `${senderName} assigned Issue #${issue.issue_number} to ${assigneeName}`,
     senderId,
-    facilityId,
+    hospiceId,
     relatedIssueId: issue.id,
     url: `/dashboard?issue=${issue.id}`,
     metadata: {

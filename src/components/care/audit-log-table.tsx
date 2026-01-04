@@ -85,7 +85,7 @@ const actionLabels: Record<string, string> = {
 
 export function AuditLogTable({ issueId }: AuditLogTableProps) {
   const pathname = usePathname();
-  const facilitySlug = pathname?.split('/')[1] || '';
+  const hospiceSlug = pathname?.split('/')[1] || '';
 
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<AuditLogEntry[]>([]);
@@ -107,14 +107,14 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       case 'patient_created':
         // Link to patient page
         if (entry.details?.patient_id) {
-          return `/${facilitySlug}/dashboard/patients?patient=${entry.details.patient_id}`;
+          return `/${hospiceSlug}/dashboard/patients?patient=${entry.details.patient_id}`;
         }
         return null;
       case 'handoff_created':
       case 'after_shift_report_created':
         // Link directly to the specific report
         if (entry.details?.handoff_id) {
-          return `/${facilitySlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`;
+          return `/${hospiceSlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`;
         }
         return null;
       case 'created':
@@ -705,7 +705,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                             if (patientDisplay.isReport && entry.details?.handoff_id) {
                               return (
                                 <Link
-                                  href={`/${facilitySlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`}
+                                  href={`/${hospiceSlug}/dashboard/after-shift-reports?report=${entry.details.handoff_id}`}
                                   className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors"
                                 >
                                   {patientDisplay.name}
@@ -729,7 +729,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                             if (entry.action === 'patient_created' && patientDisplay.id) {
                               return (
                                 <Link
-                                  href={`/${facilitySlug}/dashboard/patients?patient=${patientDisplay.id}`}
+                                  href={`/${hospiceSlug}/dashboard/patients?patient=${patientDisplay.id}`}
                                   className="flex items-center gap-1 text-sm font-medium text-[#2D7A7A] hover:text-[#2D7A7A]/80 hover:underline transition-colors"
                                 >
                                   {patientDisplay.name}

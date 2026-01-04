@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// This route is deprecated - use /api/onboarding/update-hospice instead
-// Kept for backwards compatibility
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
       message: 'Hospice information updated successfully',
     });
   } catch (error) {
-    console.error('Error in update-facility API:', error);
+    console.error('Error in update-hospice API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

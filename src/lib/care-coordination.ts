@@ -291,7 +291,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   }
 
   // Use database function for optimal performance
-  // Pass user ID so the function can filter by facility and use last_activity_at for overdue calc
+  // Pass user ID so the function can filter by hospice and use last_activity_at for overdue calc
   const { data, error } = await supabase.rpc('get_dashboard_metrics', {
     p_user_id: user.id
   });

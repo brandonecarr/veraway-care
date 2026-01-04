@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Building2, Users, Mail, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Facility {
+interface Hospice {
   id: string;
   name: string;
   slug: string;
@@ -30,53 +30,56 @@ interface Facility {
   email?: string;
 }
 
-export function FacilityManagement() {
-  const [facilities, setFacilities] = useState<Facility[]>([]);
+// Backwards compatibility alias
+type Facility = Hospice;
+
+export function HospiceManagement() {
+  const [hospices, setHospices] = useState<Hospice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showEditCoordinatorDialog, setShowEditCoordinatorDialog] = useState(false);
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
-  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [selectedHospice, setSelectedHospice] = useState<Hospice | null>(null);
 
   useEffect(() => {
-    fetchFacilities();
+    fetchHospices();
   }, []);
 
-  const fetchFacilities = async () => {
+  const fetchHospices = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/dev/facilities');
+      const response = await fetch('/api/dev/hospices');
       if (response.ok) {
         const data = await response.json();
-        setFacilities(Array.isArray(data) ? data : []);
+        setHospices(Array.isArray(data) ? data : []);
       } else {
-        toast.error('Failed to load facilities');
+        toast.error('Failed to load hospices');
       }
     } catch (error) {
-      console.error('Error fetching facilities:', error);
-      toast.error('Failed to load facilities');
+      console.error('Error fetching hospices:', error);
+      toast.error('Failed to load hospices');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInvite = async (facility: Facility) => {
-    if (facility.coordinator_count > 0) {
+  const handleInvite = async (hospice: Hospice) => {
+    if (hospice.coordinator_count > 0) {
       // Resend scenario - call API directly
       // The API will check registration status and skip registered users
       try {
         const response = await fetch('/api/dev/resend-invites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ facility_id: facility.id }),
+          body: JSON.stringify({ hospice_id: hospice.id }),
         });
 
         if (response.ok) {
           const result = await response.json();
           toast.success(result.message);
-          fetchFacilities(); // Refresh to update coordinator count
+          fetchHospices(); // Refresh to update coordinator count
         } else {
           const error = await response.json();
           toast.error(error.error || 'Failed to resend invites');
@@ -87,48 +90,48 @@ export function FacilityManagement() {
       }
     } else {
       // New invite scenario - open modal
-      setSelectedFacility(facility);
+      setSelectedHospice(hospice);
       setShowInviteDialog(true);
     }
   };
 
-  const handleViewDetails = (facility: Facility) => {
-    setSelectedFacility(facility);
+  const handleViewDetails = (hospice: Hospice) => {
+    setSelectedHospice(hospice);
     setShowDetailsDialog(true);
   };
 
-  const handleEditCoordinator = (facility: Facility) => {
-    setSelectedFacility(facility);
+  const handleEditCoordinator = (hospice: Hospice) => {
+    setSelectedHospice(hospice);
     setShowEditCoordinatorDialog(true);
   };
 
-  const handleDeleteCoordinator = (facility: Facility) => {
-    setSelectedFacility(facility);
+  const handleDeleteCoordinator = (hospice: Hospice) => {
+    setSelectedHospice(hospice);
     setShowDeleteConfirmDialog(true);
   };
 
   const confirmDeleteCoordinator = async () => {
-    if (!selectedFacility || !selectedFacility.coordinator_email) return;
+    if (!selectedHospice || !selectedHospice.coordinator_email) return;
 
     try {
       const response = await fetch('/api/dev/delete-coordinator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          facility_id: selectedFacility.id,
-          email: selectedFacility.coordinator_email,
+          hospice_id: selectedHospice.id,
+          email: selectedHospice.coordinator_email,
         }),
       });
 
       if (response.ok) {
         toast.success('Coordinator removed successfully');
         setShowDeleteConfirmDialog(false);
-        setSelectedFacility(null);
-        fetchFacilities();
+        setSelectedHospice(null);
+        fetchHospices();
         // Open invite dialog to add new coordinator
         setTimeout(() => {
-          if (selectedFacility) {
-            setSelectedFacility(selectedFacility);
+          if (selectedHospice) {
+            setSelectedHospice(selectedHospice);
             setShowInviteDialog(true);
           }
         }, 300);
@@ -147,7 +150,7 @@ export function FacilityManagement() {
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-[#2D7A7A] border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-sm text-[#666]">Loading facilities...</p>
+          <p className="text-sm text-[#666]">Loading hospices...</p>
         </div>
       </div>
     );
@@ -159,10 +162,10 @@ export function FacilityManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-            Facility Management
+            Hospice Management
           </h2>
           <p className="text-sm text-[#666]">
-            Create and manage healthcare facilities
+            Create and manage hospice organizations
           </p>
         </div>
 
@@ -170,47 +173,47 @@ export function FacilityManagement() {
           <DialogTrigger asChild>
             <Button className="bg-[#2D7A7A] hover:bg-[#236060] gap-2">
               <Plus className="h-4 w-4" />
-              Create Facility
+              Create Hospice
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Facility</DialogTitle>
+              <DialogTitle>Create New Hospice</DialogTitle>
             </DialogHeader>
-            <CreateFacilityForm
+            <CreateHospiceForm
               onSuccess={() => {
                 setShowCreateDialog(false);
-                fetchFacilities();
+                fetchHospices();
               }}
             />
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Facilities Grid */}
-      {facilities.length === 0 ? (
+      {/* Hospices Grid */}
+      {hospices.length === 0 ? (
         <Card className="p-12 text-center">
           <Building2 className="h-12 w-12 text-[#999] mx-auto mb-4" />
-          <p className="text-[#666] mb-2">No facilities yet</p>
+          <p className="text-[#666] mb-2">No hospices yet</p>
           <p className="text-sm text-[#999] mb-4">
-            Create your first facility to get started
+            Create your first hospice to get started
           </p>
           <Button
             onClick={() => setShowCreateDialog(true)}
             className="bg-[#2D7A7A] hover:bg-[#236060]"
           >
-            Create Facility
+            Create Hospice
           </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {facilities.map((facility) => (
+          {hospices.map((hospice) => (
             <Card
-              key={facility.id}
+              key={hospice.id}
               className="p-6 hover:shadow-lg transition-all cursor-pointer"
               onClick={() => {
-                if (facility.coordinator_count > 0 && facility.coordinators_registered) {
-                  handleViewDetails(facility);
+                if (hospice.coordinator_count > 0 && hospice.coordinators_registered) {
+                  handleViewDetails(hospice);
                 }
               }}
             >
@@ -220,54 +223,54 @@ export function FacilityManagement() {
                     <Building2 className="w-5 h-5 text-[#2D7A7A]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[#1A1A1A]">{facility.name}</h3>
-                    <p className="text-xs text-[#666]">{facility.slug}</p>
+                    <h3 className="font-semibold text-[#1A1A1A]">{hospice.name}</h3>
+                    <p className="text-xs text-[#666]">{hospice.slug}</p>
                   </div>
                 </div>
                 <Badge
                   variant="outline"
                   className={
-                    facility.is_active
+                    hospice.is_active
                       ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
                       : 'bg-[#999]/10 text-[#999] border-[#999]'
                   }
                 >
-                  {facility.is_active ? 'Active' : 'Inactive'}
+                  {hospice.is_active ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
 
               <div className="space-y-2 mb-4 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-[#666]">Tier:</span>
-                  <span className="font-medium capitalize">{facility.subscription_tier}</span>
+                  <span className="font-medium capitalize">{hospice.subscription_tier}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#666]">Max Users:</span>
-                  <span className="font-medium">{facility.max_users}</span>
+                  <span className="font-medium">{hospice.max_users}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#666]">Created:</span>
                   <span className="font-medium">
-                    {new Date(facility.created_at).toLocaleDateString()}
+                    {new Date(hospice.created_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
 
               {/* Coordinator Information */}
-              {facility.coordinator_count > 0 ? (
+              {hospice.coordinator_count > 0 ? (
                 <div className="mb-4 p-3 bg-[#2D7A7A]/5 rounded-lg border border-[#2D7A7A]/10">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-xs font-semibold text-[#2D7A7A] uppercase tracking-wide">
                       Coordinator
                     </h4>
                     <div className="flex gap-1">
-                      {!facility.coordinators_registered ? (
+                      {!hospice.coordinators_registered ? (
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleEditCoordinator(facility);
+                            handleEditCoordinator(hospice);
                           }}
                           className="h-6 w-6 p-0 hover:bg-[#2D7A7A]/10"
                           title="Edit coordinator information"
@@ -280,7 +283,7 @@ export function FacilityManagement() {
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteCoordinator(facility);
+                            handleDeleteCoordinator(hospice);
                           }}
                           className="h-6 w-6 p-0 hover:bg-red-100"
                           title="Remove coordinator"
@@ -294,13 +297,13 @@ export function FacilityManagement() {
                     <div className="flex items-start gap-2">
                       <span className="text-[#666] min-w-[45px]">Name:</span>
                       <span className="font-medium text-[#1A1A1A]">
-                        {facility.coordinator_name || 'Not set'}
+                        {hospice.coordinator_name || 'Not set'}
                       </span>
                     </div>
                     <div className="flex items-start gap-2">
                       <span className="text-[#666] min-w-[45px]">Email:</span>
                       <span className="font-medium text-[#1A1A1A] break-all">
-                        {facility.coordinator_email || 'Not set'}
+                        {hospice.coordinator_email || 'Not set'}
                       </span>
                     </div>
                   </div>
@@ -313,20 +316,20 @@ export function FacilityManagement() {
 
               <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                 {/* Only show invite/resend button if coordinator hasn't completed onboarding */}
-                {(!facility.coordinators_registered || facility.coordinator_count === 0) && (
+                {(!hospice.coordinators_registered || hospice.coordinator_count === 0) && (
                   <Button
-                    onClick={() => handleInvite(facility)}
+                    onClick={() => handleInvite(hospice)}
                     variant="outline"
                     className="flex-1 gap-2"
                   >
                     <Mail className="h-4 w-4" />
-                    {facility.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
+                    {hospice.coordinator_count > 0 ? 'Resend Invite' : 'Invite Coordinator'}
                   </Button>
                 )}
                 {/* Show View Details button when coordinator has completed onboarding */}
-                {facility.coordinator_count > 0 && facility.coordinators_registered && (
+                {hospice.coordinator_count > 0 && hospice.coordinators_registered && (
                   <Button
-                    onClick={() => handleViewDetails(facility)}
+                    onClick={() => handleViewDetails(hospice)}
                     variant="outline"
                     className="flex-1 gap-2"
                   >
@@ -345,18 +348,18 @@ export function FacilityManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedFacility && selectedFacility.coordinator_count > 0
+              {selectedHospice && selectedHospice.coordinator_count > 0
                 ? 'Resend Coordinator Invite'
-                : 'Invite Facility Coordinator'}
+                : 'Invite Hospice Coordinator'}
             </DialogTitle>
           </DialogHeader>
-          {selectedFacility && (
+          {selectedHospice && (
             <InviteCoordinatorForm
-              facility={selectedFacility}
+              hospice={selectedHospice}
               onSuccess={() => {
                 setShowInviteDialog(false);
-                setSelectedFacility(null);
-                fetchFacilities(); // Refresh to update coordinator count
+                setSelectedHospice(null);
+                fetchHospices(); // Refresh to update coordinator count
               }}
             />
           )}
@@ -369,12 +372,12 @@ export function FacilityManagement() {
           <DialogHeader>
             <DialogTitle>Coordinator Details</DialogTitle>
           </DialogHeader>
-          {selectedFacility && (
+          {selectedHospice && (
             <CoordinatorDetails
-              facility={selectedFacility}
+              hospice={selectedHospice}
               onClose={() => {
                 setShowDetailsDialog(false);
-                setSelectedFacility(null);
+                setSelectedHospice(null);
               }}
             />
           )}
@@ -387,13 +390,13 @@ export function FacilityManagement() {
           <DialogHeader>
             <DialogTitle>Edit Coordinator Information</DialogTitle>
           </DialogHeader>
-          {selectedFacility && (
+          {selectedHospice && (
             <EditCoordinatorForm
-              facility={selectedFacility}
+              hospice={selectedHospice}
               onSuccess={() => {
                 setShowEditCoordinatorDialog(false);
-                setSelectedFacility(null);
-                fetchFacilities();
+                setSelectedHospice(null);
+                fetchHospices();
               }}
             />
           )}
@@ -406,7 +409,7 @@ export function FacilityManagement() {
           <DialogHeader>
             <DialogTitle>Remove Coordinator</DialogTitle>
           </DialogHeader>
-          {selectedFacility && (
+          {selectedHospice && (
             <div className="space-y-4">
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-800">
@@ -416,15 +419,15 @@ export function FacilityManagement() {
 
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800 mb-2">
-                  <strong>Coordinator:</strong> {selectedFacility.coordinator_name}
+                  <strong>Coordinator:</strong> {selectedHospice.coordinator_name}
                 </p>
                 <p className="text-sm text-blue-800">
-                  <strong>Email:</strong> {selectedFacility.coordinator_email}
+                  <strong>Email:</strong> {selectedHospice.coordinator_email}
                 </p>
               </div>
 
               <p className="text-sm text-[#666]">
-                After removal, you'll be able to invite a new coordinator to this facility.
+                After removal, you'll be able to invite a new coordinator to this hospice.
               </p>
 
               <div className="flex justify-end gap-2 pt-4">
@@ -432,7 +435,7 @@ export function FacilityManagement() {
                   variant="outline"
                   onClick={() => {
                     setShowDeleteConfirmDialog(false);
-                    setSelectedFacility(null);
+                    setSelectedHospice(null);
                   }}
                 >
                   Cancel
@@ -452,7 +455,7 @@ export function FacilityManagement() {
   );
 }
 
-function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
+function CreateHospiceForm({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -473,22 +476,22 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/dev/facilities', {
+      const response = await fetch('/api/dev/hospices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
       if (response.ok) {
-        toast.success('Facility created successfully');
+        toast.success('Hospice created successfully');
         onSuccess();
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Failed to create facility');
+        toast.error(error.error || 'Failed to create hospice');
       }
     } catch (error) {
-      console.error('Error creating facility:', error);
-      toast.error('Failed to create facility');
+      console.error('Error creating hospice:', error);
+      toast.error('Failed to create hospice');
     } finally {
       setIsSubmitting(false);
     }
@@ -497,7 +500,7 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-[#1A1A1A]">Facility Name *</label>
+        <label className="text-sm font-medium text-[#1A1A1A]">Hospice Name *</label>
         <Input
           required
           value={formData.name}
@@ -506,7 +509,7 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
             const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             setFormData({ ...formData, name, slug });
           }}
-          placeholder="e.g., Memorial Hospital"
+          placeholder="e.g., Memorial Hospice"
           className="mt-1"
         />
       </div>
@@ -517,7 +520,7 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
           required
           value={formData.slug}
           onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-          placeholder="e.g., memorial-hospital"
+          placeholder="e.g., memorial-hospice"
           className="mt-1"
         />
         <p className="text-xs text-[#666] mt-1">URL-friendly identifier</p>
@@ -616,12 +619,12 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-[#1A1A1A]">Facility Email</label>
+            <label className="text-sm font-medium text-[#1A1A1A]">Hospice Email</label>
             <Input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="e.g., contact@facility.com"
+              placeholder="e.g., contact@hospice.com"
               className="mt-1"
             />
           </div>
@@ -630,7 +633,7 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
 
       <div className="flex justify-end gap-2 pt-4">
         <Button type="submit" disabled={isSubmitting} className="bg-[#2D7A7A] hover:bg-[#236060]">
-          {isSubmitting ? 'Creating...' : 'Create Facility'}
+          {isSubmitting ? 'Creating...' : 'Create Hospice'}
         </Button>
       </div>
     </form>
@@ -638,10 +641,10 @@ function CreateFacilityForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function InviteCoordinatorForm({
-  facility,
+  hospice,
   onSuccess,
 }: {
-  facility: Facility;
+  hospice: Hospice;
   onSuccess: () => void;
 }) {
   const [email, setEmail] = useState('');
@@ -659,7 +662,7 @@ function InviteCoordinatorForm({
         body: JSON.stringify({
           email,
           name,
-          facility_id: facility.id,
+          hospice_id: hospice.id,
         }),
       });
 
@@ -683,7 +686,7 @@ function InviteCoordinatorForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>Facility:</strong> {facility.name}
+          <strong>Hospice:</strong> {hospice.name}
         </p>
       </div>
 
@@ -705,7 +708,7 @@ function InviteCoordinatorForm({
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="coordinator@facility.com"
+          placeholder="coordinator@hospice.com"
           className="mt-1"
         />
       </div>
@@ -713,8 +716,8 @@ function InviteCoordinatorForm({
       <div className="flex justify-end gap-2 pt-4">
         <Button type="submit" disabled={isSubmitting} className="bg-[#2D7A7A] hover:bg-[#236060]">
           {isSubmitting
-            ? facility.coordinator_count > 0 ? 'Resending...' : 'Sending Invite...'
-            : facility.coordinator_count > 0 ? 'Resend Invite' : 'Send Invite'}
+            ? hospice.coordinator_count > 0 ? 'Resending...' : 'Sending Invite...'
+            : hospice.coordinator_count > 0 ? 'Resend Invite' : 'Send Invite'}
         </Button>
       </div>
     </form>
@@ -722,14 +725,14 @@ function InviteCoordinatorForm({
 }
 
 function EditCoordinatorForm({
-  facility,
+  hospice,
   onSuccess,
 }: {
-  facility: Facility;
+  hospice: Hospice;
   onSuccess: () => void;
 }) {
-  const [email, setEmail] = useState(facility.coordinator_email || '');
-  const [name, setName] = useState(facility.coordinator_name || '');
+  const [email, setEmail] = useState(hospice.coordinator_email || '');
+  const [name, setName] = useState(hospice.coordinator_name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -741,8 +744,8 @@ function EditCoordinatorForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          facility_id: facility.id,
-          old_email: facility.coordinator_email,
+          hospice_id: hospice.id,
+          old_email: hospice.coordinator_email,
           new_email: email,
           new_name: name,
         }),
@@ -767,7 +770,7 @@ function EditCoordinatorForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>Facility:</strong> {facility.name}
+          <strong>Hospice:</strong> {hospice.name}
         </p>
       </div>
 
@@ -795,7 +798,7 @@ function EditCoordinatorForm({
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="coordinator@facility.com"
+          placeholder="coordinator@hospice.com"
           className="mt-1"
         />
       </div>
@@ -817,10 +820,10 @@ interface Coordinator {
 }
 
 function CoordinatorDetails({
-  facility,
+  hospice,
   onClose,
 }: {
-  facility: Facility;
+  hospice: Hospice;
   onClose: () => void;
 }) {
   const [coordinators, setCoordinators] = useState<Coordinator[]>([]);
@@ -828,12 +831,12 @@ function CoordinatorDetails({
 
   useEffect(() => {
     fetchCoordinators();
-  }, [facility.id]);
+  }, [hospice.id]);
 
   const fetchCoordinators = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/dev/coordinators?facility_id=${facility.id}`);
+      const response = await fetch(`/api/dev/coordinators?hospice_id=${hospice.id}`);
       if (response.ok) {
         const data = await response.json();
         setCoordinators(Array.isArray(data) ? data : []);
@@ -860,7 +863,7 @@ function CoordinatorDetails({
     <div className="space-y-4">
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>Facility:</strong> {facility.name}
+          <strong>Hospice:</strong> {hospice.name}
         </p>
       </div>
 
@@ -897,3 +900,6 @@ function CoordinatorDetails({
     </div>
   );
 }
+
+// Backwards compatibility export
+export const FacilityManagement = HospiceManagement;

@@ -21,9 +21,9 @@ export async function GET() {
   try {
     const supabase = getAdminClient();
 
-    // Fetch all facilities
-    const { data: facilities, error } = await supabase
-      .from('facilities')
+    // Fetch all hospices
+    const { data: hospices, error } = await supabase
+      .from('hospices')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -32,7 +32,7 @@ export async function GET() {
     // Fetch coordinator roles
     const { data: coordinatorRoles } = await supabase
       .from('user_roles')
-      .select('facility_id, user_id')
+      .select('hospice_id, user_id')
       .eq('role', 'coordinator');
 
     // Get all coordinator user IDs
@@ -55,7 +55,7 @@ export async function GET() {
     const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
     const authUsers = authData?.users || [];
 
-    // Map coordinator data to facilities
+    // Map coordinator data to hospices
     const coordinatorMap = new Map<string, {
       count: number;
       all_registered: boolean;
@@ -67,13 +67,13 @@ export async function GET() {
     console.log('Users map size:', usersMap.size);
 
     coordinatorRoles?.forEach(coord => {
-      const facilityId = coord.facility_id;
+      const hospiceId = coord.hospice_id;
       const userInfo = usersMap.get(coord.user_id);
 
-      console.log(`Processing coordinator: user_id=${coord.user_id}, facility_id=${facilityId}, userInfo=`, userInfo);
+      console.log(`Processing coordinator: user_id=${coord.user_id}, hospice_id=${hospiceId}, userInfo=`, userInfo);
 
-      if (!coordinatorMap.has(facilityId)) {
-        coordinatorMap.set(facilityId, {
+      if (!coordinatorMap.has(hospiceId)) {
+        coordinatorMap.set(hospiceId, {
           count: 0,
           all_registered: true,
           coordinator_name: userInfo?.name || null,
@@ -81,7 +81,7 @@ export async function GET() {
         });
       } else if (userInfo) {
         // If we already have an entry but this coordinator has user info, update it
-        const existing = coordinatorMap.get(facilityId)!;
+        const existing = coordinatorMap.get(hospiceId)!;
         if (!existing.coordinator_name && userInfo.name) {
           existing.coordinator_name = userInfo.name;
         }
@@ -90,30 +90,30 @@ export async function GET() {
         }
       }
 
-      const facilityData = coordinatorMap.get(facilityId)!;
-      facilityData.count++;
+      const hospiceData = coordinatorMap.get(hospiceId)!;
+      hospiceData.count++;
 
       // Check if this coordinator has completed registration
       // Must have logged in at least once (which means they've set a password)
       const authUser = authUsers.find(u => u.email === userInfo?.email);
       if (!authUser || !authUser.last_sign_in_at) {
-        facilityData.all_registered = false;
+        hospiceData.all_registered = false;
       }
     });
 
     console.log('Coordinator map:', Object.fromEntries(coordinatorMap));
 
-    const facilitiesWithCoordinators = facilities?.map(facility => ({
-      ...facility,
-      coordinator_count: coordinatorMap.get(facility.id)?.count || 0,
-      coordinators_registered: coordinatorMap.get(facility.id)?.all_registered || false,
-      coordinator_name: coordinatorMap.get(facility.id)?.coordinator_name || null,
-      coordinator_email: coordinatorMap.get(facility.id)?.coordinator_email || null,
+    const hospicesWithCoordinators = hospices?.map(hospice => ({
+      ...hospice,
+      coordinator_count: coordinatorMap.get(hospice.id)?.count || 0,
+      coordinators_registered: coordinatorMap.get(hospice.id)?.all_registered || false,
+      coordinator_name: coordinatorMap.get(hospice.id)?.coordinator_name || null,
+      coordinator_email: coordinatorMap.get(hospice.id)?.coordinator_email || null,
     }));
 
-    return NextResponse.json(facilitiesWithCoordinators || []);
+    return NextResponse.json(hospicesWithCoordinators || []);
   } catch (error) {
-    console.error('Get facilities error:', error);
+    console.error('Get hospices error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -145,21 +145,21 @@ export async function POST(request: Request) {
 
     // Check if slug already exists
     const { data: existing } = await supabase
-      .from('facilities')
+      .from('hospices')
       .select('id')
       .eq('slug', slug)
       .single();
 
     if (existing) {
       return NextResponse.json(
-        { error: 'A facility with this slug already exists' },
+        { error: 'A hospice with this slug already exists' },
         { status: 409 }
       );
     }
 
-    // Create facility
+    // Create hospice
     const { data, error } = await supabase
-      .from('facilities')
+      .from('hospices')
       .insert([
         {
           name,
@@ -183,10 +183,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data, { status: 201 });
   } catch (error: any) {
-    console.error('Create facility error:', error);
+    console.error('Create hospice error:', error);
     if (error.code === '23505') {
       return NextResponse.json(
-        { error: 'Facility with this slug already exists' },
+        { error: 'Hospice with this slug already exists' },
         { status: 409 }
       );
     }

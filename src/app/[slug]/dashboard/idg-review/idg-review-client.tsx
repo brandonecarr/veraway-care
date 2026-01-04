@@ -670,7 +670,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         issues={issues}
         fromDate={fromDateStr}
         toDate={toDateStr}
-        facilitySlug={slug}
+        hospiceSlug={slug}
       />
 
       {/* IDG Completion Modal */}

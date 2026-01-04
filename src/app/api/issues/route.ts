@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../supabase/server';
 import { createIssue, getIssues } from '@/lib/care-coordination';
-import { notifyNewIssue, getUserFacilityId } from '@/lib/notifications';
+import { notifyNewIssue, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,10 +87,10 @@ export async function POST(request: Request) {
       .eq('id', issueData.patient_id)
       .single();
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId && patient) {
-      notifyNewIssue(user.id, facilityId, {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId && patient) {
+      notifyNewIssue(user.id, hospiceId, {
         id: issue.id,
         issue_number: issue.issue_number,
         issue_type: issue.issue_type,
