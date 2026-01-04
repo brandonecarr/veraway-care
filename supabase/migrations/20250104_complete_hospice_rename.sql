@@ -445,6 +445,10 @@ END $$;
 -- STEP 6: Update dashboard metrics function
 -- =====================================================
 
+-- Drop existing function variants to allow signature change
+DROP FUNCTION IF EXISTS public.get_dashboard_metrics();
+DROP FUNCTION IF EXISTS public.get_dashboard_metrics(uuid);
+
 CREATE OR REPLACE FUNCTION public.get_dashboard_metrics(p_user_id uuid DEFAULT NULL)
 RETURNS jsonb AS $$
 DECLARE
