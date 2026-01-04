@@ -122,7 +122,7 @@ export default function SettingsPage() {
       return;
     }
 
-    // Get user profile and role - use explicit foreign key to avoid ambiguous relationship error
+    // Get user profile and role
     const { data: userData } = await supabase
       .from('users')
       .select(`
@@ -130,7 +130,7 @@ export default function SettingsPage() {
         name,
         email,
         hospice_id,
-        facilities!users_organization_id_fkey(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
+        hospices(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
       `)
       .eq('id', user.id)
       .single();
@@ -160,10 +160,10 @@ export default function SettingsPage() {
       setIsCoordinator(roleData?.role === 'coordinator');
 
       // Get hospice info
-      if (userData.facilities) {
-        const hospiceData = Array.isArray(userData.facilities)
-          ? userData.facilities[0]
-          : userData.facilities;
+      if (userData.hospices) {
+        const hospiceData = Array.isArray(userData.hospices)
+          ? userData.hospices[0]
+          : userData.hospices;
 
         setHospice(hospiceData);
         setHospiceForm({
@@ -235,7 +235,7 @@ export default function SettingsPage() {
       const supabase = createClient();
 
       const { error } = await supabase
-        .from('facilities')
+        .from('hospices')
         .update({
           name: hospiceForm.name,
           address_line1: hospiceForm.address_line1,

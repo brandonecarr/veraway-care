@@ -101,7 +101,7 @@ export default function OnboardingPage() {
           name,
           hospice_id,
           onboarding_completed_at,
-          facilities!users_organization_id_fkey(
+          hospices(
             id,
             name,
             slug,
@@ -128,19 +128,19 @@ export default function OnboardingPage() {
       }
 
       // If onboarding is already completed, redirect to dashboard
-      if (userData?.onboarding_completed_at && userData?.facilities) {
-        const hospiceData = Array.isArray(userData.facilities)
-          ? userData.facilities[0]
-          : userData.facilities;
+      if (userData?.onboarding_completed_at && userData?.hospices) {
+        const hospiceData = Array.isArray(userData.hospices)
+          ? userData.hospices[0]
+          : userData.hospices;
         const dashboardUrl = hospiceData?.slug ? `/${hospiceData.slug}/dashboard` : '/dashboard';
         router.push(dashboardUrl);
         return;
       }
 
-      if (userData?.facilities) {
-        const hospiceData = Array.isArray(userData.facilities)
-          ? userData.facilities[0]
-          : userData.facilities;
+      if (userData?.hospices) {
+        const hospiceData = Array.isArray(userData.hospices)
+          ? userData.hospices[0]
+          : userData.hospices;
         setHospice(hospiceData as HospiceInfo);
 
         // Pre-fill hospice form with existing data
