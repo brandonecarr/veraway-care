@@ -161,6 +161,9 @@ export default function SettingsPage() {
 
       console.log('Settings: Filtered role result:', { roleData, roleError });
 
+      const userIsCoordinator = roleData?.role === 'coordinator';
+      console.log('Settings: Setting isCoordinator to:', userIsCoordinator);
+
       setUserProfile({
         id: user.id,
         name: userData.name || '',
@@ -169,7 +172,7 @@ export default function SettingsPage() {
         job_role: roleData?.job_role,
       });
 
-      setIsCoordinator(roleData?.role === 'coordinator');
+      setIsCoordinator(userIsCoordinator);
 
       // Get hospice info
       if (userData.hospices) {
@@ -395,6 +398,8 @@ export default function SettingsPage() {
     { id: 'billing', label: 'Billing', icon: FileText, visible: isCoordinator },
     { id: 'connect', label: 'Connect', icon: MessageSquare, visible: true },
   ].filter(item => item.visible);
+
+  console.log('Settings: Rendering with isCoordinator:', isCoordinator, 'isLoading:', isLoading, 'navItems:', navItems.map(n => n.id));
 
   if (isLoading) {
     return (
