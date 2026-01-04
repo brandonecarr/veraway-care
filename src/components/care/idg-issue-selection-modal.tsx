@@ -86,10 +86,11 @@ export function IDGIssueSelectionModal({
   const fetchAllPatients = async () => {
     setIsLoadingPatients(true);
     try {
-      const response = await fetch(`/api/patients?slug=${facilitySlug}&status=active`);
+      const response = await fetch(`/api/patients?status=active`);
       if (response.ok) {
-        const data = await response.json();
-        setAllPatients(data.patients || []);
+        const result = await response.json();
+        // API returns { data: [...], count: ... }
+        setAllPatients(result.data || []);
       }
     } catch (error) {
       console.error('Failed to fetch patients:', error);
@@ -218,8 +219,9 @@ export function IDGIssueSelectionModal({
           </div>
         </div>
 
-        {/* Issue List */}
-        <div className="flex-1 overflow-y-auto max-h-[400px] -mx-6 px-6">
+        {/* Issue List - Scrollable Container */}
+        <div className="min-h-0 flex-1">
+          <div className="h-[400px] overflow-y-auto pr-2">
           {issues.length === 0 && !showCensus ? (
             <div className="py-12 text-center">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
@@ -376,6 +378,7 @@ export function IDGIssueSelectionModal({
               )}
             </div>
           )}
+          </div>
         </div>
 
         <DialogFooter className="gap-2 border-t pt-4">
@@ -397,7 +400,7 @@ export function IDGIssueSelectionModal({
             disabled={totalSelectedCount === 0}
             className="bg-[#2D7A7A] hover:bg-[#236060]"
           >
-            Start IDG Meeting ({totalSelectedCount} item{totalSelectedCount !== 1 ? 's' : ''})
+            Create IDG Outline ({totalSelectedCount} item{totalSelectedCount !== 1 ? 's' : ''})
           </Button>
         </DialogFooter>
       </DialogContent>
