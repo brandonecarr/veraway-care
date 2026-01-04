@@ -137,6 +137,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS set_issue_hospice_id_trigger ON public.issues;
 CREATE TRIGGER set_issue_hospice_id_trigger
 BEFORE INSERT ON public.issues
 FOR EACH ROW EXECUTE FUNCTION public.set_issue_hospice_id();
@@ -152,6 +153,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS set_patient_hospice_id_trigger ON public.patients;
 CREATE TRIGGER set_patient_hospice_id_trigger
 BEFORE INSERT ON public.patients
 FOR EACH ROW EXECUTE FUNCTION public.set_patient_hospice_id();
