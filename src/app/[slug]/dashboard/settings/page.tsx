@@ -122,66 +122,53 @@ export default function SettingsPage() {
       return;
     }
 
-    // Get user profile and role
+    // Get user profile WITHOUT the hospices join to avoid RLS issues
     const { data: userData, error: userDataError } = await supabase
       .from('users')
-      .select(`
-        id,
-        name,
-        email,
-        hospice_id,
-        hospices(id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email)
-      `)
+      .select('id, name, email, hospice_id')
       .eq('id', user.id)
       .single();
 
-    console.log('Settings: userData query result:', { userData, userDataError });
+    if (userDataError || !userData) {
+      console.error('Failed to load user data:', userDataError);
+      setIsLoading(false);
+      return;
+    }
 
-    if (userData) {
-      setProfileForm({
-        name: userData.name || '',
-        email: userData.email || '',
-      });
+    setProfileForm({
+      name: userData.name || '',
+      email: userData.email || '',
+    });
 
-      // Get user role - filter by hospice_id to get the correct role for this hospice
-      console.log('Settings: Fetching role for user:', user.id, 'hospice:', userData.hospice_id);
+    // Get user role - filter by hospice_id to get the correct role for this hospice
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role, job_role')
+      .eq('user_id', user.id)
+      .eq('hospice_id', userData.hospice_id)
+      .maybeSingle();
 
-      // First, get ALL roles for this user to diagnose issues
-      const { data: allRoles, error: allRolesError } = await supabase
-        .from('user_roles')
-        .select('role, job_role, hospice_id')
-        .eq('user_id', user.id);
+    const userIsCoordinator = roleData?.role === 'coordinator';
 
-      console.log('Settings: ALL roles for user:', { allRoles, allRolesError });
+    setUserProfile({
+      id: user.id,
+      name: userData.name || '',
+      email: userData.email || '',
+      role: roleData?.role || 'clinician',
+      job_role: roleData?.job_role,
+    });
 
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role, job_role')
-        .eq('user_id', user.id)
-        .eq('hospice_id', userData.hospice_id)
-        .maybeSingle();
+    setIsCoordinator(userIsCoordinator);
 
-      console.log('Settings: Filtered role result:', { roleData, roleError });
+    // Fetch hospice data separately to avoid RLS join issues
+    if (userData.hospice_id) {
+      const { data: hospiceData } = await supabase
+        .from('hospices')
+        .select('id, name, slug, address_line1, address_line2, city, state, zip_code, phone, email')
+        .eq('id', userData.hospice_id)
+        .single();
 
-      const userIsCoordinator = roleData?.role === 'coordinator';
-      console.log('Settings: Setting isCoordinator to:', userIsCoordinator);
-
-      setUserProfile({
-        id: user.id,
-        name: userData.name || '',
-        email: userData.email || '',
-        role: roleData?.role || 'clinician',
-        job_role: roleData?.job_role,
-      });
-
-      setIsCoordinator(userIsCoordinator);
-
-      // Get hospice info
-      if (userData.hospices) {
-        const hospiceData = Array.isArray(userData.hospices)
-          ? userData.hospices[0]
-          : userData.hospices;
-
+      if (hospiceData) {
         setHospice(hospiceData);
         setHospiceForm({
           name: hospiceData.name || '',
@@ -195,7 +182,7 @@ export default function SettingsPage() {
         });
 
         // Get staff members if coordinator
-        if (roleData?.role === 'coordinator') {
+        if (userIsCoordinator) {
           loadStaffMembers(userData.hospice_id);
         }
       }
