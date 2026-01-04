@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, Clock, AlertTriangle, AlertCircle, Users } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileText, Clock, AlertTriangle, AlertCircle, Users, Calendar, Loader2 } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
 
 interface IDGIssue {
   id: string;
@@ -32,13 +32,24 @@ interface IDGIssue {
   idg_reasons: string[];
 }
 
+interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  mrn: string;
+  benefit_period: number | null;
+  admission_date: string | null;
+  status: string;
+}
+
 interface IDGIssueSelectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (selectedIssueIds: string[]) => void;
+  onConfirm: (selectedIssueIds: string[], selectedPatientIds: string[]) => void;
   issues: IDGIssue[];
   fromDate: string;
   toDate: string;
+  facilitySlug: string;
 }
 
 export function IDGIssueSelectionModal({
@@ -47,19 +58,63 @@ export function IDGIssueSelectionModal({
   onConfirm,
   issues,
   fromDate,
-  toDate
+  toDate,
+  facilitySlug
 }: IDGIssueSelectionModalProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set());
+  const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set());
+  const [showCensus, setShowCensus] = useState(false);
+  const [allPatients, setAllPatients] = useState<Patient[]>([]);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(false);
 
   // Reset selection when modal opens
   useEffect(() => {
     if (open) {
-      setSelectedIds(new Set());
+      setSelectedIssueIds(new Set());
+      setSelectedPatientIds(new Set());
+      setShowCensus(false);
     }
   }, [open]);
 
-  const handleToggle = (issueId: string) => {
-    setSelectedIds(prev => {
+  // Fetch all patients when census is toggled on
+  useEffect(() => {
+    if (showCensus && allPatients.length === 0 && facilitySlug) {
+      fetchAllPatients();
+    }
+  }, [showCensus, facilitySlug]);
+
+  const fetchAllPatients = async () => {
+    setIsLoadingPatients(true);
+    try {
+      const response = await fetch(`/api/patients?slug=${facilitySlug}&status=active`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllPatients(data.patients || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch patients:', error);
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  };
+
+  // Calculate days remaining in benefit period
+  const calculateDaysRemaining = (patient: Patient): number | null => {
+    if (!patient.benefit_period || !patient.admission_date) return null;
+
+    const admissionDate = new Date(patient.admission_date);
+    const today = new Date();
+    const daysSinceAdmission = differenceInDays(today, admissionDate);
+
+    // BP1-2: 90 days, BP3+: 60 days
+    const periodLength = patient.benefit_period <= 2 ? 90 : 60;
+    const daysRemaining = periodLength - daysSinceAdmission;
+
+    return Math.max(0, daysRemaining);
+  };
+
+  const handleIssueToggle = (issueId: string) => {
+    setSelectedIssueIds(prev => {
       const next = new Set(prev);
       if (next.has(issueId)) {
         next.delete(issueId);
@@ -70,19 +125,40 @@ export function IDGIssueSelectionModal({
     });
   };
 
+  const handlePatientToggle = (patientId: string) => {
+    setSelectedPatientIds(prev => {
+      const next = new Set(prev);
+      if (next.has(patientId)) {
+        next.delete(patientId);
+      } else {
+        next.add(patientId);
+      }
+      return next;
+    });
+  };
+
   const handleSelectAll = () => {
-    setSelectedIds(new Set(issues.map(i => i.id)));
+    setSelectedIssueIds(new Set(issues.map(i => i.id)));
+    if (showCensus) {
+      // Also select all patients without issues
+      const patientIdsWithIssues = new Set(issues.map(i => i.patient_id));
+      const patientsWithoutIssues = allPatients.filter(p => !patientIdsWithIssues.has(p.id));
+      setSelectedPatientIds(new Set(patientsWithoutIssues.map(p => p.id)));
+    }
   };
 
   const handleDeselectAll = () => {
-    setSelectedIds(new Set());
+    setSelectedIssueIds(new Set());
+    setSelectedPatientIds(new Set());
   };
 
   const handleConfirm = () => {
-    if (selectedIds.size === 0) return;
-    onConfirm(Array.from(selectedIds));
+    if (selectedIssueIds.size === 0 && selectedPatientIds.size === 0) return;
+    onConfirm(Array.from(selectedIssueIds), Array.from(selectedPatientIds));
     onOpenChange(false);
   };
+
+  const totalSelectedCount = selectedIssueIds.size + selectedPatientIds.size;
 
   const formatDateRange = () => {
     return `${format(new Date(fromDate), 'MMM d')} - ${format(new Date(toDate), 'MMM d, yyyy')}`;
@@ -132,7 +208,7 @@ export function IDGIssueSelectionModal({
         {/* Selection Controls */}
         <div className="flex items-center justify-between py-2 border-b">
           <div className="text-sm text-muted-foreground">
-            {issues.length} issues available &middot; {selectedIds.size} selected
+            {issues.length} issues available{showCensus ? ` · ${allPatients.length - Object.keys(groupedByPatient).length} patients without issues` : ''} · {totalSelectedCount} selected
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={handleSelectAll}>
@@ -145,17 +221,18 @@ export function IDGIssueSelectionModal({
         </div>
 
         {/* Issue List */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          {issues.length === 0 ? (
+        <ScrollArea className="flex-1 -mx-6 px-6 max-h-[400px]">
+          {issues.length === 0 && !showCensus ? (
             <div className="py-12 text-center">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
               <p className="text-muted-foreground">No issues found for this date range</p>
               <p className="text-sm text-muted-foreground/70 mt-1">
-                Try adjusting your date range or threshold settings
+                Try adjusting your date range or click &quot;Show Complete Census&quot; to see all patients
               </p>
             </div>
           ) : (
             <div className="space-y-4 py-2">
+              {/* Patients with issues */}
               {patientGroups.map(([patientId, group]) => (
                 <div key={patientId} className="border rounded-lg overflow-hidden">
                   {/* Patient Header */}
@@ -174,13 +251,14 @@ export function IDGIssueSelectionModal({
                       <div
                         key={issue.id}
                         className={`flex items-start gap-3 p-3 hover:bg-gray-50 transition-colors cursor-pointer ${
-                          selectedIds.has(issue.id) ? 'bg-[#2D7A7A]/5 ring-1 ring-[#2D7A7A] ring-inset' : ''
+                          selectedIssueIds.has(issue.id) ? 'bg-[#2D7A7A]/5 ring-1 ring-[#2D7A7A] ring-inset' : ''
                         }`}
-                        onClick={() => handleToggle(issue.id)}
+                        onClick={() => handleIssueToggle(issue.id)}
                       >
                         <Checkbox
-                          checked={selectedIds.has(issue.id)}
-                          onCheckedChange={() => handleToggle(issue.id)}
+                          checked={selectedIssueIds.has(issue.id)}
+                          onCheckedChange={() => handleIssueToggle(issue.id)}
+                          onClick={(e) => e.stopPropagation()}
                           className="mt-1"
                         />
                         <div className="flex-1 min-w-0">
@@ -218,7 +296,7 @@ export function IDGIssueSelectionModal({
                               {issue.hours_open.toFixed(1)}h open
                             </span>
                           </div>
-                          {issue.idg_reasons.length > 0 && (
+                          {issue.idg_reasons && issue.idg_reasons.length > 0 && (
                             <div className="flex items-center gap-1 mt-2 flex-wrap">
                               <span className="text-xs text-muted-foreground">Reason:</span>
                               {issue.idg_reasons.map((reason, idx) => (
@@ -238,11 +316,76 @@ export function IDGIssueSelectionModal({
                   </div>
                 </div>
               ))}
+
+              {/* Patients without issues (only shown when census is toggled) */}
+              {showCensus && (
+                <>
+                  {isLoadingPatients ? (
+                    <div className="py-8 text-center">
+                      <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mt-2">Loading patients...</p>
+                    </div>
+                  ) : (
+                    allPatients
+                      .filter(patient => !groupedByPatient[patient.id])
+                      .map((patient) => {
+                        const daysRemaining = calculateDaysRemaining(patient);
+                        return (
+                          <div key={patient.id} className="border rounded-lg overflow-hidden">
+                            {/* Patient Header (clickable for patients without issues) */}
+                            <div
+                              className={`bg-[#FAFAF8] px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors ${
+                                selectedPatientIds.has(patient.id) ? 'bg-[#2D7A7A]/10 ring-1 ring-[#2D7A7A] ring-inset' : ''
+                              }`}
+                              onClick={() => handlePatientToggle(patient.id)}
+                            >
+                              <Checkbox
+                                checked={selectedPatientIds.has(patient.id)}
+                                onCheckedChange={() => handlePatientToggle(patient.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <Users className="w-4 h-4 text-[#2D7A7A]" />
+                              <span className="font-medium">{patient.first_name} {patient.last_name}</span>
+                              <span className="text-xs text-muted-foreground">MRN: {patient.mrn}</span>
+
+                              {/* Benefit Period Badge */}
+                              {patient.benefit_period && (
+                                <Badge
+                                  variant="outline"
+                                  className={`ml-2 ${
+                                    daysRemaining !== null && daysRemaining <= 14
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                                  }`}
+                                >
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  BP{patient.benefit_period}
+                                  {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                </Badge>
+                              )}
+
+                              <Badge variant="outline" className="ml-auto text-muted-foreground">
+                                No issues
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </>
+              )}
             </div>
           )}
         </ScrollArea>
 
         <DialogFooter className="gap-2 border-t pt-4">
+          <Button
+            variant="ghost"
+            onClick={() => setShowCensus(!showCensus)}
+            className="mr-auto"
+          >
+            {showCensus ? 'Hide Complete Census' : 'Show Complete Census'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -251,10 +394,10 @@ export function IDGIssueSelectionModal({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={selectedIds.size === 0}
+            disabled={totalSelectedCount === 0}
             className="bg-[#2D7A7A] hover:bg-[#236060]"
           >
-            Start IDG Meeting ({selectedIds.size} issue{selectedIds.size !== 1 ? 's' : ''})
+            Start IDG Meeting ({totalSelectedCount} item{totalSelectedCount !== 1 ? 's' : ''})
           </Button>
         </DialogFooter>
       </DialogContent>

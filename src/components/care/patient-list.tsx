@@ -343,17 +343,43 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
 }
 
 function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSuccess: () => void }) {
+  // Helper to format date for HTML date input (YYYY-MM-DD)
+  const formatDateForInput = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   const [formData, setFormData] = useState({
     benefit_period: patient?.benefit_period || 1,
     mrn: patient?.mrn || '',
     first_name: patient?.first_name || '',
     last_name: patient?.last_name || '',
-    date_of_birth: patient?.date_of_birth || '',
-    admission_date: patient?.admission_date || '',
+    date_of_birth: formatDateForInput(patient?.date_of_birth),
+    admission_date: formatDateForInput(patient?.admission_date),
     diagnosis: patient?.diagnosis || '',
     status: patient?.status || 'active',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Update form data when patient prop changes (e.g., when opening edit dialog)
+  useEffect(() => {
+    setFormData({
+      benefit_period: patient?.benefit_period || 1,
+      mrn: patient?.mrn || '',
+      first_name: patient?.first_name || '',
+      last_name: patient?.last_name || '',
+      date_of_birth: formatDateForInput(patient?.date_of_birth),
+      admission_date: formatDateForInput(patient?.admission_date),
+      diagnosis: patient?.diagnosis || '',
+      status: patient?.status || 'active',
+    });
+  }, [patient]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

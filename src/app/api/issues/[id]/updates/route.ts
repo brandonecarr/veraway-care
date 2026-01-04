@@ -25,9 +25,10 @@ export async function POST(
     }
 
     // Update last_activity_at to reset the overdue timer
+    const newLastActivityAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('issues')
-      .update({ last_activity_at: new Date().toISOString() })
+      .update({ last_activity_at: newLastActivityAt })
       .eq('id', issueId);
 
     if (updateError) {
@@ -68,7 +69,7 @@ export async function POST(
       }, note).catch((err) => console.error('Failed to send issue update notification:', err));
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, last_activity_at: newLastActivityAt });
   } catch (error) {
     console.error('Add update error:', error);
     return NextResponse.json({ error: 'Failed to add update' }, { status: 500 });

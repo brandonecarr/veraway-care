@@ -190,12 +190,13 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   };
 
   // Handle starting the IDG meeting
-  const handleStartMeeting = (issueIds: string[]) => {
+  const handleStartMeeting = (issueIds: string[], patientIds: string[]) => {
     setSelectedIssueIds(new Set(issueIds));
     setMeetingStartedAt(new Date().toISOString());
     setMeetingStarted(true);
+    const totalItems = issueIds.length + patientIds.length;
     toast.success('IDG Meeting Started', {
-      description: `${issueIds.length} issues selected for review.`,
+      description: `${totalItems} item${totalItems !== 1 ? 's' : ''} selected for review.`,
     });
   };
 
@@ -669,6 +670,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         issues={issues}
         fromDate={fromDateStr}
         toDate={toDateStr}
+        facilitySlug={slug}
       />
 
       {/* IDG Completion Modal */}
