@@ -170,12 +170,11 @@ export async function POST(request: NextRequest) {
 
     // Set user role as clinician (delete existing first, then insert)
     // First, delete any existing role for this user in this hospice
-    // Note: user_roles table still uses facility_id until migration renames it
     await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('facility_id', hospiceId);
+      .eq('hospice_id', hospiceId);
 
     // Now insert the clinician role with job_role
     const { data: roleData, error: roleError } = await supabaseAdmin
@@ -183,7 +182,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: userId,
         role: 'clinician',
-        facility_id: hospiceId,
+        hospice_id: hospiceId,
         job_role,
       })
       .select();

@@ -43,7 +43,6 @@ export async function GET() {
     const userMap = new Map(users?.map(u => [u.id, u]) || []);
 
     // Format the response
-    // Note: user_roles table still uses facility_id until migration renames it
     const formattedRoles = roles?.map(role => {
       const user = userMap.get(role.user_id);
       return {
@@ -52,9 +51,9 @@ export async function GET() {
         email: user?.email || 'Unknown',
         name: user?.name || 'Unknown',
         role: role.role,
-        hospice_id: role.facility_id,
+        hospice_id: role.hospice_id,
         // Backwards compatibility
-        facility_id: role.facility_id,
+        facility_id: role.hospice_id,
         created_at: role.created_at,
       };
     });

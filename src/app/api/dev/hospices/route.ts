@@ -30,10 +30,9 @@ export async function GET() {
     if (error) throw error;
 
     // Fetch coordinator roles
-    // Note: user_roles table still uses facility_id until migration renames it
     const { data: coordinatorRoles } = await supabase
       .from('user_roles')
-      .select('facility_id, user_id')
+      .select('hospice_id, user_id')
       .eq('role', 'coordinator');
 
     // Get all coordinator user IDs
@@ -68,7 +67,7 @@ export async function GET() {
     console.log('Users map size:', usersMap.size);
 
     coordinatorRoles?.forEach(coord => {
-      const hospiceId = coord.facility_id;
+      const hospiceId = coord.hospice_id;
       const userInfo = usersMap.get(coord.user_id);
 
       console.log(`Processing coordinator: user_id=${coord.user_id}, hospice_id=${hospiceId}, userInfo=`, userInfo);

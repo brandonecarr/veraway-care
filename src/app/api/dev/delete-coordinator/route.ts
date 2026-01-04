@@ -41,12 +41,11 @@ export async function POST(request: Request) {
     const userId = authUser.id;
 
     // Delete from user_roles table
-    // Note: user_roles table still uses facility_id until migration renames it
     const { error: deleteRoleError } = await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('facility_id', hospice_id)
+      .eq('hospice_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (deleteRoleError) {

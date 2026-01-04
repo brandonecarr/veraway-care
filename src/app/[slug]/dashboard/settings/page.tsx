@@ -141,13 +141,12 @@ export default function SettingsPage() {
         email: userData.email || '',
       });
 
-      // Get user role - filter by facility_id to get the correct role for this hospice
-      // Note: using facility_id until database migration renames it to hospice_id
+      // Get user role - filter by hospice_id to get the correct role for this hospice
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role, job_role')
         .eq('user_id', user.id)
-        .eq('facility_id', userData.hospice_id)
+        .eq('hospice_id', userData.hospice_id)
         .maybeSingle();
 
       setUserProfile({

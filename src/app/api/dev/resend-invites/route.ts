@@ -28,11 +28,10 @@ export async function POST(request: Request) {
     );
 
     // Get all coordinators for this hospice
-    // Note: user_roles table still uses facility_id until migration renames it
     const { data: coordinatorRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('user_id')
-      .eq('facility_id', hospice_id)
+      .eq('hospice_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (rolesError) {
