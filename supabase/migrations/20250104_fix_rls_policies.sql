@@ -5,9 +5,11 @@
 -- First, drop the problematic policies
 DROP POLICY IF EXISTS "Users can view users in their hospice" ON users;
 DROP POLICY IF EXISTS "Users can view users in their facility" ON users;
+DROP POLICY IF EXISTS "Users can view own record" ON users;
+DROP POLICY IF EXISTS "Users can view users in same hospice" ON users;
 
--- Create a security definer function to get user's hospice_id without triggering RLS
-CREATE OR REPLACE FUNCTION auth.user_hospice_id()
+-- Create a security definer function in public schema to get user's hospice_id without triggering RLS
+CREATE OR REPLACE FUNCTION public.get_user_hospice_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
@@ -25,7 +27,7 @@ CREATE POLICY "Users can view own record" ON users
 
 CREATE POLICY "Users can view users in same hospice" ON users
     FOR SELECT
-    USING (hospice_id = auth.user_hospice_id());
+    USING (hospice_id = public.get_user_hospice_id());
 
 -- Fix policies on patients table
 DROP POLICY IF EXISTS "Users can view patients in their hospice" ON patients;
@@ -35,7 +37,7 @@ DO $$
 BEGIN
     CREATE POLICY "Users can view patients in their hospice" ON patients
         FOR SELECT
-        USING (hospice_id = auth.user_hospice_id());
+        USING (hospice_id = public.get_user_hospice_id());
 EXCEPTION
     WHEN undefined_table THEN NULL;
     WHEN duplicate_object THEN NULL;
@@ -49,7 +51,7 @@ DO $$
 BEGIN
     CREATE POLICY "Users can view issues in their hospice" ON issues
         FOR SELECT
-        USING (hospice_id = auth.user_hospice_id());
+        USING (hospice_id = public.get_user_hospice_id());
 EXCEPTION
     WHEN undefined_table THEN NULL;
     WHEN duplicate_object THEN NULL;
@@ -68,7 +70,7 @@ BEGIN
 
     CREATE POLICY "Users can view roles in their hospice" ON user_roles
         FOR SELECT
-        USING (hospice_id = auth.user_hospice_id());
+        USING (hospice_id = public.get_user_hospice_id());
 EXCEPTION
     WHEN undefined_table THEN NULL;
     WHEN duplicate_object THEN NULL;
@@ -105,7 +107,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'conversations') THEN
         CREATE POLICY "Users can view conversations in their hospice" ON conversations
             FOR SELECT
-            USING (hospice_id = auth.user_hospice_id());
+            USING (hospice_id = public.get_user_hospice_id());
     END IF;
 EXCEPTION
     WHEN undefined_table THEN NULL;
@@ -121,7 +123,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'idg_reviews') THEN
         CREATE POLICY "Users can view idg_reviews in their hospice" ON idg_reviews
             FOR SELECT
-            USING (hospice_id = auth.user_hospice_id());
+            USING (hospice_id = public.get_user_hospice_id());
     END IF;
 EXCEPTION
     WHEN undefined_table THEN NULL;
@@ -145,7 +147,7 @@ BEGIN
 
         CREATE POLICY "Users can view idg_issue_status in their hospice" ON idg_issue_status
             FOR SELECT
-            USING (hospice_id = auth.user_hospice_id());
+            USING (hospice_id = public.get_user_hospice_id());
     END IF;
 EXCEPTION
     WHEN undefined_table THEN NULL;
