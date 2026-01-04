@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Pencil, Trash2, ArrowUpDown, Filter } from 'lucide-react';
 import type { Patient } from '@/types/care-coordination';
+import { BENEFIT_PERIODS, getBenefitPeriodDays, getBenefitPeriodDaysRemaining } from '@/types/care-coordination';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -249,6 +251,27 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                         <span className="font-medium">Diagnosis:</span> {patient.diagnosis}
                       </p>
                     )}
+                    {patient.benefit_period && (
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">Benefit Period {patient.benefit_period}</span>
+                        {(() => {
+                          const daysRemaining = getBenefitPeriodDaysRemaining(patient.admitted_date, patient.benefit_period);
+                          if (daysRemaining === null) return null;
+                          const isUrgent = daysRemaining <= 14;
+                          return (
+                            <Badge
+                              variant="outline"
+                              className={isUrgent
+                                ? 'bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]'
+                                : 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                              }
+                            >
+                              {daysRemaining} days remaining
+                            </Badge>
+                          );
+                        })()}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -321,6 +344,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
 
 function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
+    benefit_period: patient?.benefit_period || 1,
     mrn: patient?.mrn || '',
     first_name: patient?.first_name || '',
     last_name: patient?.last_name || '',
@@ -362,6 +386,27 @@ function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSucce
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Benefit Period *</label>
+        <Select
+          value={String(formData.benefit_period)}
+          onValueChange={(value) => setFormData({ ...formData, benefit_period: parseInt(value) })}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select benefit period" />
+          </SelectTrigger>
+          <SelectContent>
+            {BENEFIT_PERIODS.map((period) => (
+              <SelectItem key={period} value={String(period)}>
+                BP{period} ({getBenefitPeriodDays(period)} days)
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">
+          BP1-2: 90 days | BP3+: 60 days (face-to-face required)
+        </p>
+      </div>
       <div>
         <label className="text-sm font-medium text-[#1A1A1A]">MRN *</label>
         <Input
@@ -515,6 +560,30 @@ function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: () => vo
             <div>
               <p className="text-[#666] mb-1">Diagnosis</p>
               <p className="font-medium">{patient.diagnosis}</p>
+            </div>
+          )}
+          {patient.benefit_period && (
+            <div>
+              <p className="text-[#666] mb-1">Benefit Period</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">BP{patient.benefit_period}</p>
+                {(() => {
+                  const daysRemaining = getBenefitPeriodDaysRemaining(patient.admitted_date, patient.benefit_period);
+                  if (daysRemaining === null) return null;
+                  const isUrgent = daysRemaining <= 14;
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={isUrgent
+                        ? 'bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]'
+                        : 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                      }
+                    >
+                      {daysRemaining} days remaining
+                    </Badge>
+                  );
+                })()}
+              </div>
             </div>
           )}
         </div>

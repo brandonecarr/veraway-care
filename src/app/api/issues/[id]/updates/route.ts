@@ -24,6 +24,16 @@ export async function POST(
       return NextResponse.json({ error: 'Note is required' }, { status: 400 });
     }
 
+    // Update last_activity_at to reset the overdue timer
+    const { error: updateError } = await supabase
+      .from('issues')
+      .update({ last_activity_at: new Date().toISOString() })
+      .eq('id', issueId);
+
+    if (updateError) {
+      console.error('Failed to update last_activity_at:', updateError);
+    }
+
     // Create audit log entry
     const { error } = await supabase
       .from('issue_audit_log')

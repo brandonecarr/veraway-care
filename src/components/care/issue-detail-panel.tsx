@@ -155,6 +155,8 @@ export function IssueDetailPanel({
         return 'Marked as resolved';
       case 'updated':
         return 'Added update note';
+      case 'lifecycle_completed':
+        return `Total Lifecycle: ${details?.total_lifecycle}`;
       default:
         return action;
     }
@@ -245,8 +247,9 @@ export function IssueDetailPanel({
 
   const isOverdue = () => {
     if (currentStatus === 'resolved') return false;
-    const createdAt = new Date(issue.created_at);
-    const hoursSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+    // Use last_activity_at if available, otherwise fall back to created_at
+    const lastActivity = new Date(issue.last_activity_at || issue.created_at);
+    const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
     return hoursSince > 24;
   };
 

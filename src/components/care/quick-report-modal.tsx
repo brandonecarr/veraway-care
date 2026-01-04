@@ -18,7 +18,13 @@ import { PatientAutocomplete } from './patient-autocomplete';
 import { Plus, X, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Patient } from '@/types/care-coordination';
+import { ISSUE_TYPES, TIMESTAMPED_ISSUE_TYPES } from '@/types/care-coordination';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { format } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface QuickReportModalProps {
   userId: string;
@@ -122,8 +128,22 @@ function QuickReportForm({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string>(userId);
+  const [eventDate, setEventDate] = useState<Date | undefined>(new Date());
+  const [eventTime, setEventTime] = useState('12:00');
   const tagInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Check if current issue type requires a timestamp
+  const requiresTimestamp = TIMESTAMPED_ISSUE_TYPES.includes(issueType as any);
+
+  // Combine date and time into a timestamp
+  const getEventTimestamp = () => {
+    if (!eventDate || !requiresTimestamp) return null;
+    const [hours, minutes] = eventTime.split(':').map(Number);
+    const timestamp = new Date(eventDate);
+    timestamp.setHours(hours, minutes, 0, 0);
+    return timestamp.toISOString();
+  };
 
   const isCoordinator = userRole === 'coordinator';
 
@@ -222,18 +242,6 @@ function QuickReportForm({
     }
   };
 
-  const issueTypes = [
-    'Change in Condition',
-    'Concern/Complaint',
-    'Death',
-    'Infection',
-    'Incident',
-    'Unmanaged Pain',
-    'Med Discrepancies',
-    'DME Malfunction',
-    'Missed/Declined Visit',
-    'Not Following Plan-of-Care'
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,6 +278,7 @@ function QuickReportForm({
           description: description || null,
           priority,
           tags: selectedTags.length > 0 ? selectedTags : null,
+          event_timestamp: getEventTimestamp(),
         }),
       });
 
@@ -321,11 +330,55 @@ function QuickReportForm({
           }}
         >
           <option value="">Select issue type...</option>
-          {issueTypes.map(type => (
+          {ISSUE_TYPES.map(type => (
             <option key={type} value={type}>{type}</option>
           ))}
         </select>
       </div>
+
+      {/* Date/Time picker for Admitted, Discharged, Death */}
+      {requiresTimestamp && (
+        <div className="space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center gap-2 text-amber-800">
+            <CalendarIcon className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              When did this {issueType.toLowerCase() === 'death' ? 'occur' : 'happen'}?
+            </span>
+          </div>
+          <div className="flex gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    "flex-1 justify-start text-left font-normal border-amber-300 bg-white",
+                    !eventDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {eventDate ? format(eventDate, "MMM d, yyyy") : "Select date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={eventDate}
+                  onSelect={setEventDate}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Input
+              type="time"
+              value={eventTime}
+              onChange={(e) => setEventTime(e.target.value)}
+              className="w-32 border-amber-300 bg-white"
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="text-sm font-medium text-[#1A1A1A] mb-2 block">

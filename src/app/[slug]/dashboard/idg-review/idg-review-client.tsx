@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Download, Users, FileText, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { IDGSummaryStats } from '@/components/care/idg-summary-stats';
 import { IDGIssueList } from '@/components/care/idg-issue-list';
@@ -63,9 +64,19 @@ interface IDGSummary {
   overdue: number;
   admissions?: number;
   deaths?: number;
+  expiringBenefitPeriods?: number;
   byIssueType: Record<string, number>;
   weekRange: { start: string; end: string };
   thresholdHours: number;
+}
+
+interface ExpiringBenefitPeriod {
+  patient_id: string;
+  patient_name: string;
+  patient_mrn: string;
+  benefit_period: number;
+  days_remaining: number;
+  end_date: string;
 }
 
 interface PreviousReview {
@@ -81,6 +92,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [issues, setIssues] = useState<IDGIssue[]>([]);
   const [grouped, setGrouped] = useState<Record<string, any>>({});
   const [summary, setSummary] = useState<IDGSummary | null>(null);
+  const [expiringBenefitPeriods, setExpiringBenefitPeriods] = useState<ExpiringBenefitPeriod[]>([]);
 
   // State for controls
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
@@ -146,6 +158,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       setIssues(data.issues || []);
       setGrouped(data.grouped || {});
       setSummary(data.summary || null);
+      setExpiringBenefitPeriods(data.expiringBenefitPeriods || []);
       setDisciplines(data.disciplines || []);
       setDispositions(data.dispositions || []);
       setPreviousReview(data.previousReview || null);
@@ -154,6 +167,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       setIssues([]);
       setGrouped({});
       setSummary(null);
+      setExpiringBenefitPeriods([]);
     } finally {
       setIsLoading(false);
     }
@@ -460,6 +474,62 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
           onDispositionChange={handleDispositionChange}
           dispositions={dispositions}
         />
+
+        {/* Expiring Benefit Periods */}
+        {expiringBenefitPeriods.length > 0 && (
+          <Card className="p-4 md:p-6 bg-white border-[#D4D4D4]">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg bg-purple-100">
+                <CalendarClock className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                  Benefit Period Expiring
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Patients with ≤14 days remaining - Face-to-Face visit required
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {expiringBenefitPeriods.map((patient) => (
+                <div
+                  key={patient.patient_id}
+                  className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-medium text-[#1A1A1A]">{patient.patient_name}</p>
+                      <p className="text-sm text-[#666]">MRN: {patient.patient_mrn}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                      BP{patient.benefit_period}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={patient.days_remaining <= 7
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }
+                    >
+                      {patient.days_remaining === 0 ? (
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Expired
+                        </span>
+                      ) : (
+                        `${patient.days_remaining} days remaining`
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Issue Detail Panel */}

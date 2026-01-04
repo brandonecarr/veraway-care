@@ -44,6 +44,12 @@ export async function GET(request: Request) {
   }
 }
 
+// Issue types that update patient date columns
+const PATIENT_DATE_ISSUE_TYPES: Record<string, string> = {
+  'Discharged': 'discharge_date',
+  'Death': 'death_date'
+};
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -54,16 +60,31 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const { event_timestamp, ...issueData } = body;
+
     const issue = await createIssue({
-      ...body,
+      ...issueData,
       reported_by: user.id
     });
+
+    // If this is an Admitted, Discharged, or Death issue, update the patient record
+    const patientDateColumn = PATIENT_DATE_ISSUE_TYPES[issueData.issue_type];
+    if (patientDateColumn && event_timestamp && issueData.patient_id) {
+      const { error: patientUpdateError } = await supabase
+        .from('patients')
+        .update({ [patientDateColumn]: event_timestamp })
+        .eq('id', issueData.patient_id);
+
+      if (patientUpdateError) {
+        console.error(`Failed to update patient ${patientDateColumn}:`, patientUpdateError);
+      }
+    }
 
     // Fetch patient details for the notification
     const { data: patient } = await supabase
       .from('patients')
       .select('first_name, last_name')
-      .eq('id', body.patient_id)
+      .eq('id', issueData.patient_id)
       .single();
 
     // Send notifications to all facility users (fire and forget)

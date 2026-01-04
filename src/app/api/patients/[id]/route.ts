@@ -47,16 +47,20 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
     if (first_name !== undefined) updateData.first_name = first_name;
     if (last_name !== undefined) updateData.last_name = last_name;
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth;
-    if (admission_date !== undefined) updateData.admission_date = admission_date;
+    if (admission_date !== undefined) {
+      updateData.admission_date = admission_date;
+      updateData.admitted_date = admission_date;  // Also update admitted_date for tracking
+    }
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
+    if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
 
     const { data, error } = await supabase
       .from('patients')
@@ -105,16 +109,20 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
     if (first_name !== undefined) updateData.first_name = first_name;
     if (last_name !== undefined) updateData.last_name = last_name;
     if (date_of_birth !== undefined) updateData.date_of_birth = date_of_birth;
-    if (admission_date !== undefined) updateData.admission_date = admission_date;
+    if (admission_date !== undefined) {
+      updateData.admission_date = admission_date;
+      updateData.admitted_date = admission_date;  // Also update admitted_date for tracking
+    }
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
+    if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
 
     const { data, error } = await supabase
       .from('patients')

@@ -60,6 +60,7 @@ const actionColors: Record<string, string> = {
   assigned: 'bg-blue-500/10 text-blue-700',
   status_changed: 'bg-orange-500/10 text-orange-700',
   resolved: 'bg-[#81B29A]/10 text-[#81B29A]',
+  lifecycle_completed: 'bg-[#81B29A]/10 text-[#81B29A]',
   commented: 'bg-purple-500/10 text-purple-700',
   updated: 'bg-gray-500/10 text-gray-700',
   message_sent: 'bg-indigo-500/10 text-indigo-700',
@@ -73,6 +74,7 @@ const actionLabels: Record<string, string> = {
   assigned: 'Assigned',
   status_changed: 'Status Changed',
   resolved: 'Resolved',
+  lifecycle_completed: 'Lifecycle Complete',
   commented: 'Commented',
   updated: 'Update Added',
   message_sent: 'Message Sent',
@@ -119,6 +121,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       case 'assigned':
       case 'status_changed':
       case 'resolved':
+      case 'lifecycle_completed':
       case 'updated':
       case 'message_sent':
         // Link to issue via the patient column click (existing behavior)
@@ -488,6 +491,8 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
         return `${details.old_status?.replace('_', ' ')} → ${details.new_status?.replace('_', ' ')}${details.note ? ` - ${details.note}` : ''}`;
       case 'resolved':
         return 'Issue marked as resolved';
+      case 'lifecycle_completed':
+        return `Total Lifecycle: ${details.total_lifecycle}`;
       case 'updated':
         return details.note || 'Update added';
       case 'message_sent':
@@ -768,7 +773,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
                         }
 
                         // For issue-related actions, make the badge clickable to open issue detail
-                        if (entry.issue?.id && ['created', 'assigned', 'status_changed', 'resolved', 'updated', 'message_sent'].includes(entry.action)) {
+                        if (entry.issue?.id && ['created', 'assigned', 'status_changed', 'resolved', 'lifecycle_completed', 'updated', 'message_sent'].includes(entry.action)) {
                           return (
                             <button
                               onClick={() => handlePatientClick(entry.issue!.id)}

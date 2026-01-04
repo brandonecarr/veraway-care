@@ -223,6 +223,42 @@ export async function GET(request: Request) {
       admissionsCount = count || 0;
     }
 
+    // Get patients with benefit periods expiring within 14 days
+    let expiringBenefitPeriods: any[] = [];
+    if (userData?.facility_id) {
+      // Get active patients with benefit period and admitted_date
+      const { data: patientsData } = await supabase
+        .from('patients')
+        .select('id, first_name, last_name, mrn, admitted_date, benefit_period')
+        .eq('facility_id', userData.facility_id)
+        .eq('status', 'active')
+        .not('admitted_date', 'is', null)
+        .not('benefit_period', 'is', null);
+
+      if (patientsData) {
+        // Calculate days remaining for each patient and filter for ≤14 days
+        const now = new Date();
+        expiringBenefitPeriods = patientsData
+          .map(patient => {
+            const admittedDate = new Date(patient.admitted_date);
+            const daysInPeriod = patient.benefit_period <= 2 ? 90 : 60;
+            const endDate = new Date(admittedDate.getTime() + daysInPeriod * 24 * 60 * 60 * 1000);
+            const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+
+            return {
+              patient_id: patient.id,
+              patient_name: `${patient.first_name} ${patient.last_name}`,
+              patient_mrn: patient.mrn,
+              benefit_period: patient.benefit_period,
+              days_remaining: daysRemaining,
+              end_date: endDate.toISOString()
+            };
+          })
+          .filter(p => p.days_remaining <= 14)
+          .sort((a, b) => a.days_remaining - b.days_remaining);
+      }
+    }
+
     // Check if this week has been reviewed already
     let previousReview = null;
     if (userData?.facility_id) {
@@ -256,6 +292,7 @@ export async function GET(request: Request) {
       admissions: admissionsCount,
       deaths: deathsCount,
       flaggedForMD: idgIssues.filter(i => i.flagged_for_md_review).length,
+      expiringBenefitPeriods: expiringBenefitPeriods.length,
       byIssueType: IDG_ISSUE_TYPES.reduce((acc, type) => {
         acc[type] = idgIssues.filter(i => i.issue_type === type).length;
         return acc;
@@ -268,6 +305,7 @@ export async function GET(request: Request) {
       issues: idgIssues,
       grouped,
       summary,
+      expiringBenefitPeriods,
       previousReview,
       disciplines: IDG_DISCIPLINES,
       dispositions: IDG_DISPOSITIONS,

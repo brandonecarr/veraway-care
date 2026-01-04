@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
 
     if (!mrn || !first_name || !last_name) {
       return NextResponse.json({ error: 'Missing required fields: mrn, first_name, last_name' }, { status: 400 });
@@ -62,8 +62,10 @@ export async function POST(request: Request) {
         last_name,
         date_of_birth: date_of_birth || null,
         admission_date: admission_date || null,
+        admitted_date: admission_date || null,  // Also set admitted_date for tracking
         diagnosis: diagnosis || null,
-        status: status || 'active'
+        status: status || 'active',
+        benefit_period: benefit_period || 1  // Default to BP1
       }])
       .select()
       .single();
@@ -81,7 +83,8 @@ export async function POST(request: Request) {
           patient_id: data.id,
           first_name,
           last_name,
-          mrn
+          mrn,
+          benefit_period: benefit_period || 1
         }
       });
 

@@ -12,8 +12,33 @@ export interface Patient {
   admission_date?: string;
   diagnosis?: string;
   status: string;
+  admitted_date?: string;
+  discharge_date?: string;
+  death_date?: string;
+  benefit_period?: number;
   created_at: string;
   updated_at: string;
+}
+
+// Benefit period options
+export const BENEFIT_PERIODS = [1, 2, 3, 4, 5, 6] as const;
+
+// Get the length of a benefit period in days
+export function getBenefitPeriodDays(period: number): number {
+  return period <= 2 ? 90 : 60;
+}
+
+// Calculate days remaining in benefit period
+export function getBenefitPeriodDaysRemaining(admittedDate: string | undefined, period: number): number | null {
+  if (!admittedDate) return null;
+
+  const admitted = new Date(admittedDate);
+  const periodDays = getBenefitPeriodDays(period);
+  const endDate = new Date(admitted.getTime() + periodDays * 24 * 60 * 60 * 1000);
+  const now = new Date();
+
+  const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.max(0, daysRemaining);
 }
 
 export interface Issue {
@@ -29,6 +54,7 @@ export interface Issue {
   tags?: string[];
   resolved_at?: string;
   resolved_by?: string;
+  last_activity_at?: string;
   created_at: string;
   updated_at: string;
   patient?: Patient;
@@ -90,27 +116,32 @@ export interface DashboardMetrics {
 export const ISSUE_TYPES = [
   'Change in Condition',
   'Concern/Complaint',
-  'Death',
   'Infection',
   'Incident',
   'Unmanaged Pain',
   'Med Discrepancies',
   'DME Malfunction',
   'Missed/Declined Visit',
-  'Not Following Plan-of-Care'
+  'Not Following Plan-of-Care',
+  'Discharged',
+  'Death'
 ] as const;
+
+// Issue types that require a date/time timestamp
+export const TIMESTAMPED_ISSUE_TYPES = ['Discharged', 'Death'] as const;
 
 export const ISSUE_TYPE_COLORS: Record<string, string> = {
   'Change in Condition': '#2D7A7A',
   'Concern/Complaint': '#E07A5F',
-  'Death': '#1A1A1A',
   'Infection': '#E07A5F',
   'Incident': '#F4A261',
   'Unmanaged Pain': '#E07A5F',
   'Med Discrepancies': '#264653',
   'DME Malfunction': '#81B29A',
   'Missed/Declined Visit': '#457B9D',
-  'Not Following Plan-of-Care': '#6C757D'
+  'Not Following Plan-of-Care': '#6C757D',
+  'Discharged': '#8B5CF6',
+  'Death': '#1A1A1A'
 };
 
 export interface Notification {
