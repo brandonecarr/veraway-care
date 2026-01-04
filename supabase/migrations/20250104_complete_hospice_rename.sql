@@ -97,6 +97,90 @@ DROP TRIGGER IF EXISTS set_audit_log_facility_id_trigger ON public.issue_audit_l
 DROP TRIGGER IF EXISTS set_handoff_facility_id_trigger ON public.handoffs;
 
 -- =====================================================
+-- STEP 2.5: Rename facility_id columns to hospice_id
+-- =====================================================
+
+-- Users table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.users RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- User roles table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_roles' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.user_roles RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Patients table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'patients' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.patients RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Issues table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'issues' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.issues RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Issue messages table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'issue_messages' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.issue_messages RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Issue audit log table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'issue_audit_log' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.issue_audit_log RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Handoffs table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'handoffs' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.handoffs RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- Conversations table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'conversations' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.conversations RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- IDG reviews table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'idg_reviews' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.idg_reviews RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- IDG issue status table
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'idg_issue_status' AND column_name = 'facility_id') THEN
+        ALTER TABLE public.idg_issue_status RENAME COLUMN facility_id TO hospice_id;
+    END IF;
+END $$;
+
+-- =====================================================
 -- STEP 3: Create hospice-based helper functions
 -- =====================================================
 
