@@ -123,7 +123,7 @@ export default function SettingsPage() {
     }
 
     // Get user profile and role
-    const { data: userData } = await supabase
+    const { data: userData, error: userDataError } = await supabase
       .from('users')
       .select(`
         id,
@@ -134,6 +134,8 @@ export default function SettingsPage() {
       `)
       .eq('id', user.id)
       .single();
+
+    console.log('Settings: userData query result:', { userData, userDataError });
 
     if (userData) {
       setProfileForm({
