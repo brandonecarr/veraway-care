@@ -237,9 +237,11 @@ END $$;
 -- =====================================================
 
 -- Users policies
+DROP POLICY IF EXISTS "Users can view own record" ON public.users;
 CREATE POLICY "Users can view own record" ON public.users
     FOR SELECT USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can view users in same hospice" ON public.users;
 CREATE POLICY "Users can view users in same hospice" ON public.users
     FOR SELECT USING (hospice_id = public.get_user_hospice_id());
 
@@ -249,9 +251,11 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'hospices') THEN
         ALTER TABLE public.hospices ENABLE ROW LEVEL SECURITY;
 
+        DROP POLICY IF EXISTS "Users can view their hospice" ON public.hospices;
         CREATE POLICY "Users can view their hospice" ON public.hospices
             FOR SELECT USING (id = public.get_user_hospice_id());
 
+        DROP POLICY IF EXISTS "Users can update their hospice" ON public.hospices;
         CREATE POLICY "Users can update their hospice" ON public.hospices
             FOR UPDATE USING (id = public.get_user_hospice_id());
     END IF;
@@ -259,34 +263,47 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- Patients policies
+DROP POLICY IF EXISTS "Users can view hospice patients" ON public.patients;
 CREATE POLICY "Users can view hospice patients" ON public.patients
     FOR SELECT USING (hospice_id = public.get_user_hospice_id());
 
+DROP POLICY IF EXISTS "Users can insert hospice patients" ON public.patients;
 CREATE POLICY "Users can insert hospice patients" ON public.patients
     FOR INSERT WITH CHECK (hospice_id = public.get_user_hospice_id() OR hospice_id IS NULL);
 
+DROP POLICY IF EXISTS "Users can update hospice patients" ON public.patients;
 CREATE POLICY "Users can update hospice patients" ON public.patients
     FOR UPDATE USING (hospice_id = public.get_user_hospice_id());
 
+DROP POLICY IF EXISTS "Users can delete hospice patients" ON public.patients;
 CREATE POLICY "Users can delete hospice patients" ON public.patients
     FOR DELETE USING (hospice_id = public.get_user_hospice_id());
 
 -- Issues policies
+DROP POLICY IF EXISTS "Users can view hospice issues" ON public.issues;
 CREATE POLICY "Users can view hospice issues" ON public.issues
     FOR SELECT USING (hospice_id = public.get_user_hospice_id());
 
+DROP POLICY IF EXISTS "Users can create hospice issues" ON public.issues;
 CREATE POLICY "Users can create hospice issues" ON public.issues
     FOR INSERT WITH CHECK (hospice_id = public.get_user_hospice_id() OR hospice_id IS NULL);
 
+DROP POLICY IF EXISTS "Users can update hospice issues" ON public.issues;
 CREATE POLICY "Users can update hospice issues" ON public.issues
     FOR UPDATE USING (hospice_id = public.get_user_hospice_id());
 
+DROP POLICY IF EXISTS "Users can delete hospice issues" ON public.issues;
 CREATE POLICY "Users can delete hospice issues" ON public.issues
     FOR DELETE USING (hospice_id = public.get_user_hospice_id());
 
 -- Issue messages policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice issue messages" ON public.issue_messages;
+    DROP POLICY IF EXISTS "Users can create hospice issue messages" ON public.issue_messages;
+    DROP POLICY IF EXISTS "Users can view issue messages" ON public.issue_messages;
+    DROP POLICY IF EXISTS "Users can create issue messages" ON public.issue_messages;
+
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'issue_messages' AND column_name = 'hospice_id'
@@ -322,6 +339,9 @@ END $$;
 -- Issue audit log policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice audit log" ON public.issue_audit_log;
+    DROP POLICY IF EXISTS "Users can view audit log" ON public.issue_audit_log;
+
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'issue_audit_log' AND column_name = 'hospice_id'
@@ -345,6 +365,11 @@ END $$;
 -- Handoffs policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice handoffs" ON public.handoffs;
+    DROP POLICY IF EXISTS "Users can create hospice handoffs" ON public.handoffs;
+    DROP POLICY IF EXISTS "Users can update hospice handoffs" ON public.handoffs;
+    DROP POLICY IF EXISTS "Users can delete hospice handoffs" ON public.handoffs;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'handoffs') THEN
         CREATE POLICY "Users can view hospice handoffs" ON public.handoffs
             FOR SELECT USING (hospice_id = public.get_user_hospice_id());
@@ -362,6 +387,9 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- User roles policies
+DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can view hospice roles" ON public.user_roles;
+
 CREATE POLICY "Users can view their own roles" ON public.user_roles
     FOR SELECT USING (user_id = auth.uid());
 
@@ -371,6 +399,10 @@ CREATE POLICY "Users can view hospice roles" ON public.user_roles
 -- Conversations policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice conversations" ON public.conversations;
+    DROP POLICY IF EXISTS "Users can update hospice conversations" ON public.conversations;
+    DROP POLICY IF EXISTS "Users can create hospice conversations" ON public.conversations;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'conversations') THEN
         CREATE POLICY "Users can view hospice conversations" ON public.conversations
             FOR SELECT USING (hospice_id = public.get_user_hospice_id());
@@ -387,6 +419,9 @@ END $$;
 -- Conversation participants policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view conversation participants" ON public.conversation_participants;
+    DROP POLICY IF EXISTS "Users can add participants" ON public.conversation_participants;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'conversation_participants') THEN
         CREATE POLICY "Users can view conversation participants" ON public.conversation_participants
             FOR SELECT USING (
@@ -412,6 +447,10 @@ END $$;
 -- IDG reviews policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice idg_reviews" ON public.idg_reviews;
+    DROP POLICY IF EXISTS "Users can create hospice idg_reviews" ON public.idg_reviews;
+    DROP POLICY IF EXISTS "Users can update hospice idg_reviews" ON public.idg_reviews;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'idg_reviews') THEN
         CREATE POLICY "Users can view hospice idg_reviews" ON public.idg_reviews
             FOR SELECT USING (hospice_id = public.get_user_hospice_id());
@@ -428,6 +467,9 @@ END $$;
 -- IDG issue status policies
 DO $$
 BEGIN
+    DROP POLICY IF EXISTS "Users can view hospice idg_issue_status" ON public.idg_issue_status;
+    DROP POLICY IF EXISTS "Users can manage hospice idg_issue_status" ON public.idg_issue_status;
+
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'idg_issue_status') THEN
         IF EXISTS (
             SELECT 1 FROM information_schema.columns
@@ -646,8 +688,3 @@ END $$;
 
 -- =====================================================
 -- STEP 8: Add comments
--- =====================================================
-
-COMMENT ON TABLE public.hospices IS 'Healthcare hospices for multi-tenant data isolation';
-COMMENT ON FUNCTION public.get_user_hospice_id() IS 'Returns the hospice_id of the current authenticated user';
-COMMENT ON FUNCTION public.user_belongs_to_hospice(uuid) IS 'Checks if the current user belongs to the specified hospice';
