@@ -143,25 +143,26 @@ export async function POST(request: Request) {
 
     // Set user role as coordinator (delete existing first, then insert)
     // First, delete any existing role for this user in this hospice
+    // Note: user_roles table still uses facility_id until migration renames it
     console.log('Deleting existing roles for user:', userId, 'in hospice:', hospice_id);
     const { error: deleteError } = await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('hospice_id', hospice_id);
+      .eq('facility_id', hospice_id);
 
     if (deleteError) {
       console.error('Delete existing role error:', deleteError);
     }
 
     // Now insert the coordinator role
-    console.log('Inserting coordinator role:', { user_id: userId, role: 'coordinator', hospice_id });
+    console.log('Inserting coordinator role:', { user_id: userId, role: 'coordinator', facility_id: hospice_id });
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: userId,
         role: 'coordinator',
-        hospice_id,
+        facility_id: hospice_id,
       })
       .select();
 

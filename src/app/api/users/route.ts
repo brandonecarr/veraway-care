@@ -38,10 +38,11 @@ export async function GET(request: Request) {
     console.log('Fetching users for hospice:', currentUserData.hospice_id);
 
     // Step 1: Get user_ids from the same hospice (optionally filtered by role)
+    // Note: user_roles table still uses facility_id until migration renames it
     let rolesQuery = serverSupabase
       .from('user_roles')
       .select('user_id')
-      .eq('hospice_id', currentUserData.hospice_id);
+      .eq('facility_id', currentUserData.hospice_id);
 
     if (roleFilter) {
       rolesQuery = rolesQuery.eq('role', roleFilter);

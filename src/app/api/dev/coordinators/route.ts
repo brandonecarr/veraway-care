@@ -31,10 +31,11 @@ export async function GET(request: Request) {
     const supabase = getAdminClient();
 
     // Fetch coordinator roles for this hospice
+    // Note: user_roles table still uses facility_id until migration renames it
     const { data: coordinators, error } = await supabase
       .from('user_roles')
       .select('user_id')
-      .eq('hospice_id', hospice_id)
+      .eq('facility_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (error) {

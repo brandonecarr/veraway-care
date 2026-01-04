@@ -30,17 +30,18 @@ export async function GET() {
     if (error) throw error;
 
     // Fetch coordinator counts for each organization
+    // Note: user_roles table still uses facility_id until migration renames it
     const { data: coordinators } = await supabase
       .from('user_roles')
-      .select('organization_id, user_id')
+      .select('facility_id, user_id')
       .eq('role', 'coordinator');
 
     // Map coordinator counts to organizations
     const coordinatorMap = new Map<string, number>();
     coordinators?.forEach(coord => {
       coordinatorMap.set(
-        coord.organization_id,
-        (coordinatorMap.get(coord.organization_id) || 0) + 1
+        coord.facility_id,
+        (coordinatorMap.get(coord.facility_id) || 0) + 1
       );
     });
 

@@ -43,11 +43,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Note: user_roles table still uses facility_id until migration renames it
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('hospice_id', hospiceId)
+      .eq('facility_id', hospiceId)
       .single();
 
     if (roleData?.role !== 'coordinator') {

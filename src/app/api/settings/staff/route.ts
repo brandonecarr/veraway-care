@@ -31,11 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Note: user_roles table still uses facility_id until migration renames it
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('hospice_id', userData.hospice_id)
+      .eq('facility_id', userData.hospice_id)
       .single();
 
     if (roleData?.role !== 'coordinator') {
@@ -72,10 +73,11 @@ export async function GET(request: NextRequest) {
     const authUsers = authData?.users || [];
 
     // Get roles for all users
+    // Note: user_roles table still uses facility_id until migration renames it
     const { data: roles } = await supabaseAdmin
       .from('user_roles')
       .select('user_id, role, job_role')
-      .eq('hospice_id', userData.hospice_id);
+      .eq('facility_id', userData.hospice_id);
 
     const staffWithStatus = users
       .map(u => {
