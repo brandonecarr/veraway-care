@@ -3,17 +3,91 @@
 -- to use hospice_id instead of facility_id
 
 -- =====================================================
--- STEP 1: Drop old facility-based functions
+-- STEP 1: Drop ALL policies that depend on get_user_facility_id() FIRST
 -- =====================================================
 
-DROP FUNCTION IF EXISTS public.get_user_facility_id();
-DROP FUNCTION IF EXISTS public.user_belongs_to_facility(uuid);
-DROP FUNCTION IF EXISTS public.set_issue_facility_id();
-DROP FUNCTION IF EXISTS public.set_patient_facility_id();
-DROP FUNCTION IF EXISTS public.set_issue_message_facility_id();
-DROP FUNCTION IF EXISTS public.set_audit_log_facility_id();
-DROP FUNCTION IF EXISTS public.set_handoff_facility_id();
-DROP FUNCTION IF EXISTS public.get_dashboard_metrics();
+-- Hospices table
+DROP POLICY IF EXISTS "Users can view their facility" ON public.hospices;
+DROP POLICY IF EXISTS "Users can update their facility" ON public.hospices;
+
+-- Users table
+DROP POLICY IF EXISTS "Users can view facility members" ON public.users;
+DROP POLICY IF EXISTS "Users can view users in their facility" ON public.users;
+DROP POLICY IF EXISTS "Users can view users in their hospice" ON public.users;
+DROP POLICY IF EXISTS "Users can view own record" ON public.users;
+DROP POLICY IF EXISTS "Users can view users in same hospice" ON public.users;
+DROP POLICY IF EXISTS "Users can view all users for joins" ON public.users;
+
+-- Patients table
+DROP POLICY IF EXISTS "Users can view facility patients" ON public.patients;
+DROP POLICY IF EXISTS "Users can insert facility patients" ON public.patients;
+DROP POLICY IF EXISTS "Users can update facility patients" ON public.patients;
+DROP POLICY IF EXISTS "Users can delete facility patients" ON public.patients;
+DROP POLICY IF EXISTS "Users can view patients in their hospice" ON public.patients;
+DROP POLICY IF EXISTS "Users can view patients in their facility" ON public.patients;
+
+-- Issues table
+DROP POLICY IF EXISTS "Users can view facility issues" ON public.issues;
+DROP POLICY IF EXISTS "Users can create facility issues" ON public.issues;
+DROP POLICY IF EXISTS "Users can update facility issues" ON public.issues;
+DROP POLICY IF EXISTS "Users can delete facility issues" ON public.issues;
+DROP POLICY IF EXISTS "Users can view issues in their hospice" ON public.issues;
+DROP POLICY IF EXISTS "Users can view issues in their facility" ON public.issues;
+
+-- Issue messages table
+DROP POLICY IF EXISTS "Users can view facility issue messages" ON public.issue_messages;
+DROP POLICY IF EXISTS "Users can create facility issue messages" ON public.issue_messages;
+
+-- Issue audit log table
+DROP POLICY IF EXISTS "Users can view facility audit log" ON public.issue_audit_log;
+DROP POLICY IF EXISTS "Users can view audit_log in their hospice" ON public.issue_audit_log;
+DROP POLICY IF EXISTS "Users can view audit_log in their facility" ON public.issue_audit_log;
+
+-- Handoffs table
+DROP POLICY IF EXISTS "Users can view facility handoffs" ON public.handoffs;
+DROP POLICY IF EXISTS "Users can create facility handoffs" ON public.handoffs;
+DROP POLICY IF EXISTS "Users can update facility handoffs" ON public.handoffs;
+DROP POLICY IF EXISTS "Users can delete facility handoffs" ON public.handoffs;
+DROP POLICY IF EXISTS "Users can view handoffs in their hospice" ON public.handoffs;
+DROP POLICY IF EXISTS "Users can view handoffs in their facility" ON public.handoffs;
+
+-- User roles table
+DROP POLICY IF EXISTS "Users can view facility roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can insert facility roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can update facility roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can view roles in their hospice" ON public.user_roles;
+DROP POLICY IF EXISTS "Users can view roles in their facility" ON public.user_roles;
+
+-- Conversations table
+DROP POLICY IF EXISTS "Users can view their conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Users can update their conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Users can create conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Users can view conversations in their hospice" ON public.conversations;
+DROP POLICY IF EXISTS "Users can view conversations in their facility" ON public.conversations;
+
+-- Conversation participants
+DROP POLICY IF EXISTS "Users can view conversation participants" ON public.conversation_participants;
+DROP POLICY IF EXISTS "Users can add participants" ON public.conversation_participants;
+
+-- IDG tables
+DROP POLICY IF EXISTS "Users can view idg_reviews in their hospice" ON public.idg_reviews;
+DROP POLICY IF EXISTS "Users can view idg_reviews in their facility" ON public.idg_reviews;
+DROP POLICY IF EXISTS "Users can view idg_issue_status in their hospice" ON public.idg_issue_status;
+DROP POLICY IF EXISTS "Users can view idg_issue_status in their facility" ON public.idg_issue_status;
+
+-- =====================================================
+-- STEP 2: Now drop old facility-based functions (policies gone)
+-- =====================================================
+
+DROP FUNCTION IF EXISTS public.get_user_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.user_belongs_to_facility(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.set_issue_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.set_patient_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.set_issue_message_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.set_audit_log_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.set_handoff_facility_id() CASCADE;
+DROP FUNCTION IF EXISTS public.get_dashboard_metrics() CASCADE;
 
 -- Drop old triggers
 DROP TRIGGER IF EXISTS set_issue_facility_id_trigger ON public.issues;
@@ -23,7 +97,7 @@ DROP TRIGGER IF EXISTS set_audit_log_facility_id_trigger ON public.issue_audit_l
 DROP TRIGGER IF EXISTS set_handoff_facility_id_trigger ON public.handoffs;
 
 -- =====================================================
--- STEP 2: Create hospice-based helper functions
+-- STEP 3: Create hospice-based helper functions
 -- =====================================================
 
 -- Function to get current user's hospice_id (SECURITY DEFINER to bypass RLS)
@@ -49,7 +123,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =====================================================
--- STEP 3: Create hospice-based trigger functions
+-- STEP 4: Create hospice-based trigger functions
 -- =====================================================
 
 -- Auto-populate hospice_id on issues
@@ -155,81 +229,6 @@ BEGIN
         END IF;
     END IF;
 END $$;
-
--- =====================================================
--- STEP 4: Drop all old facility-based RLS policies
--- =====================================================
-
--- Users table
-DROP POLICY IF EXISTS "Users can view facility members" ON public.users;
-DROP POLICY IF EXISTS "Users can view users in their facility" ON public.users;
-DROP POLICY IF EXISTS "Users can view users in their hospice" ON public.users;
-DROP POLICY IF EXISTS "Users can view own record" ON public.users;
-DROP POLICY IF EXISTS "Users can view users in same hospice" ON public.users;
-DROP POLICY IF EXISTS "Users can view all users for joins" ON public.users;
-
--- Patients table
-DROP POLICY IF EXISTS "Users can view facility patients" ON public.patients;
-DROP POLICY IF EXISTS "Users can insert facility patients" ON public.patients;
-DROP POLICY IF EXISTS "Users can update facility patients" ON public.patients;
-DROP POLICY IF EXISTS "Users can delete facility patients" ON public.patients;
-DROP POLICY IF EXISTS "Users can view patients in their hospice" ON public.patients;
-DROP POLICY IF EXISTS "Users can view patients in their facility" ON public.patients;
-
--- Issues table
-DROP POLICY IF EXISTS "Users can view facility issues" ON public.issues;
-DROP POLICY IF EXISTS "Users can create facility issues" ON public.issues;
-DROP POLICY IF EXISTS "Users can update facility issues" ON public.issues;
-DROP POLICY IF EXISTS "Users can delete facility issues" ON public.issues;
-DROP POLICY IF EXISTS "Users can view issues in their hospice" ON public.issues;
-DROP POLICY IF EXISTS "Users can view issues in their facility" ON public.issues;
-
--- Issue messages table
-DROP POLICY IF EXISTS "Users can view facility issue messages" ON public.issue_messages;
-DROP POLICY IF EXISTS "Users can create facility issue messages" ON public.issue_messages;
-
--- Issue audit log table
-DROP POLICY IF EXISTS "Users can view facility audit log" ON public.issue_audit_log;
-DROP POLICY IF EXISTS "Users can view audit_log in their hospice" ON public.issue_audit_log;
-DROP POLICY IF EXISTS "Users can view audit_log in their facility" ON public.issue_audit_log;
-
--- Handoffs table
-DROP POLICY IF EXISTS "Users can view facility handoffs" ON public.handoffs;
-DROP POLICY IF EXISTS "Users can create facility handoffs" ON public.handoffs;
-DROP POLICY IF EXISTS "Users can update facility handoffs" ON public.handoffs;
-DROP POLICY IF EXISTS "Users can delete facility handoffs" ON public.handoffs;
-DROP POLICY IF EXISTS "Users can view handoffs in their hospice" ON public.handoffs;
-DROP POLICY IF EXISTS "Users can view handoffs in their facility" ON public.handoffs;
-
--- User roles table
-DROP POLICY IF EXISTS "Users can view facility roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Users can insert facility roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Users can update facility roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Users can view roles in their hospice" ON public.user_roles;
-DROP POLICY IF EXISTS "Users can view roles in their facility" ON public.user_roles;
-
--- Hospices table
-DROP POLICY IF EXISTS "Users can view their facility" ON public.hospices;
-DROP POLICY IF EXISTS "Users can update their facility" ON public.hospices;
-DROP POLICY IF EXISTS "Users can view their hospice" ON public.hospices;
-DROP POLICY IF EXISTS "Users can update their hospice" ON public.hospices;
-
--- Conversations table
-DROP POLICY IF EXISTS "Users can view their conversations" ON public.conversations;
-DROP POLICY IF EXISTS "Users can update their conversations" ON public.conversations;
-DROP POLICY IF EXISTS "Users can view conversations in their hospice" ON public.conversations;
-DROP POLICY IF EXISTS "Users can view conversations in their facility" ON public.conversations;
-
--- Conversation participants
-DROP POLICY IF EXISTS "Users can view conversation participants" ON public.conversation_participants;
-DROP POLICY IF EXISTS "Users can add participants" ON public.conversation_participants;
-
--- IDG tables
-DROP POLICY IF EXISTS "Users can view idg_reviews in their hospice" ON public.idg_reviews;
-DROP POLICY IF EXISTS "Users can view idg_reviews in their facility" ON public.idg_reviews;
-DROP POLICY IF EXISTS "Users can view idg_issue_status in their hospice" ON public.idg_issue_status;
-DROP POLICY IF EXISTS "Users can view idg_issue_status in their facility" ON public.idg_issue_status;
 
 -- =====================================================
 -- STEP 5: Create new hospice-based RLS policies
