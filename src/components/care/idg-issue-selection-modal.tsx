@@ -12,8 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, Clock, AlertTriangle, AlertCircle, Users, Calendar, Loader2 } from 'lucide-react';
+import { FileText, Clock, Users, Calendar, Loader2 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 
 interface IDGIssue {
@@ -73,12 +72,13 @@ export function IDGIssueSelectionModal({
       setSelectedIssueIds(new Set());
       setSelectedPatientIds(new Set());
       setShowCensus(false);
+      setAllPatients([]); // Reset cached patients so they're fresh on next census toggle
     }
   }, [open]);
 
   // Fetch all patients when census is toggled on
   useEffect(() => {
-    if (showCensus && allPatients.length === 0 && facilitySlug) {
+    if (showCensus && facilitySlug) {
       fetchAllPatients();
     }
   }, [showCensus, facilitySlug]);
@@ -140,10 +140,8 @@ export function IDGIssueSelectionModal({
   const handleSelectAll = () => {
     setSelectedIssueIds(new Set(issues.map(i => i.id)));
     if (showCensus) {
-      // Also select all patients without issues
-      const patientIdsWithIssues = new Set(issues.map(i => i.patient_id));
-      const patientsWithoutIssues = allPatients.filter(p => !patientIdsWithIssues.has(p.id));
-      setSelectedPatientIds(new Set(patientsWithoutIssues.map(p => p.id)));
+      // Select all patients when census is shown
+      setSelectedPatientIds(new Set(allPatients.map(p => p.id)));
     }
   };
 
@@ -208,7 +206,7 @@ export function IDGIssueSelectionModal({
         {/* Selection Controls */}
         <div className="flex items-center justify-between py-2 border-b">
           <div className="text-sm text-muted-foreground">
-            {issues.length} issues available{showCensus ? ` · ${allPatients.length - Object.keys(groupedByPatient).length} patients without issues` : ''} · {totalSelectedCount} selected
+            {issues.length} issues available{showCensus ? ` · ${allPatients.length} patients` : ''} · {totalSelectedCount} selected
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={handleSelectAll}>
@@ -221,7 +219,7 @@ export function IDGIssueSelectionModal({
         </div>
 
         {/* Issue List */}
-        <ScrollArea className="flex-1 -mx-6 px-6 max-h-[400px]">
+        <div className="flex-1 overflow-y-auto max-h-[400px] -mx-6 px-6">
           {issues.length === 0 && !showCensus ? (
             <div className="py-12 text-center">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
@@ -317,7 +315,7 @@ export function IDGIssueSelectionModal({
                 </div>
               ))}
 
-              {/* Patients without issues (only shown when census is toggled) */}
+              {/* All patients (shown when census is toggled) */}
               {showCensus && (
                 <>
                   {isLoadingPatients ? (
@@ -326,57 +324,59 @@ export function IDGIssueSelectionModal({
                       <p className="text-sm text-muted-foreground mt-2">Loading patients...</p>
                     </div>
                   ) : (
-                    allPatients
-                      .filter(patient => !groupedByPatient[patient.id])
-                      .map((patient) => {
-                        const daysRemaining = calculateDaysRemaining(patient);
-                        return (
-                          <div key={patient.id} className="border rounded-lg overflow-hidden">
-                            {/* Patient Header (clickable for patients without issues) */}
-                            <div
-                              className={`bg-[#FAFAF8] px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors ${
-                                selectedPatientIds.has(patient.id) ? 'bg-[#2D7A7A]/10 ring-1 ring-[#2D7A7A] ring-inset' : ''
-                              }`}
-                              onClick={() => handlePatientToggle(patient.id)}
-                            >
-                              <Checkbox
-                                checked={selectedPatientIds.has(patient.id)}
-                                onCheckedChange={() => handlePatientToggle(patient.id)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <Users className="w-4 h-4 text-[#2D7A7A]" />
-                              <span className="font-medium">{patient.first_name} {patient.last_name}</span>
-                              <span className="text-xs text-muted-foreground">MRN: {patient.mrn}</span>
+                    allPatients.map((patient) => {
+                      const daysRemaining = calculateDaysRemaining(patient);
+                      const patientIssues = groupedByPatient[patient.id];
+                      const hasIssues = !!patientIssues;
+                      const issueCount = hasIssues ? patientIssues.issues.length : 0;
 
-                              {/* Benefit Period Badge */}
-                              {patient.benefit_period && (
-                                <Badge
-                                  variant="outline"
-                                  className={`ml-2 ${
-                                    daysRemaining !== null && daysRemaining <= 14
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                      : 'bg-blue-50 text-blue-700 border-blue-200'
-                                  }`}
-                                >
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  BP{patient.benefit_period}
-                                  {daysRemaining !== null && ` · ${daysRemaining}d left`}
-                                </Badge>
-                              )}
+                      return (
+                        <div key={patient.id} className="border rounded-lg overflow-hidden">
+                          {/* Patient Header */}
+                          <div
+                            className={`bg-[#FAFAF8] px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors ${
+                              selectedPatientIds.has(patient.id) ? 'bg-[#2D7A7A]/10 ring-1 ring-[#2D7A7A] ring-inset' : ''
+                            }`}
+                            onClick={() => handlePatientToggle(patient.id)}
+                          >
+                            <Checkbox
+                              checked={selectedPatientIds.has(patient.id)}
+                              onCheckedChange={() => handlePatientToggle(patient.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <Users className="w-4 h-4 text-[#2D7A7A]" />
+                            <span className="font-medium">{patient.first_name} {patient.last_name}</span>
+                            <span className="text-xs text-muted-foreground">MRN: {patient.mrn}</span>
 
-                              <Badge variant="outline" className="ml-auto text-muted-foreground">
-                                No issues
+                            {/* Benefit Period Badge */}
+                            {patient.benefit_period && (
+                              <Badge
+                                variant="outline"
+                                className={`ml-2 ${
+                                  daysRemaining !== null && daysRemaining <= 14
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}
+                              >
+                                <Calendar className="w-3 h-3 mr-1" />
+                                BP{patient.benefit_period}
+                                {daysRemaining !== null && ` · ${daysRemaining}d left`}
                               </Badge>
-                            </div>
+                            )}
+
+                            <Badge variant="outline" className={`ml-auto ${hasIssues ? 'text-[#2D7A7A]' : 'text-muted-foreground'}`}>
+                              {hasIssues ? `${issueCount} issue${issueCount !== 1 ? 's' : ''}` : 'No issues'}
+                            </Badge>
                           </div>
-                        );
-                      })
+                        </div>
+                      );
+                    })
                   )}
                 </>
               )}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="gap-2 border-t pt-4">
           <Button
