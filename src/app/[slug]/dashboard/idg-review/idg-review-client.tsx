@@ -195,7 +195,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     setMeetingStartedAt(new Date().toISOString());
     setMeetingStarted(true);
     const totalItems = issueIds.length + patientIds.length;
-    toast.success('IDG Meeting Started', {
+    toast.success('IDG Outline Created', {
       description: `${totalItems} item${totalItems !== 1 ? 's' : ''} selected for review.`,
     });
   };
