@@ -110,11 +110,15 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [threshold, setThreshold] = useState('24');
   const [groupBy, setGroupBy] = useState<'patient' | 'issue_type'>('patient');
 
-  // Meeting workflow state
+  // Meeting workflow state - initialized from localStorage if available
   const [meetingStarted, setMeetingStarted] = useState(false);
   const [meetingStartedAt, setMeetingStartedAt] = useState<string | null>(null);
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set());
   const [isIssueSelectionModalOpen, setIsIssueSelectionModalOpen] = useState(false);
+  const [outlineLoaded, setOutlineLoaded] = useState(false);
+
+  // LocalStorage key for persisting IDG outline
+  const OUTLINE_STORAGE_KEY = `idg-outline-${slug}`;
 
   // Issue detail panel
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
@@ -150,6 +154,41 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     };
     initUser();
   }, []);
+
+  // Load IDG outline from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(OUTLINE_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.meetingStarted && parsed.selectedIssueIds?.length > 0) {
+          setMeetingStarted(true);
+          setMeetingStartedAt(parsed.meetingStartedAt);
+          setSelectedIssueIds(new Set(parsed.selectedIssueIds));
+          console.log('IDG Outline restored from localStorage:', parsed.selectedIssueIds.length, 'items');
+        }
+      }
+    } catch (e) {
+      console.error('Error loading IDG outline from localStorage:', e);
+    }
+    setOutlineLoaded(true);
+  }, [OUTLINE_STORAGE_KEY]);
+
+  // Save IDG outline to localStorage when it changes
+  useEffect(() => {
+    if (!outlineLoaded) return; // Don't save until we've loaded
+
+    if (meetingStarted && selectedIssueIds.size > 0) {
+      const toSave = {
+        meetingStarted,
+        meetingStartedAt,
+        selectedIssueIds: Array.from(selectedIssueIds),
+      };
+      localStorage.setItem(OUTLINE_STORAGE_KEY, JSON.stringify(toSave));
+    } else if (!meetingStarted) {
+      localStorage.removeItem(OUTLINE_STORAGE_KEY);
+    }
+  }, [meetingStarted, meetingStartedAt, selectedIssueIds, outlineLoaded, OUTLINE_STORAGE_KEY]);
 
   useEffect(() => {
     fetchIDGData();
@@ -200,11 +239,12 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     });
   };
 
-  // Reset meeting state
+  // Reset meeting state and clear localStorage
   const resetMeeting = () => {
     setMeetingStarted(false);
     setMeetingStartedAt(null);
     setSelectedIssueIds(new Set());
+    localStorage.removeItem(OUTLINE_STORAGE_KEY);
   };
 
   // Get issues to display based on meeting state
