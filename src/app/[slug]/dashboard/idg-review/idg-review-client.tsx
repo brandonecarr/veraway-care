@@ -114,6 +114,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [meetingStarted, setMeetingStarted] = useState(false);
   const [meetingStartedAt, setMeetingStartedAt] = useState<string | null>(null);
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set());
+  const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set()); // Census patients without issues
+  const [censusPatients, setCensusPatients] = useState<Array<{ id: string; first_name: string; last_name: string; mrn: string; benefit_period: number | null; admission_date: string | null }>>([]);
   const [isIssueSelectionModalOpen, setIsIssueSelectionModalOpen] = useState(false);
   const [outlineLoaded, setOutlineLoaded] = useState(false);
 
@@ -161,11 +163,17 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       const saved = localStorage.getItem(OUTLINE_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.meetingStarted && parsed.selectedIssueIds?.length > 0) {
+        const hasIssues = parsed.selectedIssueIds?.length > 0;
+        const hasPatients = parsed.selectedPatientIds?.length > 0;
+        if (parsed.meetingStarted && (hasIssues || hasPatients)) {
           setMeetingStarted(true);
           setMeetingStartedAt(parsed.meetingStartedAt);
-          setSelectedIssueIds(new Set(parsed.selectedIssueIds));
-          console.log('IDG Outline restored from localStorage:', parsed.selectedIssueIds.length, 'items');
+          setSelectedIssueIds(new Set(parsed.selectedIssueIds || []));
+          setSelectedPatientIds(new Set(parsed.selectedPatientIds || []));
+          if (parsed.censusPatients) {
+            setCensusPatients(parsed.censusPatients);
+          }
+          console.log('IDG Outline restored from localStorage:', parsed.selectedIssueIds?.length || 0, 'issues,', parsed.selectedPatientIds?.length || 0, 'census patients');
         }
       }
     } catch (e) {
@@ -178,17 +186,19 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   useEffect(() => {
     if (!outlineLoaded) return; // Don't save until we've loaded
 
-    if (meetingStarted && selectedIssueIds.size > 0) {
+    if (meetingStarted && (selectedIssueIds.size > 0 || selectedPatientIds.size > 0)) {
       const toSave = {
         meetingStarted,
         meetingStartedAt,
         selectedIssueIds: Array.from(selectedIssueIds),
+        selectedPatientIds: Array.from(selectedPatientIds),
+        censusPatients,
       };
       localStorage.setItem(OUTLINE_STORAGE_KEY, JSON.stringify(toSave));
     } else if (!meetingStarted) {
       localStorage.removeItem(OUTLINE_STORAGE_KEY);
     }
-  }, [meetingStarted, meetingStartedAt, selectedIssueIds, outlineLoaded, OUTLINE_STORAGE_KEY]);
+  }, [meetingStarted, meetingStartedAt, selectedIssueIds, selectedPatientIds, censusPatients, outlineLoaded, OUTLINE_STORAGE_KEY]);
 
   useEffect(() => {
     fetchIDGData();
@@ -229,10 +239,28 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   };
 
   // Handle starting the IDG meeting
-  const handleStartMeeting = (issueIds: string[], patientIds: string[]) => {
+  const handleStartMeeting = async (issueIds: string[], patientIds: string[]) => {
     setSelectedIssueIds(new Set(issueIds));
+    setSelectedPatientIds(new Set(patientIds));
     setMeetingStartedAt(new Date().toISOString());
     setMeetingStarted(true);
+
+    // Fetch census patient data if any patients were selected
+    if (patientIds.length > 0) {
+      try {
+        const response = await fetch(`/api/patients?status=active`);
+        if (response.ok) {
+          const result = await response.json();
+          const patients = result.data || [];
+          // Filter to only selected patients
+          const selectedCensusPatients = patients.filter((p: any) => patientIds.includes(p.id));
+          setCensusPatients(selectedCensusPatients);
+        }
+      } catch (error) {
+        console.error('Failed to fetch census patients:', error);
+      }
+    }
+
     const totalItems = issueIds.length + patientIds.length;
     toast.success('IDG Outline Created', {
       description: `${totalItems} item${totalItems !== 1 ? 's' : ''} selected for review.`,
@@ -244,6 +272,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     setMeetingStarted(false);
     setMeetingStartedAt(null);
     setSelectedIssueIds(new Set());
+    setSelectedPatientIds(new Set());
+    setCensusPatients([]);
     localStorage.removeItem(OUTLINE_STORAGE_KEY);
   };
 
@@ -610,7 +640,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
               )}
             </div>
           </Card>
-        ) : (
+        ) : displayedIssues.length > 0 ? (
           <IDGIssueList
             issues={displayedIssues}
             grouped={displayedGrouped}
@@ -620,6 +650,53 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             onDispositionChange={handleDispositionChange}
             dispositions={dispositions}
           />
+        ) : null}
+
+        {/* Census Patients (patients without issues selected from census) */}
+        {meetingStarted && censusPatients.length > 0 && (
+          <Card className="p-4 md:p-6 bg-white border-[#D4D4D4]">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg bg-teal-100">
+                <Users className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                  Census Patients
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {censusPatients.length} patient{censusPatients.length !== 1 ? 's' : ''} selected from census (no active issues)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {censusPatients.map((patient) => (
+                <div
+                  key={patient.id}
+                  className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-medium text-[#1A1A1A]">
+                        {patient.first_name} {patient.last_name}
+                      </p>
+                      <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {patient.benefit_period && (
+                      <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
+                        BP{patient.benefit_period}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                      No active issues
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
 
         {/* Expiring Benefit Periods */}
