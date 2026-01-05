@@ -1,11 +1,11 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Issue } from "@/types/care-coordination";
+import { Issue, TIMESTAMPED_ISSUE_TYPES } from "@/types/care-coordination";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, MessageSquare, CheckCircle } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Clock, User, MessageSquare, CheckCircle, Calendar, FileText, Heart } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
@@ -120,6 +120,53 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
             <p className="text-body text-muted-foreground line-clamp-2 mt-1 min-h-[2.5rem]">
               {issue.description || '\u00A0'}
             </p>
+
+            {/* Death/Discharge Details */}
+            {TIMESTAMPED_ISSUE_TYPES.includes(issue.issue_type as any) && (
+              <div className="mt-3 p-2 bg-muted/50 rounded-md space-y-1.5 text-xs">
+                {/* Date/Time */}
+                {(issue.issue_type === 'Death' && issue.patient?.death_date) && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="w-3 h-3 shrink-0" />
+                    <span className="font-medium text-foreground">Date of Death:</span>
+                    <span>{format(new Date(issue.patient.death_date), 'MMM d, yyyy h:mm a')}</span>
+                  </div>
+                )}
+                {(issue.issue_type === 'Discharged' && issue.patient?.discharge_date) && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="w-3 h-3 shrink-0" />
+                    <span className="font-medium text-foreground">Discharge Date:</span>
+                    <span>{format(new Date(issue.patient.discharge_date), 'MMM d, yyyy h:mm a')}</span>
+                  </div>
+                )}
+                {/* Cause/Reason */}
+                {issue.issue_type === 'Death' && issue.patient?.cause_of_death && (
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <FileText className="w-3 h-3 shrink-0 mt-0.5" />
+                    <span className="font-medium text-foreground shrink-0">Cause:</span>
+                    <span className="line-clamp-2">{issue.patient.cause_of_death}</span>
+                  </div>
+                )}
+                {/* Bereavement Status */}
+                {issue.issue_type === 'Death' && issue.patient?.bereavement_status && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Heart className="w-3 h-3 shrink-0" />
+                    <span className="font-medium text-foreground">Bereavement:</span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] py-0 h-5",
+                        issue.patient.bereavement_status === 'Education Provided'
+                          ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                          : 'bg-amber-100 text-amber-700 border-amber-300'
+                      )}
+                    >
+                      {issue.patient.bereavement_status}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <Badge
             variant={isOverdue() ? "destructive" : "outline"}
