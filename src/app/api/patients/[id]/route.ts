@@ -47,7 +47,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -61,6 +61,9 @@ export async function PUT(
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
     if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
+    if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
+    if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
+    if (residence_type !== undefined) updateData.residence_type = residence_type;
 
     const { data, error } = await supabase
       .from('patients')
@@ -109,7 +112,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -123,6 +126,9 @@ export async function PATCH(
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
     if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
+    if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
+    if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
+    if (residence_type !== undefined) updateData.residence_type = residence_type;
 
     const { data, error } = await supabase
       .from('patients')

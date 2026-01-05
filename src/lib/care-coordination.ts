@@ -126,7 +126,7 @@ export async function getPatients(filters?: {
 
   let query = supabase
     .from('patients')
-    .select('*', { count: 'exact' })
+    .select('*, rn_case_manager:users!patients_rn_case_manager_id_fkey(id, name, email)', { count: 'exact' })
     .order('last_name', { ascending: true });
 
   // Filter by status if provided
@@ -146,6 +146,29 @@ export async function getPatients(filters?: {
   const { data, error, count } = await query;
 
   if (error) throw error;
+
+  // Add job_role from user_roles if we have rn_case_manager data
+  if (data && data.length > 0) {
+    const managerIds = data
+      .filter((p: any) => p.rn_case_manager?.id)
+      .map((p: any) => p.rn_case_manager.id);
+
+    if (managerIds.length > 0) {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, job_role')
+        .in('user_id', managerIds);
+
+      const roleMap = new Map(roles?.map(r => [r.user_id, r.job_role]) || []);
+
+      data.forEach((patient: any) => {
+        if (patient.rn_case_manager?.id) {
+          patient.rn_case_manager.job_role = roleMap.get(patient.rn_case_manager.id) || null;
+        }
+      });
+    }
+  }
+
   return { data: data as Patient[], count };
 }
 
