@@ -13,20 +13,29 @@ export async function getUserHospiceSlug(): Promise<string | null> {
     return null;
   }
 
-  const { data, error } = await supabase
+  // First get user's hospice_id
+  const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('hospice_id, hospices(slug)')
+    .select('hospice_id')
     .eq('id', user.id)
     .single();
 
-  if (error || !data?.hospices) {
+  if (userError || !userData?.hospice_id) {
     return null;
   }
 
-  // hospices is returned as an array by Supabase, get the first element
-  const hospice = Array.isArray(data.hospices) ? data.hospices[0] : data.hospices;
+  // Then get hospice slug separately to avoid RLS join issues
+  const { data: hospiceData, error: hospiceError } = await supabase
+    .from('hospices')
+    .select('slug')
+    .eq('id', userData.hospice_id)
+    .single();
 
-  return hospice?.slug || null;
+  if (hospiceError || !hospiceData?.slug) {
+    return null;
+  }
+
+  return hospiceData.slug;
 }
 
 /**
@@ -45,27 +54,32 @@ export async function getUserHospice(): Promise<{
     return null;
   }
 
-  const { data, error } = await supabase
+  // First get user's hospice_id
+  const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('hospice_id, hospices(id, slug, name)')
+    .select('hospice_id')
     .eq('id', user.id)
     .single();
 
-  if (error || !data?.hospices) {
+  if (userError || !userData?.hospice_id) {
     return null;
   }
 
-  // hospices is returned as an array by Supabase, get the first element
-  const hospice = Array.isArray(data.hospices) ? data.hospices[0] : data.hospices;
+  // Then get hospice data separately to avoid RLS join issues
+  const { data: hospiceData, error: hospiceError } = await supabase
+    .from('hospices')
+    .select('id, slug, name')
+    .eq('id', userData.hospice_id)
+    .single();
 
-  if (!hospice?.id || !hospice?.slug || !hospice?.name) {
+  if (hospiceError || !hospiceData?.id || !hospiceData?.slug || !hospiceData?.name) {
     return null;
   }
 
   return {
-    id: hospice.id,
-    slug: hospice.slug,
-    name: hospice.name,
+    id: hospiceData.id,
+    slug: hospiceData.slug,
+    name: hospiceData.name,
   };
 }
 

@@ -68,19 +68,52 @@ export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     try {
+      // If user is on /onboarding, check if they've already completed onboarding
+      if (pathname === '/onboarding') {
+        const { data: rpcData, error: userError } = await supabase
+          .rpc('get_user_for_middleware', { p_user_id: user.id })
+          .maybeSingle();
+
+        console.log('Middleware: Onboarding page - RPC result:', { rpcData, userError, userId: user.id });
+
+        const userData = rpcData as { hospice_id: string; onboarding_completed_at: string } | null;
+
+        if (!userError && userData?.onboarding_completed_at && userData?.hospice_id) {
+          // User has completed onboarding, get their hospice slug and redirect to dashboard
+          const { data: slugData } = await supabase
+            .rpc('get_hospice_slug', { p_hospice_id: userData.hospice_id })
+            .maybeSingle();
+
+          const hospiceSlug = slugData as string | null;
+          console.log('Middleware: User already onboarded, redirecting to dashboard. Slug:', hospiceSlug);
+
+          if (hospiceSlug) {
+            return NextResponse.redirect(new URL(`/${hospiceSlug}/dashboard`, request.url));
+          } else {
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+          }
+        }
+      }
+
       // If user is accessing /dashboard without a slug, redirect to hospice-specific URL
       if (pathname.startsWith('/dashboard')) {
-        // Get user's hospice slug and onboarding status - use maybeSingle to avoid errors if no row exists
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('hospice_id, onboarding_completed_at, hospices(slug)')
-          .eq('id', user.id)
+        // Use RPC function to bypass RLS issues
+        const { data: rpcData, error: userError } = await supabase
+          .rpc('get_user_for_middleware', { p_user_id: user.id })
           .maybeSingle();
+
+        console.log('Middleware: RPC result for get_user_for_middleware:', { rpcData, userError, userId: user.id });
+
+        const userData = rpcData as { hospice_id: string; onboarding_completed_at: string } | null;
 
         if (userError) {
           console.error('Middleware: Error fetching user data:', userError);
           // Don't block user, let them through to handle error in the page
           return response;
+        }
+
+        if (!userData) {
+          console.error('Middleware: No user data returned from RPC for user:', user.id);
         }
 
         // Check if user is an admin - use maybeSingle to avoid errors if no role exists
@@ -105,14 +138,17 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/onboarding', request.url));
         }
 
-        if (userData?.hospices) {
-          const hospice = Array.isArray(userData.hospices)
-            ? userData.hospices[0]
-            : userData.hospices;
+        // Use RPC function to get hospice slug
+        if (userData?.hospice_id) {
+          const { data: slugData } = await supabase
+            .rpc('get_hospice_slug', { p_hospice_id: userData.hospice_id })
+            .maybeSingle();
 
-          if (hospice?.slug) {
+          const hospiceSlug = slugData as string | null;
+
+          if (hospiceSlug) {
             // Redirect to hospice-specific URL
-            const newPath = pathname.replace('/dashboard', `/${hospice.slug}/dashboard`);
+            const newPath = pathname.replace('/dashboard', `/${hospiceSlug}/dashboard`);
             return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
           }
         }
@@ -126,12 +162,12 @@ export async function middleware(request: NextRequest) {
       if (slugMatch) {
         const slug = slugMatch[1];
 
-        // Get user's hospice slug and onboarding status to verify - use maybeSingle
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('hospice_id, onboarding_completed_at, hospices(slug)')
-          .eq('id', user.id)
+        // Use RPC function to bypass RLS issues
+        const { data: rpcData, error: userError } = await supabase
+          .rpc('get_user_for_middleware', { p_user_id: user.id })
           .maybeSingle();
+
+        const userData = rpcData as { hospice_id: string; onboarding_completed_at: string } | null;
 
         if (userError) {
           console.error('Middleware: Error fetching user data for slug verification:', userError);
@@ -144,15 +180,18 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL('/onboarding', request.url));
         }
 
-        if (userData?.hospices) {
-          const hospice = Array.isArray(userData.hospices)
-            ? userData.hospices[0]
-            : userData.hospices;
+        // Use RPC function to get hospice slug
+        if (userData?.hospice_id) {
+          const { data: slugData } = await supabase
+            .rpc('get_hospice_slug', { p_hospice_id: userData.hospice_id })
+            .maybeSingle();
+
+          const hospiceSlug = slugData as string | null;
 
           // Verify slug matches user's hospice
-          if (hospice?.slug && hospice.slug !== slug) {
+          if (hospiceSlug && hospiceSlug !== slug) {
             // Redirect to correct hospice slug
-            const newPath = pathname.replace(`/${slug}/`, `/${hospice.slug}/`);
+            const newPath = pathname.replace(`/${slug}/`, `/${hospiceSlug}/`);
             return NextResponse.redirect(new URL(newPath + request.nextUrl.search, request.url));
           }
         }

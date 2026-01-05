@@ -93,30 +93,16 @@ export default function OnboardingPage() {
     setUserEmail(user.email || '');
     setUserName(user.user_metadata?.name || user.user_metadata?.full_name || '');
 
-    // Fetch user's hospice information with contact details and onboarding status
+    // Fetch user's data and hospice information separately to avoid RLS join issues
     try {
+      // First get user data without hospice join
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select(`
-          name,
-          hospice_id,
-          onboarding_completed_at,
-          hospices(
-            id,
-            name,
-            slug,
-            subscription_tier,
-            address_line1,
-            address_line2,
-            city,
-            state,
-            zip_code,
-            phone,
-            email
-          )
-        `)
+        .select('name, hospice_id, onboarding_completed_at')
         .eq('id', user.id)
         .single();
+
+      console.log('Onboarding: User data query result:', { userData, userError, userId: user.id });
 
       if (userError) {
         console.error('Error fetching user data:', userError);
@@ -127,21 +113,34 @@ export default function OnboardingPage() {
         setUserName(userData.name);
       }
 
+      // Fetch hospice data separately
+      let hospiceData: HospiceInfo | null = null;
+      if (userData?.hospice_id) {
+        const { data: fetchedHospice, error: hospiceError } = await supabase
+          .from('hospices')
+          .select('id, name, slug, subscription_tier, address_line1, address_line2, city, state, zip_code, phone, email')
+          .eq('id', userData.hospice_id)
+          .single();
+
+        console.log('Onboarding: Hospice data query result:', { fetchedHospice, hospiceError });
+        if (hospiceError) {
+          console.error('Error fetching hospice data:', hospiceError);
+        } else {
+          hospiceData = fetchedHospice as HospiceInfo;
+        }
+      }
+
+      console.log('Onboarding: Checking redirect - onboarding_completed_at:', userData?.onboarding_completed_at, 'hospiceData:', hospiceData);
+
       // If onboarding is already completed, redirect to dashboard
-      if (userData?.onboarding_completed_at && userData?.hospices) {
-        const hospiceData = Array.isArray(userData.hospices)
-          ? userData.hospices[0]
-          : userData.hospices;
+      if (userData?.onboarding_completed_at && hospiceData) {
         const dashboardUrl = hospiceData?.slug ? `/${hospiceData.slug}/dashboard` : '/dashboard';
         router.push(dashboardUrl);
         return;
       }
 
-      if (userData?.hospices) {
-        const hospiceData = Array.isArray(userData.hospices)
-          ? userData.hospices[0]
-          : userData.hospices;
-        setHospice(hospiceData as HospiceInfo);
+      if (hospiceData) {
+        setHospice(hospiceData);
 
         // Pre-fill hospice form with existing data
         setHospiceForm({
