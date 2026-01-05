@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Download, Filter, Search, X, FileText, Printer, ExternalLink } from 'lucide-react';
@@ -659,8 +659,9 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       </Card>
 
       {/* Audit Table */}
-      <Card className="border-[#D4D4D4]">
-        <ScrollArea className="h-[600px]">
+      <Card className="border-[#D4D4D4] overflow-hidden">
+        <ScrollArea className="h-[600px] w-full">
+          <div className="min-w-[800px]">
           <Table>
             <TableHeader>
               <TableRow className="border-brand-border">
@@ -801,6 +802,8 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
               )}
             </TableBody>
           </Table>
+          </div>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </Card>
 
