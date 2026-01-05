@@ -119,8 +119,8 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
             </h3>
             {/* For Death/Discharge: show event details instead of description */}
             {TIMESTAMPED_ISSUE_TYPES.includes(issue.issue_type as any) ? (
-              <div className="mt-1 min-h-[2.5rem] text-body text-muted-foreground">
-                {/* First line: Date and cause/reason */}
+              <div className="mt-1 h-[2.5rem] text-body text-muted-foreground overflow-hidden">
+                {/* Single line: Date, cause, and bereavement inline */}
                 <p className="line-clamp-1">
                   {issue.issue_type === 'Death' && issue.patient?.death_date && (
                     <span>{format(new Date(issue.patient.death_date), 'MMM d, yyyy h:mm a')}</span>
@@ -134,12 +134,12 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
                 </p>
                 {/* Second line: Bereavement status for Death */}
                 {issue.issue_type === 'Death' && issue.patient?.bereavement_status && (
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Heart className="w-3 h-3 text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Heart className="w-3 h-3 shrink-0" />
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-[10px] py-0 h-5",
+                        "text-[10px] py-0 h-4",
                         issue.patient.bereavement_status === 'Education Provided'
                           ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
                           : 'bg-amber-100 text-amber-700 border-amber-300'
@@ -151,7 +151,7 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
                 )}
               </div>
             ) : (
-              <p className="text-body text-muted-foreground line-clamp-2 mt-1 min-h-[2.5rem]">
+              <p className="text-body text-muted-foreground line-clamp-2 mt-1 h-[2.5rem]">
                 {issue.description || '\u00A0'}
               </p>
             )}
