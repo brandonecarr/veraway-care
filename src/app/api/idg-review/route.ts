@@ -36,6 +36,36 @@ const IDG_DISPOSITIONS = [
   { value: 'resolved', label: 'Resolved' }
 ];
 
+// Helper function to format patient data for PDF export
+function formatPatientForPDF(patient: any) {
+  const admittedDate = patient.admitted_date || patient.admission_date;
+  let daysRemaining: number | null = null;
+
+  if (admittedDate && patient.benefit_period) {
+    const admitted = new Date(admittedDate);
+    const daysInPeriod = patient.benefit_period <= 2 ? 90 : 60;
+    const endDate = new Date(admitted.getTime() + daysInPeriod * 24 * 60 * 60 * 1000);
+    daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
+  return {
+    id: patient.id,
+    first_name: patient.first_name,
+    last_name: patient.last_name,
+    mrn: patient.mrn,
+    date_of_birth: patient.date_of_birth,
+    diagnosis: patient.diagnosis,
+    level_of_care: patient.level_of_care,
+    residence_type: patient.residence_type,
+    benefit_period: patient.benefit_period,
+    admission_date: admittedDate,
+    discharge_date: patient.discharge_date,
+    death_date: patient.death_date,
+    rn_case_manager: patient.rn_case_manager || null,
+    days_remaining: daysRemaining
+  };
+}
+
 interface IDGIssue {
   id: string;
   issue_number: number;
@@ -79,6 +109,17 @@ export async function GET(request: Request) {
       .select('hospice_id')
       .eq('id', user.id)
       .single();
+
+    // Get hospice name
+    let hospiceName = '';
+    if (userData?.hospice_id) {
+      const { data: hospiceData } = await supabase
+        .from('hospices')
+        .select('name')
+        .eq('id', userData.hospice_id)
+        .single();
+      hospiceName = hospiceData?.name || '';
+    }
 
     // Check if user is coordinator
     const { data: roleData } = await supabase
@@ -204,41 +245,55 @@ export async function GET(request: Request) {
     // Group issues
     const grouped = groupIssues(idgIssues, groupBy);
 
-    // Get patient counts for the new summary stats
+    // Define patient select fields for PDF export
+    const patientSelectFields = `
+      id, first_name, last_name, mrn, date_of_birth, diagnosis,
+      level_of_care, residence_type, benefit_period, admitted_date, admission_date,
+      discharge_date, death_date, rn_case_manager_id,
+      rn_case_manager:users!patients_rn_case_manager_id_fkey(id, name, job_role)
+    `;
+
+    // Get patient data for the summary stats and PDF export
     let totalActivePatients = 0;
     let admissionsCount = 0;
     let dischargesCount = 0;
     let deathsCount = 0;
+    let admissionsPatients: any[] = [];
+    let dischargesPatients: any[] = [];
+    let censusPatients: any[] = [];
 
     if (userData?.hospice_id) {
-      // Get total active patients
-      const { count: activeCount } = await supabase
+      // Get all active patients (for census and counts)
+      const { data: activePatients, count: activeCount } = await supabase
         .from('patients')
-        .select('*', { count: 'exact', head: true })
+        .select(patientSelectFields, { count: 'exact' })
         .eq('hospice_id', userData.hospice_id)
         .eq('status', 'active');
 
       totalActivePatients = activeCount || 0;
+      censusPatients = (activePatients || []).map(p => formatPatientForPDF(p));
 
       // Get admissions in date range (using admitted_date)
-      const { count: admissions } = await supabase
+      const { data: admissions } = await supabase
         .from('patients')
-        .select('*', { count: 'exact', head: true })
+        .select(patientSelectFields)
         .eq('hospice_id', userData.hospice_id)
         .gte('admitted_date', fromDate)
         .lte('admitted_date', toDate);
 
-      admissionsCount = admissions || 0;
+      admissionsPatients = (admissions || []).map(p => formatPatientForPDF(p));
+      admissionsCount = admissionsPatients.length;
 
       // Get discharges in date range (using discharge_date)
-      const { count: discharges } = await supabase
+      const { data: discharges } = await supabase
         .from('patients')
-        .select('*', { count: 'exact', head: true })
+        .select(patientSelectFields)
         .eq('hospice_id', userData.hospice_id)
         .gte('discharge_date', fromDate)
         .lte('discharge_date', toDate);
 
-      dischargesCount = discharges || 0;
+      dischargesPatients = (discharges || []).map(p => formatPatientForPDF(p));
+      dischargesCount = dischargesPatients.length;
 
       // Get deaths in date range (using death_date)
       const { count: deaths } = await supabase
@@ -254,10 +309,10 @@ export async function GET(request: Request) {
     // Get patients with benefit periods expiring within 14 days
     let expiringBenefitPeriods: any[] = [];
     if (userData?.hospice_id) {
-      // Get active patients with benefit period and admitted_date
+      // Get active patients with benefit period and admitted_date (with full data for PDF)
       const { data: patientsData } = await supabase
         .from('patients')
-        .select('id, first_name, last_name, mrn, admitted_date, benefit_period')
+        .select(patientSelectFields)
         .eq('hospice_id', userData.hospice_id)
         .eq('status', 'active')
         .not('admitted_date', 'is', null)
@@ -274,10 +329,10 @@ export async function GET(request: Request) {
             const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
 
             return {
+              ...formatPatientForPDF(patient),
               patient_id: patient.id,
               patient_name: `${patient.first_name} ${patient.last_name}`,
               patient_mrn: patient.mrn,
-              benefit_period: patient.benefit_period,
               days_remaining: daysRemaining,
               end_date: endDate.toISOString()
             };
@@ -348,7 +403,13 @@ export async function GET(request: Request) {
       previousReview,
       disciplines: IDG_DISCIPLINES,
       dispositions: IDG_DISPOSITIONS,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      // PDF export data
+      hospiceName,
+      admissionsPatients,
+      dischargesPatients,
+      censusPatients,
+      totalCensusCount: totalActivePatients
     });
   } catch (error) {
     console.error('IDG Review API error:', error);
