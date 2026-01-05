@@ -84,6 +84,7 @@ export async function createIssue(issue: {
   priority?: string;
   tags?: string[];
   assigned_to?: string;
+  event_reason?: string | null;
 }) {
   const supabase = await createClient();
 

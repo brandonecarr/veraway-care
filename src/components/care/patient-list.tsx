@@ -748,6 +748,32 @@ function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: () => vo
               <p className="font-medium">{patient.residence_type}</p>
             </div>
           )}
+          {patient.death_date && (
+            <div>
+              <p className="text-[#666] mb-1">Date of Death</p>
+              <p className="font-medium">{new Date(patient.death_date).toLocaleDateString()}</p>
+            </div>
+          )}
+          {patient.cause_of_death && (
+            <div>
+              <p className="text-[#666] mb-1">Cause of Death</p>
+              <p className="font-medium">{patient.cause_of_death}</p>
+            </div>
+          )}
+          {patient.bereavement_status && (
+            <div>
+              <p className="text-[#666] mb-1">Bereavement Status</p>
+              <Badge
+                variant="outline"
+                className={patient.bereavement_status === 'Education Provided'
+                  ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                  : 'bg-amber-100 text-amber-700 border-amber-300'
+                }
+              >
+                {patient.bereavement_status}
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
 

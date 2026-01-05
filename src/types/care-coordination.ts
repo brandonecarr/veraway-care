@@ -15,6 +15,8 @@ export interface Patient {
   admitted_date?: string;
   discharge_date?: string;
   death_date?: string;
+  cause_of_death?: string;
+  bereavement_status?: string;
   benefit_period?: number;
   level_of_care?: string;
   rn_case_manager_id?: string;
@@ -23,6 +25,12 @@ export interface Patient {
   created_at: string;
   updated_at: string;
 }
+
+// Bereavement status options
+export const BEREAVEMENT_STATUSES = [
+  'Education Provided',
+  'Education Not Yet Provided',
+] as const;
 
 // Level of Care options
 export const LEVELS_OF_CARE = [
@@ -70,6 +78,7 @@ export interface Issue {
   resolved_at?: string;
   resolved_by?: string;
   last_activity_at?: string;
+  event_reason?: string;
   created_at: string;
   updated_at: string;
   patient?: Patient;

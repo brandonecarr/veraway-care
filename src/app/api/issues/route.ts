@@ -60,19 +60,35 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { event_timestamp, ...issueData } = body;
+    const { event_timestamp, event_reason, bereavement_status, ...issueData } = body;
 
     const issue = await createIssue({
       ...issueData,
+      event_reason,
       reported_by: user.id
     });
 
     // If this is an Admitted, Discharged, or Death issue, update the patient record
     const patientDateColumn = PATIENT_DATE_ISSUE_TYPES[issueData.issue_type];
     if (patientDateColumn && event_timestamp && issueData.patient_id) {
+      // Build update object with date and optional death-related fields
+      const patientUpdate: Record<string, any> = {
+        [patientDateColumn]: event_timestamp
+      };
+
+      // For Death issues, also save cause_of_death and bereavement_status
+      if (issueData.issue_type === 'Death') {
+        if (event_reason) {
+          patientUpdate.cause_of_death = event_reason;
+        }
+        if (bereavement_status) {
+          patientUpdate.bereavement_status = bereavement_status;
+        }
+      }
+
       const { error: patientUpdateError } = await supabase
         .from('patients')
-        .update({ [patientDateColumn]: event_timestamp })
+        .update(patientUpdate)
         .eq('id', issueData.patient_id);
 
       if (patientUpdateError) {
