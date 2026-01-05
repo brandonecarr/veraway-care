@@ -86,19 +86,19 @@ export function QuickReportModal({ userId, userRole = 'clinician', onSuccess, on
       ) : (
         /* Desktop: Use Dialog */
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="text-2xl font-semibold">Quick Report</DialogTitle>
               <p className="text-sm text-[#666] mt-1">Create a new issue in under 60 seconds</p>
             </DialogHeader>
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
               <QuickReportForm
                 userId={userId}
                 userRole={userRole}
                 onSuccess={handleSuccess}
                 onCancel={() => setIsOpen(false)}
               />
-            </ScrollArea>
+            </div>
           </DialogContent>
         </Dialog>
       )}
