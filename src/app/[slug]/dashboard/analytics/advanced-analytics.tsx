@@ -6,6 +6,7 @@ import { ResolutionVelocity } from '@/components/care/resolution-velocity';
 import { ClinicianWorkloadHeatmap } from '@/components/care/clinician-workload-heatmap';
 import { IssueTypeDistribution } from '@/components/care/issue-type-distribution';
 import { AnalyticsExport } from '@/components/care/analytics-export';
+import { ReportGenerator } from '@/components/care/report-generator';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, BarChart3, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -42,6 +43,34 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
   const [isLoading, setIsLoading] = useState(true);
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(new Date());
+  const [issues, setIssues] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
+
+  // Fetch issues and metrics for report generation
+  useEffect(() => {
+    const fetchIssuesAndMetrics = async () => {
+      try {
+        const [issuesRes, metricsRes] = await Promise.all([
+          fetch('/api/issues?includeResolved=true'),
+          fetch('/api/metrics')
+        ]);
+
+        if (issuesRes.ok) {
+          const issuesData = await issuesRes.json();
+          setIssues(Array.isArray(issuesData) ? issuesData : []);
+        }
+
+        if (metricsRes.ok) {
+          const metricsData = await metricsRes.json();
+          setMetrics(metricsData);
+        }
+      } catch (error) {
+        console.error('Error fetching issues and metrics:', error);
+      }
+    };
+
+    fetchIssuesAndMetrics();
+  }, []);
 
   useEffect(() => {
     if (period !== 'custom') {
@@ -204,6 +233,7 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
             </div>
             <Skeleton className="h-[500px]" />
             <Skeleton className="h-[400px]" />
+            <Skeleton className="h-[350px]" />
           </div>
         ) : analyticsData ? (
           <>
@@ -234,11 +264,19 @@ export default function AdvancedAnalytics({ userId, slug }: AdvancedAnalyticsPro
             </div>
 
             {/* Row 3: Issue Type Distribution */}
-            <div 
+            <div
               className="animate-in fade-in slide-in-from-bottom-4 duration-500"
               style={{ animationDelay: '300ms' }}
             >
               <IssueTypeDistribution data={analyticsData.issueTypeDistribution || []} />
+            </div>
+
+            {/* Row 4: Report Generator */}
+            <div
+              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: '400ms' }}
+            >
+              <ReportGenerator issues={issues} metrics={metrics || {}} />
             </div>
           </>
         ) : (

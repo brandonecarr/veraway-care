@@ -12,7 +12,6 @@ import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
 import { AfterShiftReportModal } from './after-shift-report-modal';
 import { AfterShiftReportBanner } from './after-shift-report-banner';
-import { ReportGenerator } from './report-generator';
 import { IssueCard } from './issue-card';
 import { ConnectionStatus } from './connection-status';
 import { IssueCardSkeleton, MetricCardSkeleton, ChartSkeleton } from './loading-skeletons';
@@ -619,29 +618,20 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
               />
             </div>
 
-            {/* Clinician Responsiveness or Report Generator */}
-            {userRole === 'coordinator' && metrics.clinicianResponsiveness && metrics.clinicianResponsiveness.length > 0 ? (
-              <div 
-                className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-                style={{ animationDelay: '600ms' }}
-              >
-                <ClinicianResponsiveness
-                  data={metrics.clinicianResponsiveness}
-                  onClinicianClick={(userId) => {
-                    setFilter('all');
-                    setTypeFilter(null);
-                    // Could add clinician-specific filtering here
-                  }}
-                />
-              </div>
-            ) : (
-              <div 
-                className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-                style={{ animationDelay: '600ms' }}
-              >
-                <ReportGenerator issues={issues} metrics={metrics} />
-              </div>
-            )}
+            {/* Team Responsiveness - Always shown for all user roles */}
+            <div
+              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: '600ms' }}
+            >
+              <ClinicianResponsiveness
+                data={metrics.clinicianResponsiveness || []}
+                onClinicianClick={(userId) => {
+                  setFilter('all');
+                  setTypeFilter(null);
+                  // Could add clinician-specific filtering here
+                }}
+              />
+            </div>
           </div>
           </ErrorBoundary>
         )}
