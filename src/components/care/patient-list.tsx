@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -38,10 +39,28 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'mrn' | 'admission'>('name');
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     fetchPatients();
   }, []);
+
+  // Handle patient query parameter to auto-open patient detail
+  useEffect(() => {
+    const patientId = searchParams.get('patient');
+    if (patientId && patients.length > 0) {
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        setSelectedPatient(patient);
+        setShowDetailDialog(true);
+        // Clear the query parameter from the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('patient');
+        router.replace(url.pathname, { scroll: false });
+      }
+    }
+  }, [searchParams, patients, router]);
 
   const fetchPatients = async () => {
     setIsLoading(true);

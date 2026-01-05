@@ -66,6 +66,18 @@ export function NotificationCenter() {
       return;
     }
 
+    // Handle patient notifications - navigate to patients page with patient detail
+    if (notification.type === 'new_patient' || notification.type === 'patient_update') {
+      const patientId = notification.related_patient_id || notification.metadata?.patient_id;
+      if (patientId) {
+        router.push(`${basePath}/patients?patient=${patientId}`);
+        return;
+      }
+      // Fallback to patients page if no patient ID
+      router.push(`${basePath}/patients`);
+      return;
+    }
+
     // Handle issue-related notifications - navigate and open issue detail panel
     if (notification.related_issue_id) {
       router.push(`${basePath}?issue=${notification.related_issue_id}`);
@@ -75,6 +87,7 @@ export function NotificationCenter() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'assignment':
+      case 'issue_assigned':
         return '👤';
       case 'message':
         return '💬';
@@ -84,6 +97,16 @@ export function NotificationCenter() {
         return '🔔';
       case 'overdue':
         return '⚠️';
+      case 'new_patient':
+        return '🏥';
+      case 'patient_update':
+        return '📝';
+      case 'new_issue':
+        return '🚨';
+      case 'issue_update':
+        return '💬';
+      case 'issue_resolved':
+        return '✅';
       default:
         return '📋';
     }

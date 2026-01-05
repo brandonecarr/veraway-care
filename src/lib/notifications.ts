@@ -85,6 +85,7 @@ export async function sendHospiceNotification(
       title: payload.title,
       message: payload.message,
       related_issue_id: payload.relatedIssueId || null,
+      related_patient_id: payload.relatedPatientId || null,
       metadata: {
         ...payload.metadata,
         sender_id: payload.senderId,
