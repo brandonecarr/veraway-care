@@ -15,7 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle, Calendar as CalendarIcon, ClipboardList, ChevronDown, ChevronRight, Archive, Trash2 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { IDGSummaryStats } from '@/components/care/idg-summary-stats';
 import { IDGIssueList } from '@/components/care/idg-issue-list';
@@ -380,6 +380,21 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       }
       return next;
     });
+  };
+
+  // Calculate days remaining in benefit period
+  const calculateDaysRemaining = (patient: CensusPatient): number | null => {
+    if (!patient.benefit_period || !patient.admission_date) return null;
+
+    const admissionDate = new Date(patient.admission_date);
+    const today = new Date();
+    const daysSinceAdmission = differenceInDays(today, admissionDate);
+
+    // BP1-2: 90 days, BP3+: 60 days
+    const periodLength = patient.benefit_period <= 2 ? 90 : 60;
+    const daysRemaining = periodLength - daysSinceAdmission;
+
+    return Math.max(0, daysRemaining);
   };
 
   // Get issues to display based on meeting state
@@ -829,31 +844,43 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
                     </div>
 
                     <div className="space-y-3">
-                      {censusPatients.map((patient) => (
-                        <div
-                          key={patient.id}
-                          className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium text-[#1A1A1A]">
-                                {patient.first_name} {patient.last_name}
-                              </p>
-                              <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                      {censusPatients.map((patient) => {
+                        const daysRemaining = calculateDaysRemaining(patient);
+                        return (
+                          <div
+                            key={patient.id}
+                            className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <p className="font-medium text-[#1A1A1A]">
+                                  {patient.first_name} {patient.last_name}
+                                </p>
+                                <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {patient.benefit_period && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    daysRemaining !== null && daysRemaining <= 14
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-teal-50 text-teal-700 border-teal-200'
+                                  )}
+                                >
+                                  <CalendarClock className="w-3 h-3 mr-1" />
+                                  BP{patient.benefit_period}
+                                  {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                No active issues
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {patient.benefit_period && (
-                              <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
-                                BP{patient.benefit_period}
-                              </Badge>
-                            )}
-                            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                              No active issues
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1032,20 +1059,39 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium text-[#666]">Census Patients ({archive.censusPatients.length})</h4>
                           <div className="space-y-2">
-                            {archive.censusPatients.map((patient) => (
-                              <div
-                                key={patient.id}
-                                className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
-                              >
-                                <div>
-                                  <p className="font-medium text-[#1A1A1A]">{patient.first_name} {patient.last_name}</p>
-                                  <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                            {archive.censusPatients.map((patient) => {
+                              const daysRemaining = calculateDaysRemaining(patient);
+                              return (
+                                <div
+                                  key={patient.id}
+                                  className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
+                                >
+                                  <div>
+                                    <p className="font-medium text-[#1A1A1A]">{patient.first_name} {patient.last_name}</p>
+                                    <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {patient.benefit_period && (
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          daysRemaining !== null && daysRemaining <= 14
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-teal-50 text-teal-700 border-teal-200'
+                                        )}
+                                      >
+                                        <CalendarClock className="w-3 h-3 mr-1" />
+                                        BP{patient.benefit_period}
+                                        {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                      No active issues
+                                    </Badge>
+                                  </div>
                                 </div>
-                                <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                                  No active issues
-                                </Badge>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
