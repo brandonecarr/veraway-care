@@ -22,48 +22,64 @@ CREATE TRIGGER set_conversation_hospice_id_trigger
 BEFORE INSERT ON public.conversations
 FOR EACH ROW EXECUTE FUNCTION public.set_conversation_hospice_id();
 
--- Also update the auto_create_patient_conversation function if it exists
--- and is still using facility_id
-CREATE OR REPLACE FUNCTION public.auto_create_patient_conversation()
+-- Fix the create_patient_conversation function that is triggered when a patient is created
+-- This function uses facility_id and needs to use hospice_id instead
+CREATE OR REPLACE FUNCTION public.create_patient_conversation()
 RETURNS TRIGGER AS $$
+DECLARE
+    new_conversation_id uuid;
+    staff_user RECORD;
+    current_user_id uuid;
 BEGIN
-    -- Check if a conversation already exists for this patient
-    IF NOT EXISTS (
-        SELECT 1 FROM public.conversations
-        WHERE patient_id = NEW.id AND type = 'patient'
-    ) THEN
-        -- Create patient conversation
-        INSERT INTO public.conversations (
-            type,
-            patient_id,
-            hospice_id,
-            name,
-            created_by
-        ) VALUES (
-            'patient',
-            NEW.id,
-            NEW.hospice_id,
-            NEW.first_name || ' ' || NEW.last_name || ' - Care Team',
-            auth.uid()
-        );
+    -- Get current user id
+    current_user_id := auth.uid();
 
-        -- Add all hospice users as participants
-        INSERT INTO public.conversation_participants (conversation_id, user_id)
-        SELECT
-            (SELECT id FROM public.conversations WHERE patient_id = NEW.id AND type = 'patient' ORDER BY created_at DESC LIMIT 1),
-            u.id
+    -- Create conversation for the patient
+    INSERT INTO public.conversations (
+        hospice_id,
+        type,
+        name,
+        patient_id,
+        created_by
+    ) VALUES (
+        NEW.hospice_id,
+        'patient',
+        NEW.first_name || ' ' || NEW.last_name || ' - Care Team',
+        NEW.id,
+        current_user_id
+    ) RETURNING id INTO new_conversation_id;
+
+    -- Add all staff members from the same hospice as participants
+    FOR staff_user IN
+        SELECT DISTINCT u.id
         FROM public.users u
+        INNER JOIN public.user_roles ur ON u.id = ur.user_id
         WHERE u.hospice_id = NEW.hospice_id
-        AND u.id != auth.uid()
-        ON CONFLICT DO NOTHING;
+        AND ur.role IN ('clinician', 'coordinator', 'after_hours', 'admin')
+    LOOP
+        INSERT INTO public.conversation_participants (
+            conversation_id,
+            user_id,
+            role
+        ) VALUES (
+            new_conversation_id,
+            staff_user.id,
+            'member'
+        ) ON CONFLICT DO NOTHING;
+    END LOOP;
 
-        -- Add the creator as a participant
-        INSERT INTO public.conversation_participants (conversation_id, user_id)
-        SELECT
-            (SELECT id FROM public.conversations WHERE patient_id = NEW.id AND type = 'patient' ORDER BY created_at DESC LIMIT 1),
-            auth.uid()
-        ON CONFLICT DO NOTHING;
-    END IF;
+    -- Create a system message announcing the conversation
+    INSERT INTO public.messages (
+        conversation_id,
+        sender_id,
+        content,
+        message_type
+    ) VALUES (
+        new_conversation_id,
+        NULL,
+        'Care team conversation created for ' || NEW.first_name || ' ' || NEW.last_name,
+        'system'
+    );
 
     RETURN NEW;
 END;
