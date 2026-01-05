@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../supabase/server';
 import { updateIssue } from '@/lib/care-coordination';
-import { notifyIssueAssigned, getUserFacilityId } from '@/lib/notifications';
+import { notifyIssueAssigned, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,10 +100,10 @@ export async function PATCH(
 
     // Send notification for assignment if it changed
     if (isAssignmentUpdate && body.assigned_to && currentIssue && currentIssue.patient) {
-      const facilityId = await getUserFacilityId(user.id);
-      if (facilityId) {
+      const hospiceId = await getUserHospiceId(user.id);
+      if (hospiceId) {
         const patient = Array.isArray(currentIssue.patient) ? currentIssue.patient[0] : currentIssue.patient;
-        notifyIssueAssigned(user.id, facilityId, {
+        notifyIssueAssigned(user.id, hospiceId, {
           id: issueId,
           issue_number: currentIssue.issue_number,
         }, {

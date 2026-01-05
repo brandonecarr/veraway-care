@@ -48,7 +48,7 @@ export default async function Home() {
       <section className="py-12 bg-[#FAFAF8] border-b border-[#E0E0E0]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <p className="text-sm text-[#666] uppercase tracking-wide font-medium">Trusted by leading healthcare facilities</p>
+            <p className="text-sm text-[#666] uppercase tracking-wide font-medium">Trusted by leading hospice organizations</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center opacity-60">
             {/* Placeholder for logos */}
@@ -183,8 +183,8 @@ export default async function Home() {
               {[
                 {
                   step: "01",
-                  title: "Create Your Facility",
-                  description: "Set up your facility profile and customize settings to match your workflow",
+                  title: "Create Your Hospice",
+                  description: "Set up your hospice profile and customize settings to match your workflow",
                   icon: <UserCheck className="w-6 h-6" />
                 },
                 {
@@ -384,7 +384,7 @@ export default async function Home() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-lg text-[#666] max-w-2xl mx-auto">
-              Choose the perfect plan for your facility. No hidden fees, no surprises.
+              Choose the perfect plan for your hospice. No hidden fees, no surprises.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -408,7 +408,7 @@ export default async function Home() {
             Ready to Transform Your Care Coordination?
           </h2>
           <p className="text-xl text-[#81B29A] mb-10 max-w-2xl mx-auto leading-relaxed">
-            Join hundreds of healthcare facilities already using Veraway Care to deliver better patient outcomes
+            Join hundreds of hospice organizations already using Veraway Care to deliver better patient outcomes
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

@@ -13,10 +13,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the current user's facility_id
+    // Get the current user's hospice_id
     const { data: currentUserData, error: userDataError } = await serverSupabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
@@ -25,9 +25,9 @@ export async function GET(request: Request) {
       throw userDataError;
     }
 
-    if (!currentUserData?.facility_id) {
-      console.log('User has no facility_id:', user.id);
-      return NextResponse.json({ error: 'User not associated with a facility' }, { status: 400 });
+    if (!currentUserData?.hospice_id) {
+      console.log('User has no hospice_id:', user.id);
+      return NextResponse.json({ error: 'User not associated with a hospice' }, { status: 400 });
     }
 
     // Check query params for role filter
@@ -35,13 +35,13 @@ export async function GET(request: Request) {
     const roleFilter = searchParams.get('role');
     const allStaff = searchParams.get('all') === 'true';
 
-    console.log('Fetching users for facility:', currentUserData.facility_id);
+    console.log('Fetching users for hospice:', currentUserData.hospice_id);
 
-    // Step 1: Get user_ids from the same facility (optionally filtered by role)
+    // Step 1: Get user_ids from the same hospice (optionally filtered by role)
     let rolesQuery = serverSupabase
       .from('user_roles')
       .select('user_id')
-      .eq('facility_id', currentUserData.facility_id);
+      .eq('hospice_id', currentUserData.hospice_id);
 
     if (roleFilter) {
       rolesQuery = rolesQuery.eq('role', roleFilter);

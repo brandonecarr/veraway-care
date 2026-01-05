@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { IssueStatus } from '@/types/care-coordination';
-import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle2, TrendingUp, X, ChevronLeft, ChevronRight, Archive, MessageSquare, FileCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { MetricCard } from './metric-card';
@@ -12,7 +12,6 @@ import { QuickReportModal } from './quick-report-modal';
 import { IssueDetailPanel } from './issue-detail-panel';
 import { AfterShiftReportModal } from './after-shift-report-modal';
 import { AfterShiftReportBanner } from './after-shift-report-banner';
-import { ReportGenerator } from './report-generator';
 import { IssueCard } from './issue-card';
 import { ConnectionStatus } from './connection-status';
 import { IssueCardSkeleton, MetricCardSkeleton, ChartSkeleton } from './loading-skeletons';
@@ -64,6 +63,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(5);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [recertificationCount, setRecertificationCount] = useState(0);
   const openQuickReportModalRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const issuesSectionRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,19 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   useEffect(() => {
     fetchMetrics();
     fetchUsers();
+    fetchRecertificationCount();
   }, []);
+
+  const fetchRecertificationCount = async () => {
+    try {
+      const response = await fetch('/api/patients/recertification');
+      if (!response.ok) return;
+      const data = await response.json();
+      setRecertificationCount(data.count || 0);
+    } catch (error) {
+      // Silently fail - user may not be an RN Case Manager
+    }
+  };
 
   // Re-fetch metrics when issues count changes (debounced to prevent rapid API calls)
   useEffect(() => {
@@ -223,8 +235,9 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     } else if (filter === 'overdue') {
       filtered = issues.filter(i => {
         if (i.status === 'resolved') return false;
-        const createdAt = new Date(i.created_at);
-        const hoursSince = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+        // Use last_activity_at if available (reset when update is added), otherwise fall back to created_at
+        const lastActivity = new Date(i.last_activity_at || i.created_at);
+        const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
         return hoursSince > 24;
       });
     }
@@ -396,6 +409,46 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
           />
         )}
 
+        {/* BP Recertification Notification Card */}
+        {recertificationCount > 0 && (
+          <div
+            className="animate-in fade-in slide-in-from-top-4 duration-500"
+            style={{ animationDelay: '50ms' }}
+          >
+            <Card
+              className="bg-gradient-to-r from-amber-500/10 to-orange-500/5 border-amber-500/30 cursor-pointer hover:border-amber-500/50 transition-colors"
+              onClick={() => router.push(`/${slug}/dashboard/recertification`)}
+            >
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-amber-500/20">
+                    <FileCheck className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-700">
+                      {recertificationCount} {recertificationCount === 1 ? 'patient requires' : 'patients require'} BP Recertification
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      These patients have 7 days or less remaining in their current benefit period
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-amber-500/30 text-amber-700 hover:bg-amber-500/10 hover:text-amber-700"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/${slug}/dashboard/recertification`);
+                  }}
+                >
+                  View Patients
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Overdue Issues Alert Banner */}
         {metrics && metrics.overdueIssues > 0 && (
           <div
@@ -565,29 +618,20 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
               />
             </div>
 
-            {/* Clinician Responsiveness or Report Generator */}
-            {userRole === 'coordinator' && metrics.clinicianResponsiveness && metrics.clinicianResponsiveness.length > 0 ? (
-              <div 
-                className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-                style={{ animationDelay: '600ms' }}
-              >
-                <ClinicianResponsiveness
-                  data={metrics.clinicianResponsiveness}
-                  onClinicianClick={(userId) => {
-                    setFilter('all');
-                    setTypeFilter(null);
-                    // Could add clinician-specific filtering here
-                  }}
-                />
-              </div>
-            ) : (
-              <div 
-                className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-                style={{ animationDelay: '600ms' }}
-              >
-                <ReportGenerator issues={issues} metrics={metrics} />
-              </div>
-            )}
+            {/* Team Responsiveness - Always shown for all user roles */}
+            <div
+              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: '600ms' }}
+            >
+              <ClinicianResponsiveness
+                data={metrics.clinicianResponsiveness || []}
+                onClinicianClick={(userId) => {
+                  setFilter('all');
+                  setTypeFilter(null);
+                  // Could add clinician-specific filtering here
+                }}
+              />
+            </div>
           </div>
           </ErrorBoundary>
         )}

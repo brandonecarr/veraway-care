@@ -15,10 +15,33 @@ export interface Patient {
   admitted_date?: string;
   discharge_date?: string;
   death_date?: string;
+  cause_of_death?: string;
+  bereavement_status?: string;
   benefit_period?: number;
+  level_of_care?: string;
+  rn_case_manager_id?: string;
+  rn_case_manager?: { id: string; name?: string; email?: string; job_role?: string };
+  residence_type?: string;
   created_at: string;
   updated_at: string;
 }
+
+// Bereavement status options
+export const BEREAVEMENT_STATUSES = [
+  'Education Provided',
+  'Education Not Yet Provided',
+] as const;
+
+// Level of Care options
+export const LEVELS_OF_CARE = [
+  'Routine Care',
+  'General Inpatient Care',
+  'Continuous Care',
+  'Respite Care',
+] as const;
+
+// Residence type options
+export const RESIDENCE_TYPES = ['Home', 'Facility'] as const;
 
 // Benefit period options
 export const BENEFIT_PERIODS = [1, 2, 3, 4, 5, 6] as const;

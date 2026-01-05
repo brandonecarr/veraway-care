@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../../supabase/server';
-import { notifyIssueUpdate, getUserFacilityId } from '@/lib/notifications';
+import { notifyIssueUpdate, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,9 +25,10 @@ export async function POST(
     }
 
     // Update last_activity_at to reset the overdue timer
+    const newLastActivityAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('issues')
-      .update({ last_activity_at: new Date().toISOString() })
+      .update({ last_activity_at: newLastActivityAt })
       .eq('id', issueId);
 
     if (updateError) {
@@ -55,11 +56,11 @@ export async function POST(
       .eq('id', issueId)
       .single();
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId && issue && issue.patient) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId && issue && issue.patient) {
       const patient = Array.isArray(issue.patient) ? issue.patient[0] : issue.patient;
-      notifyIssueUpdate(user.id, facilityId, {
+      notifyIssueUpdate(user.id, hospiceId, {
         id: issueId,
         issue_number: issue.issue_number,
       }, {
@@ -68,7 +69,7 @@ export async function POST(
       }, note).catch((err) => console.error('Failed to send issue update notification:', err));
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, last_activity_at: newLastActivityAt });
   } catch (error) {
     console.error('Add update error:', error);
     return NextResponse.json({ error: 'Failed to add update' }, { status: 500 });

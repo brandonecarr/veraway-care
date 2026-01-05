@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../../supabase/server';
-import { notifyIssueStatusChange, getUserFacilityId } from '@/lib/notifications';
+import { notifyIssueStatusChange, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,11 +98,11 @@ export async function PATCH(
         });
     }
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId && currentIssue && currentIssue.patient) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId && currentIssue && currentIssue.patient) {
       const patient = Array.isArray(currentIssue.patient) ? currentIssue.patient[0] : currentIssue.patient;
-      notifyIssueStatusChange(user.id, facilityId, {
+      notifyIssueStatusChange(user.id, hospiceId, {
         id: issueId,
         issue_number: currentIssue.issue_number,
       }, {

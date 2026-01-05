@@ -62,15 +62,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { notes, tagged_issues } = body;
 
-    // Get the current user's facility
+    // Get the current user's hospice
     const { data: currentUser } = await supabase
       .from('users')
-      .select('facility_id, name, email')
+      .select('hospice_id, name, email')
       .eq('id', user.id)
       .single();
 
-    if (!currentUser?.facility_id) {
-      return NextResponse.json({ error: 'User facility not found' }, { status: 400 });
+    if (!currentUser?.hospice_id) {
+      return NextResponse.json({ error: 'User hospice not found' }, { status: 400 });
     }
 
     // Use current time as default for shift_start/shift_end (required by DB constraint)
@@ -107,26 +107,26 @@ export async function POST(request: Request) {
           tagged_count: tagged_issues?.length || 0,
           tagged_issues: tagged_issues || []
         },
-        facility_id: currentUser.facility_id
+        hospice_id: currentUser.hospice_id
       });
     } catch (auditError) {
       console.error('Failed to create audit log entry:', auditError);
     }
 
-    // Get all users in the same facility for notifications (non-blocking)
+    // Get all users in the same hospice for notifications (non-blocking)
     try {
-      const { data: facilityUsers } = await supabase
+      const { data: hospiceUsers } = await supabase
         .from('users')
         .select('id')
-        .eq('facility_id', currentUser.facility_id)
+        .eq('hospice_id', currentUser.hospice_id)
         .neq('id', user.id); // Don't notify the creator
 
-      if (facilityUsers && facilityUsers.length > 0) {
+      if (hospiceUsers && hospiceUsers.length > 0) {
         const creatorName = currentUser.name || currentUser.email?.split('@')[0] || 'A team member';
         const issueCount = tagged_issues?.length || 0;
 
-        // Create in-app notifications for all facility staff
-        const notifications = facilityUsers.map((u: { id: string }) => ({
+        // Create in-app notifications for all hospice staff
+        const notifications = hospiceUsers.map((u: { id: string }) => ({
           user_id: u.id,
           type: 'handoff',
           title: 'New After Shift Report',
@@ -137,8 +137,8 @@ export async function POST(request: Request) {
 
         await supabase.from('notifications').insert(notifications);
 
-        // Send push notifications to all facility users
-        const userIds = facilityUsers.map((u: { id: string }) => u.id);
+        // Send push notifications to all hospice users
+        const userIds = hospiceUsers.map((u: { id: string }) => u.id);
         await sendPushNotificationToMultipleUsers(userIds, {
           title: 'New After Shift Report',
           body: `${issueCount} issue${issueCount !== 1 ? 's' : ''} require${issueCount === 1 ? 's' : ''} attention`,

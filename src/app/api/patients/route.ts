@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../supabase/server';
 import { getPatients } from '@/lib/care-coordination';
-import { notifyNewPatient, getUserFacilityId } from '@/lib/notifications';
+import { notifyNewPatient, getUserHospiceId } from '@/lib/notifications';
 import type { Patient } from '@/types/care-coordination';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
 
     if (!mrn || !first_name || !last_name) {
       return NextResponse.json({ error: 'Missing required fields: mrn, first_name, last_name' }, { status: 400 });
@@ -65,7 +65,10 @@ export async function POST(request: Request) {
         admitted_date: admission_date || null,  // Also set admitted_date for tracking
         diagnosis: diagnosis || null,
         status: status || 'active',
-        benefit_period: benefit_period || 1  // Default to BP1
+        benefit_period: benefit_period || 1,  // Default to BP1
+        level_of_care: level_of_care || null,
+        rn_case_manager_id: rn_case_manager_id || null,
+        residence_type: residence_type || null,
       }])
       .select()
       .single();
@@ -88,10 +91,10 @@ export async function POST(request: Request) {
         }
       });
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId) {
-      notifyNewPatient(user.id, facilityId, {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId) {
+      notifyNewPatient(user.id, hospiceId, {
         id: data.id,
         first_name,
         last_name,

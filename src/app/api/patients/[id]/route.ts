@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '../../../../../supabase/server';
-import { notifyPatientUpdate, getUserFacilityId } from '@/lib/notifications';
+import { notifyPatientUpdate, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +47,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -61,6 +61,9 @@ export async function PUT(
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
     if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
+    if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
+    if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
+    if (residence_type !== undefined) updateData.residence_type = residence_type;
 
     const { data, error } = await supabase
       .from('patients')
@@ -74,11 +77,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId) {
       const changedFields = Object.keys(updateData).join(', ');
-      notifyPatientUpdate(user.id, facilityId, {
+      notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,
         last_name: data.last_name,
@@ -109,7 +112,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -123,6 +126,9 @@ export async function PATCH(
     if (diagnosis !== undefined) updateData.diagnosis = diagnosis;
     if (status !== undefined) updateData.status = status;
     if (benefit_period !== undefined) updateData.benefit_period = benefit_period;
+    if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
+    if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
+    if (residence_type !== undefined) updateData.residence_type = residence_type;
 
     const { data, error } = await supabase
       .from('patients')
@@ -136,11 +142,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
     }
 
-    // Send notifications to all facility users (fire and forget)
-    const facilityId = await getUserFacilityId(user.id);
-    if (facilityId) {
+    // Send notifications to all hospice users (fire and forget)
+    const hospiceId = await getUserHospiceId(user.id);
+    if (hospiceId) {
       const changedFields = Object.keys(updateData).join(', ');
-      notifyPatientUpdate(user.id, facilityId, {
+      notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,
         last_name: data.last_name,

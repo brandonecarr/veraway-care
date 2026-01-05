@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    // Support both hospice_id and facility_id for backwards compatibility
+    const hospiceId = body.hospice_id || body.facility_id;
     const {
-      facility_id,
       address_line1,
       address_line2,
       city,
@@ -27,30 +28,30 @@ export async function POST(request: NextRequest) {
       email,
     } = body;
 
-    if (!facility_id) {
+    if (!hospiceId) {
       return NextResponse.json(
-        { error: 'Facility ID is required' },
+        { error: 'Hospice ID is required' },
         { status: 400 }
       );
     }
 
-    // Verify the user belongs to this facility
+    // Verify the user belongs to this hospice
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData || userData.facility_id !== facility_id) {
+    if (userError || !userData || userData.hospice_id !== hospiceId) {
       return NextResponse.json(
-        { error: 'You do not have permission to update this facility' },
+        { error: 'You do not have permission to update this hospice' },
         { status: 403 }
       );
     }
 
-    // Update the facility information
+    // Update the hospice information
     const { error: updateError } = await supabase
-      .from('facilities')
+      .from('hospices')
       .update({
         address_line1,
         address_line2,
@@ -61,22 +62,22 @@ export async function POST(request: NextRequest) {
         email,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', facility_id);
+      .eq('id', hospiceId);
 
     if (updateError) {
-      console.error('Error updating facility:', updateError);
+      console.error('Error updating hospice:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update facility information' },
+        { error: 'Failed to update hospice information' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Facility information updated successfully',
+      message: 'Hospice information updated successfully',
     });
   } catch (error) {
-    console.error('Error in update-facility API:', error);
+    console.error('Error in update-hospice API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

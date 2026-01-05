@@ -39,7 +39,8 @@ interface IDGSummary {
   };
   overdue: number;
   byIssueType: Record<string, number>;
-  weekRange: { start: string; end: string };
+  dateRange?: { start: string; end: string };
+  weekRange?: { start: string; end: string }; // Legacy support
   thresholdHours: number;
 }
 

@@ -3,7 +3,7 @@
 import { encodedRedirect } from "@/utils/utils";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
-import { getUserFacilitySlug } from "@/lib/facility";
+import { getUserHospiceSlug } from "@/lib/hospice";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -100,14 +100,14 @@ export const signInAction = async (formData: FormData) => {
     }
   }
 
-  // Get the user's facility slug and redirect to facility-specific dashboard
-  const facilitySlug = await getUserFacilitySlug();
+  // Get the user's hospice slug and redirect to hospice-specific dashboard
+  const hospiceSlug = await getUserHospiceSlug();
 
-  if (facilitySlug) {
-    return redirect(`/${facilitySlug}/dashboard`);
+  if (hospiceSlug) {
+    return redirect(`/${hospiceSlug}/dashboard`);
   }
 
-  // Fallback to onboarding if no facility found
+  // Fallback to onboarding if no hospice found
   return redirect("/onboarding");
 };
 

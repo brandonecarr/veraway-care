@@ -18,25 +18,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { facility_id, email } = body;
+    // Support both hospice_id and facility_id for backwards compatibility
+    const hospiceId = body.hospice_id || body.facility_id;
+    const { email } = body;
 
-    if (!facility_id || !email) {
+    if (!hospiceId || !email) {
       return NextResponse.json(
-        { error: 'Missing required fields: facility_id, email' },
+        { error: 'Missing required fields: hospice_id, email' },
         { status: 400 }
       );
     }
 
-    // Verify the user is a coordinator for this facility
+    // Verify the user is a coordinator for this hospice
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData || userData.facility_id !== facility_id) {
+    if (userError || !userData || userData.hospice_id !== hospiceId) {
       return NextResponse.json(
-        { error: 'You do not have permission to resend invites for this facility' },
+        { error: 'You do not have permission to resend invites for this hospice' },
         { status: 403 }
       );
     }
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('facility_id', facility_id)
+      .eq('hospice_id', hospiceId)
       .single();
 
     if (roleData?.role !== 'coordinator') {

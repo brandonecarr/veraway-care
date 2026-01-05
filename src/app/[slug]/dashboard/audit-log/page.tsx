@@ -18,14 +18,14 @@ export default async function AuditLogPage({ params }: { params: { slug: string 
     return redirect('/sign-in');
   }
 
-  // Get user's facility
+  // Get user's hospice
   const { data: userData } = await supabase
     .from('users')
-    .select('facility_id')
+    .select('hospice_id')
     .eq('id', user.id)
     .single();
 
-  if (!userData?.facility_id) {
+  if (!userData?.hospice_id) {
     redirect('/sign-in');
   }
 

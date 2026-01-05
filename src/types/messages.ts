@@ -13,7 +13,7 @@ export interface User {
 
 export interface Conversation {
   id: string;
-  facility_id: string;
+  hospice_id: string;
   type: ConversationType;
   name: string | null;
   patient_id: string | null;

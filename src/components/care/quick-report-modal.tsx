@@ -86,17 +86,19 @@ export function QuickReportModal({ userId, userRole = 'clinician', onSuccess, on
       ) : (
         /* Desktop: Use Dialog */
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle className="text-2xl font-semibold">Quick Report</DialogTitle>
               <p className="text-sm text-[#666] mt-1">Create a new issue in under 60 seconds</p>
             </DialogHeader>
-            <QuickReportForm
-              userId={userId}
-              userRole={userRole}
-              onSuccess={handleSuccess}
-              onCancel={() => setIsOpen(false)}
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
+              <QuickReportForm
+                userId={userId}
+                userRole={userRole}
+                onSuccess={handleSuccess}
+                onCancel={() => setIsOpen(false)}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -130,6 +132,8 @@ function QuickReportForm({
   const [selectedAssignee, setSelectedAssignee] = useState<string>(userId);
   const [eventDate, setEventDate] = useState<Date | undefined>(new Date());
   const [eventTime, setEventTime] = useState('12:00');
+  const [eventReason, setEventReason] = useState('');
+  const [bereavementStatus, setBereavementStatus] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -279,6 +283,8 @@ function QuickReportForm({
           priority,
           tags: selectedTags.length > 0 ? selectedTags : null,
           event_timestamp: getEventTimestamp(),
+          event_reason: requiresTimestamp && eventReason.trim() ? eventReason.trim() : null,
+          bereavement_status: issueType === 'Death' && bereavementStatus ? bereavementStatus : null,
         }),
       });
 
@@ -377,6 +383,46 @@ function QuickReportForm({
               className="w-32 border-amber-300 bg-white"
             />
           </div>
+
+          {/* Reason textarea for Death/Discharged */}
+          <div>
+            <label className="text-sm font-medium text-amber-800 mb-2 block">
+              {issueType === 'Death' ? 'Cause of Death' : 'Reason For Discharge'}
+            </label>
+            <Textarea
+              value={eventReason}
+              onChange={(e) => setEventReason(e.target.value)}
+              placeholder={issueType === 'Death'
+                ? "Enter the cause of death..."
+                : "Enter the reason for discharge..."}
+              className="resize-none border-amber-300 bg-white"
+              rows={3}
+            />
+          </div>
+
+          {/* Bereavement Status - Death only */}
+          {issueType === 'Death' && (
+            <div>
+              <label className="text-sm font-medium text-amber-800 mb-2 block">
+                Bereavement Status
+              </label>
+              <select
+                value={bereavementStatus}
+                onChange={(e) => setBereavementStatus(e.target.value)}
+                className="w-full border border-amber-300 px-3 py-2 text-sm text-[#1A1A1A] focus:outline-none focus:border-[#2D7A7A] bg-white transition-colors appearance-none cursor-pointer hover:border-amber-400"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%231A1A1A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 12px center',
+                  paddingRight: '36px'
+                }}
+              >
+                <option value="">Select status...</option>
+                <option value="Education Provided">Education Provided</option>
+                <option value="Education Not Yet Provided">Education Not Yet Provided</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 

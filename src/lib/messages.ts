@@ -431,9 +431,9 @@ export async function archiveConversation(
 }
 
 /**
- * Get facility users for starting new conversations
+ * Get hospice users for starting new conversations
  */
-export async function getFacilityUsers(): Promise<User[]> {
+export async function getHospiceUsers(): Promise<User[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -444,6 +444,9 @@ export async function getFacilityUsers(): Promise<User[]> {
   if (error) throw error;
   return (data || []) as User[];
 }
+
+// Backwards compatibility alias
+export const getFacilityUsers = getHospiceUsers;
 
 /**
  * Get conversation for a patient (if exists)

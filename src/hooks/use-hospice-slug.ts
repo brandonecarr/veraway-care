@@ -3,11 +3,11 @@
 import { usePathname } from 'next/navigation';
 
 /**
- * Client-side hook to extract the facility slug from the current pathname
+ * Client-side hook to extract the hospice slug from the current pathname
  * Returns the slug if present in the URL pattern /:slug/dashboard
- * Returns null if not in a facility-scoped route
+ * Returns null if not in a hospice-scoped route
  */
-export function useFacilitySlug(): string | null {
+export function useHospiceSlug(): string | null {
   const pathname = usePathname();
 
   // Extract slug from pathname like /sunrise-hospice-care/dashboard
@@ -17,11 +17,11 @@ export function useFacilitySlug(): string | null {
 }
 
 /**
- * Get the facility-scoped path for a given route
+ * Get the hospice-scoped path for a given route
  * E.g., getPath('/patients') with slug 'sunrise-hospice-care' returns '/sunrise-hospice-care/dashboard/patients'
  */
-export function useFacilityPath() {
-  const slug = useFacilitySlug();
+export function useHospicePath() {
+  const slug = useHospiceSlug();
 
   return function getPath(path: string): string {
     if (!slug) {
@@ -35,3 +35,7 @@ export function useFacilityPath() {
     return `/${slug}/dashboard${cleanPath ? `/${cleanPath}` : ''}`;
   };
 }
+
+// Re-export with legacy names for backwards compatibility during transition
+export const useFacilitySlug = useHospiceSlug;
+export const useFacilityPath = useHospicePath;

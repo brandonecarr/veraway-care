@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { facility_id } = body;
+    const { hospice_id } = body;
 
-    if (!facility_id) {
+    if (!hospice_id) {
       return NextResponse.json(
-        { error: 'Missing required field: facility_id' },
+        { error: 'Missing required field: hospice_id' },
         { status: 400 }
       );
     }
@@ -27,11 +27,11 @@ export async function POST(request: Request) {
       }
     );
 
-    // Get all coordinators for this facility
+    // Get all coordinators for this hospice
     const { data: coordinatorRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('user_id')
-      .eq('facility_id', facility_id)
+      .eq('hospice_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (rolesError) {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     if (!coordinatorRoles || coordinatorRoles.length === 0) {
       return NextResponse.json(
-        { error: 'No coordinators found for this facility' },
+        { error: 'No coordinators found for this hospice' },
         { status: 404 }
       );
     }

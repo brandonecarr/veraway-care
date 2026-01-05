@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FacilityManagement } from '@/components/dev/facility-management';
+import { HospiceManagement } from '@/components/dev/hospice-management';
 import { Button } from '@/components/ui/button';
 import { Building2, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,7 +51,7 @@ export default function DevDashboardPage() {
               <h1 className="text-xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
                 Developer Portal
               </h1>
-              <p className="text-xs text-[#666]">Facility & User Management</p>
+              <p className="text-xs text-[#666]">Hospice & User Management</p>
             </div>
           </div>
 
@@ -68,7 +68,7 @@ export default function DevDashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <FacilityManagement />
+        <HospiceManagement />
       </div>
     </div>
   );

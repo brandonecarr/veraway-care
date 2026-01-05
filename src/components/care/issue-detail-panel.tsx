@@ -64,13 +64,15 @@ export function IssueDetailPanel({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [patientConversationId, setPatientConversationId] = useState<string | null>(null);
+  const [localLastActivityAt, setLocalLastActivityAt] = useState<string | null>(null);
 
   // Use local status if set, otherwise use issue status
   const currentStatus = localStatus || issue?.status;
 
-  // Reset local status when issue changes or when issue status is updated from parent
+  // Reset local state when issue changes or when issue status is updated from parent
   useEffect(() => {
     setLocalStatus(null);
+    setLocalLastActivityAt(null);
   }, [issue?.id, issue?.status]);
 
   // Clear form fields when the sheet closes
@@ -199,7 +201,7 @@ export function IssueDetailPanel({
 
   const handleAddUpdate = async () => {
     if (!issue || !updateNote.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/issues/${issue.id}/updates`, {
         method: 'POST',
@@ -208,6 +210,11 @@ export function IssueDetailPanel({
       });
 
       if (response.ok) {
+        const data = await response.json();
+        // Update local last_activity_at to immediately reflect overdue reset
+        if (data.last_activity_at) {
+          setLocalLastActivityAt(data.last_activity_at);
+        }
         setUpdateNote('');
         toast.success('Update added');
         fetchAuditHistory();
@@ -247,8 +254,8 @@ export function IssueDetailPanel({
 
   const isOverdue = () => {
     if (currentStatus === 'resolved') return false;
-    // Use last_activity_at if available, otherwise fall back to created_at
-    const lastActivity = new Date(issue.last_activity_at || issue.created_at);
+    // Use local last_activity_at first (from recent update), then issue prop, then created_at
+    const lastActivity = new Date(localLastActivityAt || issue.last_activity_at || issue.created_at);
     const hoursSince = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60);
     return hoursSince > 24;
   };

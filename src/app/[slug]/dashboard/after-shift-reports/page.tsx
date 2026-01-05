@@ -378,8 +378,8 @@ export default function AfterShiftReportsPage() {
   return (
     <>
       <DashboardNavbar />
-      <main className="min-h-screen bg-[#FAFAF8] p-4 md:p-6 pb-24 md:pb-6">
-        <div className="container mx-auto space-y-6 md:space-y-8">
+      <main className="min-h-screen bg-[#FAFAF8] pb-24 md:pb-6">
+        <div className="container mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6 md:space-y-8">
           {/* Header */}
           <div>
             <h1

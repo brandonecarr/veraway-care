@@ -51,7 +51,9 @@ export async function GET() {
         email: user?.email || 'Unknown',
         name: user?.name || 'Unknown',
         role: role.role,
-        facility_id: role.facility_id,
+        hospice_id: role.hospice_id,
+        // Backwards compatibility
+        facility_id: role.hospice_id,
         created_at: role.created_at,
       };
     });

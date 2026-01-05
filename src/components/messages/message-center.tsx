@@ -16,7 +16,7 @@ import { NewConversationDialog } from './new-conversation-dialog';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
 import { useRealtimeConversations } from '@/hooks/use-realtime-conversations';
 import { useRealtimeChatMessages } from '@/hooks/use-realtime-chat-messages';
-import { useFacilityUsers } from '@/lib/queries/users';
+import { useHospiceUsers } from '@/lib/queries/users';
 import type { ConversationWithDetails } from '@/types/messages';
 import type { Issue } from '@/types/care-coordination';
 import { useParams } from 'next/navigation';
@@ -41,8 +41,8 @@ export function MessageCenter({ userId, initialConversationId }: MessageCenterPr
   const { conversations, isLoading: isLoadingConversations, refreshConversations } =
     useRealtimeConversations({ selectedConversationId: selectedConversation?.id });
 
-  // Use cached facility users from React Query (replaces useEffect fetch)
-  const { data: availableUsers = [] } = useFacilityUsers();
+  // Use cached hospice users from React Query (replaces useEffect fetch)
+  const { data: availableUsers = [] } = useHospiceUsers();
 
   const {
     messages,

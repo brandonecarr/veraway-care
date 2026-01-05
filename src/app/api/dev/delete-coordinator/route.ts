@@ -6,11 +6,11 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { facility_id, email } = body;
+    const { hospice_id, email } = body;
 
-    if (!facility_id || !email) {
+    if (!hospice_id || !email) {
       return NextResponse.json(
-        { error: 'Missing required fields: facility_id, email' },
+        { error: 'Missing required fields: hospice_id, email' },
         { status: 400 }
       );
     }
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('facility_id', facility_id)
+      .eq('hospice_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (deleteRoleError) {

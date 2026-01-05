@@ -12,12 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle, Calendar as CalendarIcon, ClipboardList, ChevronDown, ChevronRight, Archive, Trash2 } from 'lucide-react';
+import { format, subDays, differenceInDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { IDGSummaryStats } from '@/components/care/idg-summary-stats';
 import { IDGIssueList } from '@/components/care/idg-issue-list';
 import { IssueDetailPanel } from '@/components/care/issue-detail-panel';
 import { IDGCompletionModal } from '@/components/care/idg-completion-modal';
+import { IDGIssueSelectionModal } from '@/components/care/idg-issue-selection-modal';
 import { generateIDGPDF } from '@/components/care/idg-pdf-export';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -50,6 +54,14 @@ interface IDGIssue {
 }
 
 interface IDGSummary {
+  // New stats format
+  totalActivePatients: number;
+  admissionsThisWeek: number;
+  dischargesThisWeek: number;
+  deathsThisWeek: number;
+  totalIssuesIncluded: number;
+  highPriorityOverdueCount: number;
+  // Legacy fields for backwards compatibility
   totalIssues: number;
   byPriority: {
     urgent: number;
@@ -62,11 +74,9 @@ interface IDGSummary {
     in_progress: number;
   };
   overdue: number;
-  admissions?: number;
-  deaths?: number;
   expiringBenefitPeriods?: number;
   byIssueType: Record<string, number>;
-  weekRange: { start: string; end: string };
+  dateRange: { start: string; end: string };
   thresholdHours: number;
 }
 
@@ -85,6 +95,29 @@ interface PreviousReview {
   total_issues_reviewed: number;
 }
 
+interface CensusPatient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  mrn: string;
+  benefit_period: number | null;
+  admission_date: string | null;
+}
+
+interface ArchivedOutline {
+  id: string;
+  archivedAt: string;
+  meetingStartedAt: string;
+  fromDate: string;
+  toDate: string;
+  selectedIssueIds: string[];
+  selectedPatientIds: string[];
+  censusPatients: CensusPatient[];
+  issues: IDGIssue[];
+  issueCount: number;
+  patientCount: number;
+}
+
 export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -94,12 +127,31 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [summary, setSummary] = useState<IDGSummary | null>(null);
   const [expiringBenefitPeriods, setExpiringBenefitPeriods] = useState<ExpiringBenefitPeriod[]>([]);
 
-  // State for controls
-  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 })
-  );
+  // Date range controls (replacing week navigation)
+  const [fromDate, setFromDate] = useState<Date>(() => subDays(new Date(), 7));
+  const [toDate, setToDate] = useState<Date>(() => new Date());
   const [threshold, setThreshold] = useState('24');
   const [groupBy, setGroupBy] = useState<'patient' | 'issue_type'>('patient');
+
+  // Meeting workflow state - initialized from localStorage if available
+  const [meetingStarted, setMeetingStarted] = useState(false);
+  const [meetingStartedAt, setMeetingStartedAt] = useState<string | null>(null);
+  const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(new Set());
+  const [selectedPatientIds, setSelectedPatientIds] = useState<Set<string>>(new Set()); // Census patients without issues
+  const [censusPatients, setCensusPatients] = useState<CensusPatient[]>([]);
+  const [isIssueSelectionModalOpen, setIsIssueSelectionModalOpen] = useState(false);
+  const [outlineLoaded, setOutlineLoaded] = useState(false);
+
+  // Collapsible state for current outline
+  const [isOutlineExpanded, setIsOutlineExpanded] = useState(true);
+
+  // Archived outlines
+  const [archivedOutlines, setArchivedOutlines] = useState<ArchivedOutline[]>([]);
+  const [expandedArchives, setExpandedArchives] = useState<Set<string>>(new Set());
+
+  // LocalStorage keys for persisting IDG outline and archives
+  const OUTLINE_STORAGE_KEY = `idg-outline-${slug}`;
+  const ARCHIVES_STORAGE_KEY = `idg-archives-${slug}`;
 
   // Issue detail panel
   const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
@@ -113,8 +165,9 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [previousReview, setPreviousReview] = useState<PreviousReview | null>(null);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
 
-  const weekStart = format(currentWeekStart, 'yyyy-MM-dd');
-  const weekEnd = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  // Format dates for API calls
+  const fromDateStr = format(fromDate, 'yyyy-MM-dd');
+  const toDateStr = format(toDate, 'yyyy-MM-dd');
 
   useEffect(() => {
     const initUser = async () => {
@@ -135,16 +188,70 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     initUser();
   }, []);
 
+  // Load IDG outline and archives from localStorage on mount
+  useEffect(() => {
+    try {
+      // Load current outline
+      const saved = localStorage.getItem(OUTLINE_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const hasIssues = parsed.selectedIssueIds?.length > 0;
+        const hasPatients = parsed.selectedPatientIds?.length > 0;
+        if (parsed.meetingStarted && (hasIssues || hasPatients)) {
+          setMeetingStarted(true);
+          setMeetingStartedAt(parsed.meetingStartedAt);
+          setSelectedIssueIds(new Set(parsed.selectedIssueIds || []));
+          setSelectedPatientIds(new Set(parsed.selectedPatientIds || []));
+          if (parsed.censusPatients) {
+            setCensusPatients(parsed.censusPatients);
+          }
+          console.log('IDG Outline restored from localStorage:', parsed.selectedIssueIds?.length || 0, 'issues,', parsed.selectedPatientIds?.length || 0, 'census patients');
+        }
+      }
+
+      // Load archived outlines
+      const savedArchives = localStorage.getItem(ARCHIVES_STORAGE_KEY);
+      if (savedArchives) {
+        const parsedArchives = JSON.parse(savedArchives);
+        if (Array.isArray(parsedArchives)) {
+          setArchivedOutlines(parsedArchives);
+          console.log('IDG Archives restored from localStorage:', parsedArchives.length, 'archived outlines');
+        }
+      }
+    } catch (e) {
+      console.error('Error loading IDG data from localStorage:', e);
+    }
+    setOutlineLoaded(true);
+  }, [OUTLINE_STORAGE_KEY, ARCHIVES_STORAGE_KEY]);
+
+  // Save IDG outline to localStorage when it changes
+  useEffect(() => {
+    if (!outlineLoaded) return; // Don't save until we've loaded
+
+    if (meetingStarted && (selectedIssueIds.size > 0 || selectedPatientIds.size > 0)) {
+      const toSave = {
+        meetingStarted,
+        meetingStartedAt,
+        selectedIssueIds: Array.from(selectedIssueIds),
+        selectedPatientIds: Array.from(selectedPatientIds),
+        censusPatients,
+      };
+      localStorage.setItem(OUTLINE_STORAGE_KEY, JSON.stringify(toSave));
+    } else if (!meetingStarted) {
+      localStorage.removeItem(OUTLINE_STORAGE_KEY);
+    }
+  }, [meetingStarted, meetingStartedAt, selectedIssueIds, selectedPatientIds, censusPatients, outlineLoaded, OUTLINE_STORAGE_KEY]);
+
   useEffect(() => {
     fetchIDGData();
-  }, [weekStart, weekEnd, threshold, groupBy]);
+  }, [fromDateStr, toDateStr, threshold, groupBy]);
 
   const fetchIDGData = async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
-        weekStart,
-        weekEnd,
+        fromDate: fromDateStr,
+        toDate: toDateStr,
         threshold,
         groupBy
       });
@@ -173,17 +280,145 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     }
   };
 
-  const goToPreviousWeek = () => {
-    setCurrentWeekStart(prev => subWeeks(prev, 1));
+  // Handle starting the IDG meeting
+  const handleStartMeeting = async (issueIds: string[], patientIds: string[]) => {
+    setSelectedIssueIds(new Set(issueIds));
+    setSelectedPatientIds(new Set(patientIds));
+    setMeetingStartedAt(new Date().toISOString());
+    setMeetingStarted(true);
+
+    // Fetch census patient data if any patients were selected
+    if (patientIds.length > 0) {
+      try {
+        const response = await fetch(`/api/patients?status=active`);
+        if (response.ok) {
+          const result = await response.json();
+          const patients = result.data || [];
+          // Filter to only selected patients
+          const selectedCensusPatients = patients.filter((p: any) => patientIds.includes(p.id));
+          setCensusPatients(selectedCensusPatients);
+        }
+      } catch (error) {
+        console.error('Failed to fetch census patients:', error);
+      }
+    }
+
+    const totalItems = issueIds.length + patientIds.length;
+    toast.success('IDG Outline Created', {
+      description: `${totalItems} item${totalItems !== 1 ? 's' : ''} selected for review.`,
+    });
   };
 
-  const goToNextWeek = () => {
-    setCurrentWeekStart(prev => addWeeks(prev, 1));
+  // Reset meeting state and clear localStorage
+  const resetMeeting = () => {
+    setMeetingStarted(false);
+    setMeetingStartedAt(null);
+    setSelectedIssueIds(new Set());
+    setSelectedPatientIds(new Set());
+    setCensusPatients([]);
+    localStorage.removeItem(OUTLINE_STORAGE_KEY);
   };
 
-  const goToCurrentWeek = () => {
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  // Archive the current outline
+  const archiveOutline = () => {
+    if (!meetingStarted || (selectedIssueIds.size === 0 && selectedPatientIds.size === 0)) {
+      return;
+    }
+
+    const archivedOutline: ArchivedOutline = {
+      id: crypto.randomUUID(),
+      archivedAt: new Date().toISOString(),
+      meetingStartedAt: meetingStartedAt || new Date().toISOString(),
+      fromDate: fromDateStr,
+      toDate: toDateStr,
+      selectedIssueIds: Array.from(selectedIssueIds),
+      selectedPatientIds: Array.from(selectedPatientIds),
+      censusPatients,
+      issues: displayedIssues,
+      issueCount: selectedIssueIds.size,
+      patientCount: selectedPatientIds.size,
+    };
+
+    const newArchives = [archivedOutline, ...archivedOutlines];
+    setArchivedOutlines(newArchives);
+    localStorage.setItem(ARCHIVES_STORAGE_KEY, JSON.stringify(newArchives));
+
+    // Reset the current outline
+    resetMeeting();
+
+    toast.success('IDG Outline Archived', {
+      description: `Outline from ${format(new Date(archivedOutline.meetingStartedAt), 'MMM d, yyyy')} has been archived.`,
+    });
   };
+
+  // Delete an archived outline
+  const deleteArchivedOutline = (archiveId: string) => {
+    const newArchives = archivedOutlines.filter(a => a.id !== archiveId);
+    setArchivedOutlines(newArchives);
+    localStorage.setItem(ARCHIVES_STORAGE_KEY, JSON.stringify(newArchives));
+
+    // Remove from expanded set if it was expanded
+    setExpandedArchives(prev => {
+      const next = new Set(prev);
+      next.delete(archiveId);
+      return next;
+    });
+
+    toast.success('Archive Deleted', {
+      description: 'The archived outline has been removed.',
+    });
+  };
+
+  // Toggle archive expansion
+  const toggleArchiveExpansion = (archiveId: string) => {
+    setExpandedArchives(prev => {
+      const next = new Set(prev);
+      if (next.has(archiveId)) {
+        next.delete(archiveId);
+      } else {
+        next.add(archiveId);
+      }
+      return next;
+    });
+  };
+
+  // Calculate days remaining in benefit period
+  const calculateDaysRemaining = (patient: CensusPatient): number | null => {
+    if (!patient.benefit_period || !patient.admission_date) return null;
+
+    const admissionDate = new Date(patient.admission_date);
+    const today = new Date();
+    const daysSinceAdmission = differenceInDays(today, admissionDate);
+
+    // BP1-2: 90 days, BP3+: 60 days
+    const periodLength = patient.benefit_period <= 2 ? 90 : 60;
+    const daysRemaining = periodLength - daysSinceAdmission;
+
+    return Math.max(0, daysRemaining);
+  };
+
+  // Get issues to display based on meeting state
+  const displayedIssues = meetingStarted
+    ? issues.filter(i => selectedIssueIds.has(i.id))
+    : [];
+
+  // Get grouped data for displayed issues
+  const displayedGrouped = meetingStarted
+    ? Object.entries(grouped).reduce((acc, [key, value]) => {
+        if (groupBy === 'patient' && value?.issues) {
+          const filteredIssues = value.issues.filter((i: IDGIssue) => selectedIssueIds.has(i.id));
+          if (filteredIssues.length > 0) {
+            acc[key] = { ...value, issues: filteredIssues };
+          }
+        } else if (Array.isArray(value)) {
+          const filteredIssues = value.filter((i: IDGIssue) => selectedIssueIds.has(i.id));
+          if (filteredIssues.length > 0) {
+            acc[key] = filteredIssues;
+          }
+        }
+        return acc;
+      }, {} as Record<string, any>)
+    : {};
 
   // Helper to update an issue in both issues and grouped state
   const updateIssueInState = (issueId: string, updates: Partial<IDGIssue>) => {
@@ -297,12 +532,13 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          weekStart,
-          weekEnd,
+          fromDate: fromDateStr,
+          toDate: toDateStr,
           disciplinesPresent,
-          issueIds: issues.map(i => i.id),
-          admissionsCount: summary?.admissions || 0,
-          deathsCount: summary?.deaths || 0
+          selectedIssueIds: Array.from(selectedIssueIds),
+          meetingStartedAt,
+          admissionsCount: summary?.admissionsThisWeek || 0,
+          deathsCount: summary?.deathsThisWeek || 0
         })
       });
 
@@ -311,10 +547,11 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       }
 
       toast.success('IDG Review Completed', {
-        description: `Review recorded with ${disciplinesPresent.length} disciplines present and ${issues.length} issues reviewed.`,
+        description: `Review recorded with ${disciplinesPresent.length} disciplines present and ${selectedIssueIds.size} issues reviewed.`,
       });
 
-      // Refresh data to show updated status
+      // Reset meeting state and refresh data
+      resetMeeting();
       fetchIDGData();
     } catch (error) {
       console.error('Error completing IDG review:', error);
@@ -323,8 +560,11 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     }
   };
 
-  const isCurrentWeek = format(currentWeekStart, 'yyyy-MM-dd') ===
-    format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  // Build summary for stats display (with overrides for selected issues)
+  const displaySummary = summary ? {
+    ...summary,
+    totalIssuesIncluded: meetingStarted ? selectedIssueIds.size : 0
+  } : null;
 
   return (
     <main className="min-h-screen bg-[#FAFAF8] pb-24 md:pb-6">
@@ -347,16 +587,16 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             <Button
               variant="outline"
               className="flex items-center gap-2 w-fit"
-              disabled={isExporting || isLoading || issues.length === 0}
+              disabled={isExporting || isLoading || displayedIssues.length === 0}
               onClick={async () => {
                 if (!summary) return;
                 setIsExporting(true);
                 try {
                   await generateIDGPDF({
-                    issues,
+                    issues: displayedIssues,
                     summary,
-                    weekStart,
-                    weekEnd,
+                    weekStart: fromDateStr,
+                    weekEnd: toDateStr,
                     groupBy
                   });
                 } finally {
@@ -368,50 +608,88 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
               {isExporting ? 'Exporting...' : 'Export PDF'}
             </Button>
 
-            <Button
-              className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
-              disabled={isLoading || issues.length === 0}
-              onClick={() => setIsCompletionModalOpen(true)}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              IDG Review Completed
-            </Button>
+            {!meetingStarted ? (
+              <Button
+                className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
+                disabled={isLoading || issues.length === 0}
+                onClick={() => setIsIssueSelectionModalOpen(true)}
+              >
+                <ClipboardList className="w-4 h-4" />
+                Create IDG Meeting Outline
+              </Button>
+            ) : (
+              <Button
+                className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
+                disabled={isLoading || selectedIssueIds.size === 0}
+                onClick={() => setIsCompletionModalOpen(true)}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                IDG Review Completed
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Controls */}
         <Card className="p-4 bg-white border-[#D4D4D4]">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
-            {/* Week Navigation */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goToPreviousWeek}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <div className="text-center min-w-[200px]">
-                <p className="font-medium">
-                  {format(currentWeekStart, 'MMM d')} - {format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'MMM d, yyyy')}
-                </p>
-                {!isCurrentWeek && (
-                  <button
-                    onClick={goToCurrentWeek}
-                    className="text-xs text-[#2D7A7A] hover:underline"
+            {/* Date Range Pickers */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">From:</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[140px] justify-start text-left font-normal",
+                      !fromDate && "text-muted-foreground"
+                    )}
+                    disabled={meetingStarted}
                   >
-                    Go to current week
-                  </button>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goToNextWeek}
-                disabled={isCurrentWeek}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {fromDate ? format(fromDate, "MMM d, yyyy") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={fromDate}
+                    onSelect={(date) => date && setFromDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <span className="text-sm text-muted-foreground whitespace-nowrap">To:</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[140px] justify-start text-left font-normal",
+                      !toDate && "text-muted-foreground"
+                    )}
+                    disabled={meetingStarted}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {toDate ? format(toDate, "MMM d, yyyy") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={toDate}
+                    onSelect={(date) => date && setToDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {meetingStarted && (
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 ml-2">
+                  Meeting in progress
+                </Badge>
+              )}
             </div>
 
             <div className="flex-1" />
@@ -421,7 +699,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
               <span className="text-sm text-muted-foreground whitespace-nowrap">
                 Unresolved threshold:
               </span>
-              <Select value={threshold} onValueChange={setThreshold}>
+              <Select value={threshold} onValueChange={setThreshold} disabled={meetingStarted}>
                 <SelectTrigger className="w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -462,18 +740,161 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         </Card>
 
         {/* Summary Stats */}
-        <IDGSummaryStats data={summary || undefined} isLoading={isLoading} />
+        <IDGSummaryStats data={displaySummary || undefined} isLoading={isLoading} />
 
-        {/* Issue List */}
-        <IDGIssueList
-          issues={issues}
-          grouped={grouped}
-          groupBy={groupBy}
-          onIssueClick={handleIssueClick}
-          onFlagForMD={handleFlagForMD}
-          onDispositionChange={handleDispositionChange}
-          dispositions={dispositions}
-        />
+        {/* Issue List or Empty State */}
+        {!meetingStarted ? (
+          <Card className="p-8 md:p-12 bg-white border-[#D4D4D4] text-center">
+            <div className="max-w-md mx-auto">
+              <ClipboardList className="w-16 h-16 mx-auto text-muted-foreground/40 mb-4" />
+              <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                No Meeting in Progress
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Click &quot;Create IDG Meeting Outline&quot; to select issues and start your IDG review meeting.
+              </p>
+              {issues.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {issues.length} issue{issues.length !== 1 ? 's' : ''} available for review in this date range.
+                </p>
+              )}
+            </div>
+          </Card>
+        ) : (
+          /* Current IDG Outline - Collapsible Card */
+          <Card className="bg-white border-[#D4D4D4] overflow-hidden">
+            {/* Collapsible Header */}
+            <div
+              className="flex items-center justify-between p-4 md:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => setIsOutlineExpanded(!isOutlineExpanded)}
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  className="p-1 rounded hover:bg-gray-100 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOutlineExpanded(!isOutlineExpanded);
+                  }}
+                >
+                  {isOutlineExpanded ? (
+                    <ChevronDown className="w-5 h-5 text-[#666]" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-[#666]" />
+                  )}
+                </button>
+                <div className="p-2 rounded-lg bg-[#2D7A7A]/10">
+                  <ClipboardList className="w-5 h-5 text-[#2D7A7A]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                    IDG Outline — {meetingStartedAt ? format(new Date(meetingStartedAt), 'MMMM d, yyyy') : format(new Date(), 'MMMM d, yyyy')}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {displayedIssues.length} issue{displayedIssues.length !== 1 ? 's' : ''}
+                    {censusPatients.length > 0 && ` • ${censusPatients.length} census patient${censusPatients.length !== 1 ? 's' : ''}`}
+                    {' '}• Created {meetingStartedAt ? format(new Date(meetingStartedAt), 'h:mm a') : ''}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  archiveOutline();
+                }}
+              >
+                <Archive className="w-4 h-4" />
+                Archive Outline
+              </Button>
+            </div>
+
+            {/* Collapsible Content */}
+            {isOutlineExpanded && (
+              <div className="border-t border-[#D4D4D4] p-4 md:p-6 space-y-6">
+                {/* Issue List */}
+                {displayedIssues.length > 0 && (
+                  <IDGIssueList
+                    issues={displayedIssues}
+                    grouped={displayedGrouped}
+                    groupBy={groupBy}
+                    onIssueClick={handleIssueClick}
+                    onFlagForMD={handleFlagForMD}
+                    onDispositionChange={handleDispositionChange}
+                    dispositions={dispositions}
+                  />
+                )}
+
+                {/* Census Patients */}
+                {censusPatients.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 rounded-lg bg-teal-100">
+                        <Users className="w-5 h-5 text-teal-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                          Census Patients
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {censusPatients.length} patient{censusPatients.length !== 1 ? 's' : ''} selected from census (no active issues)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {censusPatients.map((patient) => {
+                        const daysRemaining = calculateDaysRemaining(patient);
+                        return (
+                          <div
+                            key={patient.id}
+                            className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <p className="font-medium text-[#1A1A1A]">
+                                  {patient.first_name} {patient.last_name}
+                                </p>
+                                <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {patient.benefit_period && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    daysRemaining !== null && daysRemaining <= 14
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                      : 'bg-teal-50 text-teal-700 border-teal-200'
+                                  )}
+                                >
+                                  <CalendarClock className="w-3 h-3 mr-1" />
+                                  BP{patient.benefit_period}
+                                  {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                No active issues
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state if no issues or patients */}
+                {displayedIssues.length === 0 && censusPatients.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No items in this outline.
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Expiring Benefit Periods */}
         {expiringBenefitPeriods.length > 0 && (
@@ -530,6 +951,157 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             </div>
           </Card>
         )}
+
+        {/* Archived Outlines Section */}
+        {archivedOutlines.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gray-100">
+                <Archive className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                  Archived Outlines
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {archivedOutlines.length} archived outline{archivedOutlines.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {archivedOutlines.map((archive) => (
+                <Card key={archive.id} className="bg-white border-[#D4D4D4] overflow-hidden">
+                  {/* Archive Header */}
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => toggleArchiveExpansion(archive.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleArchiveExpansion(archive.id);
+                        }}
+                      >
+                        {expandedArchives.has(archive.id) ? (
+                          <ChevronDown className="w-5 h-5 text-[#666]" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-[#666]" />
+                        )}
+                      </button>
+                      <div className="p-2 rounded-lg bg-gray-100">
+                        <ClipboardList className="w-4 h-4 text-gray-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-medium text-[#1A1A1A]">
+                          IDG Outline — {format(new Date(archive.meetingStartedAt), 'MMMM d, yyyy')}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {archive.issueCount} issue{archive.issueCount !== 1 ? 's' : ''}
+                          {archive.patientCount > 0 && ` • ${archive.patientCount} census patient${archive.patientCount !== 1 ? 's' : ''}`}
+                          {' '}• Archived {format(new Date(archive.archivedAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteArchivedOutline(archive.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Archive Content */}
+                  {expandedArchives.has(archive.id) && (
+                    <div className="border-t border-[#D4D4D4] p-4 space-y-4 bg-gray-50/50">
+                      {/* Archived Issues */}
+                      {archive.issues.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-[#666]">Issues ({archive.issues.length})</h4>
+                          <div className="space-y-2">
+                            {archive.issues.map((issue) => (
+                              <div
+                                key={issue.id}
+                                className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
+                              >
+                                <div>
+                                  <p className="font-medium text-[#1A1A1A]">{issue.patient_name}</p>
+                                  <p className="text-sm text-[#666]">
+                                    {issue.issue_type} • MRN: {issue.patient_mrn}
+                                  </p>
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    issue.priority === 'urgent' && 'bg-red-50 text-red-700 border-red-200',
+                                    issue.priority === 'high' && 'bg-orange-50 text-orange-700 border-orange-200',
+                                    issue.priority === 'normal' && 'bg-blue-50 text-blue-700 border-blue-200',
+                                    issue.priority === 'low' && 'bg-gray-50 text-gray-600 border-gray-200'
+                                  )}
+                                >
+                                  {issue.priority}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Archived Census Patients */}
+                      {archive.censusPatients.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-[#666]">Census Patients ({archive.censusPatients.length})</h4>
+                          <div className="space-y-2">
+                            {archive.censusPatients.map((patient) => {
+                              const daysRemaining = calculateDaysRemaining(patient);
+                              return (
+                                <div
+                                  key={patient.id}
+                                  className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
+                                >
+                                  <div>
+                                    <p className="font-medium text-[#1A1A1A]">{patient.first_name} {patient.last_name}</p>
+                                    <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {patient.benefit_period && (
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          daysRemaining !== null && daysRemaining <= 14
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-teal-50 text-teal-700 border-teal-200'
+                                        )}
+                                      >
+                                        <CalendarClock className="w-3 h-3 mr-1" />
+                                        BP{patient.benefit_period}
+                                        {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                      No active issues
+                                    </Badge>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Issue Detail Panel */}
@@ -555,17 +1127,28 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         availableUsers={availableUsers}
       />
 
+      {/* IDG Issue Selection Modal */}
+      <IDGIssueSelectionModal
+        open={isIssueSelectionModalOpen}
+        onOpenChange={setIsIssueSelectionModalOpen}
+        onConfirm={handleStartMeeting}
+        issues={issues}
+        fromDate={fromDateStr}
+        toDate={toDateStr}
+        hospiceSlug={slug}
+      />
+
       {/* IDG Completion Modal */}
       <IDGCompletionModal
         open={isCompletionModalOpen}
         onOpenChange={setIsCompletionModalOpen}
         onComplete={handleCompleteIDGReview}
-        weekStart={weekStart}
-        weekEnd={weekEnd}
+        weekStart={fromDateStr}
+        weekEnd={toDateStr}
         disciplines={disciplines}
-        issueCount={issues.length}
-        admissionsCount={summary?.admissions || 0}
-        deathsCount={summary?.deaths || 0}
+        issueCount={selectedIssueIds.size}
+        admissionsCount={summary?.admissionsThisWeek || 0}
+        deathsCount={summary?.deathsThisWeek || 0}
         previousReview={previousReview}
       />
     </main>

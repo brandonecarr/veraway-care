@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Pencil, Trash2, ArrowUpDown, Filter } from 'lucide-react';
 import type { Patient } from '@/types/care-coordination';
-import { BENEFIT_PERIODS, getBenefitPeriodDays, getBenefitPeriodDaysRemaining } from '@/types/care-coordination';
+import { BENEFIT_PERIODS, getBenefitPeriodDays, getBenefitPeriodDaysRemaining, LEVELS_OF_CARE, RESIDENCE_TYPES } from '@/types/care-coordination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -38,10 +39,28 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'mrn' | 'admission'>('name');
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     fetchPatients();
   }, []);
+
+  // Handle patient query parameter to auto-open patient detail
+  useEffect(() => {
+    const patientId = searchParams.get('patient');
+    if (patientId && patients.length > 0) {
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        setSelectedPatient(patient);
+        setShowDetailDialog(true);
+        // Clear the query parameter from the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('patient');
+        router.replace(url.pathname, { scroll: false });
+      }
+    }
+  }, [searchParams, patients, router]);
 
   const fetchPatients = async () => {
     setIsLoading(true);
@@ -180,7 +199,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                 Add Patient
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Patient</DialogTitle>
               </DialogHeader>
@@ -306,7 +325,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Patient</DialogTitle>
           </DialogHeader>
@@ -342,18 +361,78 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
   );
 }
 
+interface StaffMember {
+  id: string;
+  name: string | null;
+  email: string;
+  job_role: string | null;
+}
+
 function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSuccess: () => void }) {
+  // Helper to format date for HTML date input (YYYY-MM-DD)
+  const formatDateForInput = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   const [formData, setFormData] = useState({
     benefit_period: patient?.benefit_period || 1,
     mrn: patient?.mrn || '',
     first_name: patient?.first_name || '',
     last_name: patient?.last_name || '',
-    date_of_birth: patient?.date_of_birth || '',
-    admission_date: patient?.admission_date || '',
+    date_of_birth: formatDateForInput(patient?.date_of_birth),
+    admission_date: formatDateForInput(patient?.admission_date),
     diagnosis: patient?.diagnosis || '',
     status: patient?.status || 'active',
+    level_of_care: patient?.level_of_care || '',
+    rn_case_manager_id: patient?.rn_case_manager_id || '',
+    residence_type: patient?.residence_type || '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
+  // Fetch staff members on mount
+  useEffect(() => {
+    const fetchStaff = async () => {
+      setIsLoadingStaff(true);
+      try {
+        const response = await fetch('/api/settings/staff');
+        if (response.ok) {
+          const data = await response.json();
+          setStaffMembers(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    };
+    fetchStaff();
+  }, []);
+
+  // Update form data when patient prop changes (e.g., when opening edit dialog)
+  useEffect(() => {
+    setFormData({
+      benefit_period: patient?.benefit_period || 1,
+      mrn: patient?.mrn || '',
+      first_name: patient?.first_name || '',
+      last_name: patient?.last_name || '',
+      date_of_birth: formatDateForInput(patient?.date_of_birth),
+      admission_date: formatDateForInput(patient?.admission_date),
+      diagnosis: patient?.diagnosis || '',
+      status: patient?.status || 'active',
+      level_of_care: patient?.level_of_care || '',
+      rn_case_manager_id: patient?.rn_case_manager_id || '',
+      residence_type: patient?.residence_type || '',
+    });
+  }, [patient]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,6 +544,66 @@ function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSucce
           placeholder="Primary diagnosis"
           className="mt-1"
         />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Level of Care</label>
+        <Select
+          value={formData.level_of_care}
+          onValueChange={(value) => setFormData({ ...formData, level_of_care: value })}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select level of care" />
+          </SelectTrigger>
+          <SelectContent>
+            {LEVELS_OF_CARE.map((level) => (
+              <SelectItem key={level} value={level}>
+                {level}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Registered Nurse Case Manager</label>
+        <Select
+          value={formData.rn_case_manager_id}
+          onValueChange={(value) => setFormData({ ...formData, rn_case_manager_id: value })}
+          disabled={isLoadingStaff}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder={isLoadingStaff ? "Loading staff..." : "Select RN Case Manager"} />
+          </SelectTrigger>
+          <SelectContent>
+            {staffMembers.map((staff) => (
+              <SelectItem key={staff.id} value={staff.id}>
+                <div className="flex items-center gap-2">
+                  <span>{staff.name || staff.email}</span>
+                  {staff.job_role && (
+                    <span className="text-xs text-muted-foreground">({staff.job_role})</span>
+                  )}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-[#1A1A1A]">Home or Facility</label>
+        <Select
+          value={formData.residence_type}
+          onValueChange={(value) => setFormData({ ...formData, residence_type: value })}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select residence type" />
+          </SelectTrigger>
+          <SelectContent>
+            {RESIDENCE_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex justify-end gap-2 pt-4">
         <Button type="submit" disabled={isSubmitting} className="bg-[#2D7A7A] hover:bg-[#236060]">
@@ -584,6 +723,55 @@ function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: () => vo
                   );
                 })()}
               </div>
+            </div>
+          )}
+          {patient.level_of_care && (
+            <div>
+              <p className="text-[#666] mb-1">Level of Care</p>
+              <p className="font-medium">{patient.level_of_care}</p>
+            </div>
+          )}
+          {patient.rn_case_manager && (
+            <div>
+              <p className="text-[#666] mb-1">RN Case Manager</p>
+              <p className="font-medium">
+                {patient.rn_case_manager.name || patient.rn_case_manager.email}
+                {patient.rn_case_manager.job_role && (
+                  <span className="text-[#666] ml-1">({patient.rn_case_manager.job_role})</span>
+                )}
+              </p>
+            </div>
+          )}
+          {patient.residence_type && (
+            <div>
+              <p className="text-[#666] mb-1">Residence</p>
+              <p className="font-medium">{patient.residence_type}</p>
+            </div>
+          )}
+          {patient.death_date && (
+            <div>
+              <p className="text-[#666] mb-1">Date of Death</p>
+              <p className="font-medium">{new Date(patient.death_date).toLocaleDateString()}</p>
+            </div>
+          )}
+          {patient.cause_of_death && (
+            <div>
+              <p className="text-[#666] mb-1">Cause of Death</p>
+              <p className="font-medium">{patient.cause_of_death}</p>
+            </div>
+          )}
+          {patient.bereavement_status && (
+            <div>
+              <p className="text-[#666] mb-1">Bereavement Status</p>
+              <Badge
+                variant="outline"
+                className={patient.bereavement_status === 'Education Provided'
+                  ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                  : 'bg-amber-100 text-amber-700 border-amber-300'
+                }
+              >
+                {patient.bereavement_status}
+              </Badge>
             </div>
           )}
         </div>

@@ -19,22 +19,22 @@ function getAdminClient() {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const facility_id = searchParams.get('facility_id');
+    const hospice_id = searchParams.get('hospice_id');
 
-    if (!facility_id) {
+    if (!hospice_id) {
       return NextResponse.json(
-        { error: 'Missing facility_id parameter' },
+        { error: 'Missing hospice_id parameter' },
         { status: 400 }
       );
     }
 
     const supabase = getAdminClient();
 
-    // Fetch coordinator roles for this facility
+    // Fetch coordinator roles for this hospice
     const { data: coordinators, error } = await supabase
       .from('user_roles')
       .select('user_id')
-      .eq('facility_id', facility_id)
+      .eq('hospice_id', hospice_id)
       .eq('role', 'coordinator');
 
     if (error) {

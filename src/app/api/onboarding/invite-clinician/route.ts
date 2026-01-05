@@ -18,25 +18,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { facility_id, name, email, job_role } = body;
+    // Support both hospice_id and facility_id for backwards compatibility
+    const hospiceId = body.hospice_id || body.facility_id;
+    const { name, email, job_role } = body;
 
-    if (!facility_id || !name || !email || !job_role) {
+    if (!hospiceId || !name || !email || !job_role) {
       return NextResponse.json(
-        { error: 'Missing required fields: facility_id, name, email, job_role' },
+        { error: 'Missing required fields: hospice_id, name, email, job_role' },
         { status: 400 }
       );
     }
 
-    // Verify the user belongs to this facility
+    // Verify the user belongs to this hospice
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('facility_id')
+      .select('hospice_id')
       .eq('id', user.id)
       .single();
 
-    if (userError || !userData || userData.facility_id !== facility_id) {
+    if (userError || !userData || userData.hospice_id !== hospiceId) {
       return NextResponse.json(
-        { error: 'You do not have permission to invite users to this facility' },
+        { error: 'You do not have permission to invite users to this hospice' },
         { status: 403 }
       );
     }
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest) {
       userAlreadyRegistered = !!userExists.last_sign_in_at;
 
       if (userAlreadyRegistered) {
-        console.log('User already registered, adding to facility as clinician');
+        console.log('User already registered, adding to hospice as clinician');
       } else {
         console.log('User exists but not registered, will resend invite');
       }
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
           id: userId,
           email,
           name,
-          facility_id,
+          hospice_id: hospiceId,
         });
 
       if (createUserError) {
@@ -151,28 +153,28 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      // Update user's facility if needed
+      // Update user's hospice if needed
       const { error: updateError } = await supabaseAdmin
         .from('users')
-        .update({ facility_id })
+        .update({ hospice_id: hospiceId })
         .eq('id', userId);
 
       if (updateError) {
-        console.error('Update user facility error:', updateError);
+        console.error('Update user hospice error:', updateError);
         return NextResponse.json(
-          { error: 'Failed to update user facility' },
+          { error: 'Failed to update user hospice' },
           { status: 500 }
         );
       }
     }
 
     // Set user role as clinician (delete existing first, then insert)
-    // First, delete any existing role for this user in this facility
+    // First, delete any existing role for this user in this hospice
     await supabaseAdmin
       .from('user_roles')
       .delete()
       .eq('user_id', userId)
-      .eq('facility_id', facility_id);
+      .eq('hospice_id', hospiceId);
 
     // Now insert the clinician role with job_role
     const { data: roleData, error: roleError } = await supabaseAdmin
@@ -180,7 +182,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: userId,
         role: 'clinician',
-        facility_id,
+        hospice_id: hospiceId,
         job_role,
       })
       .select();
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
 
     let message = 'Clinician invited successfully';
     if (userAlreadyRegistered) {
-      message = 'Clinician added to facility successfully';
+      message = 'Clinician added to hospice successfully';
     } else if (userExists) {
       message = 'Invite resent successfully';
     }
