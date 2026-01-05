@@ -78,7 +78,6 @@ export interface Issue {
   resolved_at?: string;
   resolved_by?: string;
   last_activity_at?: string;
-  event_reason?: string;
   created_at: string;
   updated_at: string;
   patient?: Patient;

@@ -64,7 +64,6 @@ export async function POST(request: Request) {
 
     const issue = await createIssue({
       ...issueData,
-      event_reason,
       reported_by: user.id
     });
 
