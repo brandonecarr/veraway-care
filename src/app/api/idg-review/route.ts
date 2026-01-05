@@ -37,7 +37,7 @@ const IDG_DISPOSITIONS = [
 ];
 
 // Helper function to format patient data for PDF export
-function formatPatientForPDF(patient: any) {
+function formatPatientForPDF(patient: any, userMap?: Map<string, { name: string; job_role: string }>) {
   const admittedDate = patient.admitted_date || patient.admission_date;
   let daysRemaining: number | null = null;
 
@@ -46,6 +46,15 @@ function formatPatientForPDF(patient: any) {
     const daysInPeriod = patient.benefit_period <= 2 ? 90 : 60;
     const endDate = new Date(admitted.getTime() + daysInPeriod * 24 * 60 * 60 * 1000);
     daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+  }
+
+  // Look up RN case manager info from the user map
+  let rnCaseManager = null;
+  if (patient.rn_case_manager_id && userMap) {
+    const user = userMap.get(patient.rn_case_manager_id);
+    if (user) {
+      rnCaseManager = { name: user.name, job_role: user.job_role };
+    }
   }
 
   return {
@@ -61,7 +70,7 @@ function formatPatientForPDF(patient: any) {
     admission_date: admittedDate,
     discharge_date: patient.discharge_date,
     death_date: patient.death_date,
-    rn_case_manager: patient.rn_case_manager || null,
+    rn_case_manager: rnCaseManager,
     days_remaining: daysRemaining
   };
 }
@@ -246,11 +255,11 @@ export async function GET(request: Request) {
     const grouped = groupIssues(idgIssues, groupBy);
 
     // Define patient select fields for PDF export
+    // Note: rn_case_manager_id references auth.users, so we look up user info separately
     const patientSelectFields = `
       id, first_name, last_name, mrn, date_of_birth, diagnosis,
       level_of_care, residence_type, benefit_period, admitted_date, admission_date,
-      discharge_date, death_date, rn_case_manager_id,
-      rn_case_manager:users!patients_rn_case_manager_id_fkey(id, name, job_role)
+      discharge_date, death_date, rn_case_manager_id
     `;
 
     // Get patient data for the summary stats and PDF export
@@ -261,6 +270,7 @@ export async function GET(request: Request) {
     let admissionsPatients: any[] = [];
     let dischargesPatients: any[] = [];
     let censusPatients: any[] = [];
+    let userMap = new Map<string, { name: string; job_role: string }>();
 
     if (userData?.hospice_id) {
       // Get all active patients (for census and counts)
@@ -271,7 +281,6 @@ export async function GET(request: Request) {
         .eq('status', 'active');
 
       totalActivePatients = activeCount || 0;
-      censusPatients = (activePatients || []).map(p => formatPatientForPDF(p));
 
       // Get admissions in date range (using admitted_date)
       const { data: admissions } = await supabase
@@ -281,9 +290,6 @@ export async function GET(request: Request) {
         .gte('admitted_date', fromDate)
         .lte('admitted_date', toDate);
 
-      admissionsPatients = (admissions || []).map(p => formatPatientForPDF(p));
-      admissionsCount = admissionsPatients.length;
-
       // Get discharges in date range (using discharge_date)
       const { data: discharges } = await supabase
         .from('patients')
@@ -292,7 +298,27 @@ export async function GET(request: Request) {
         .gte('discharge_date', fromDate)
         .lte('discharge_date', toDate);
 
-      dischargesPatients = (discharges || []).map(p => formatPatientForPDF(p));
+      // Collect all unique rn_case_manager_ids
+      const allPatients = [...(activePatients || []), ...(admissions || []), ...(discharges || [])];
+      const rnCaseManagerIds = Array.from(new Set(allPatients.map(p => p.rn_case_manager_id).filter(Boolean)));
+
+      // Fetch user info for RN case managers
+      if (rnCaseManagerIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, job_role')
+          .in('id', rnCaseManagerIds);
+
+        if (users) {
+          users.forEach(u => userMap.set(u.id, { name: u.name || '', job_role: u.job_role || '' }));
+        }
+      }
+
+      // Format patients with user info
+      censusPatients = (activePatients || []).map(p => formatPatientForPDF(p, userMap));
+      admissionsPatients = (admissions || []).map(p => formatPatientForPDF(p, userMap));
+      admissionsCount = admissionsPatients.length;
+      dischargesPatients = (discharges || []).map(p => formatPatientForPDF(p, userMap));
       dischargesCount = dischargesPatients.length;
 
       // Get deaths in date range (using death_date)
@@ -329,7 +355,7 @@ export async function GET(request: Request) {
             const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
 
             return {
-              ...formatPatientForPDF(patient),
+              ...formatPatientForPDF(patient, userMap),
               patient_id: patient.id,
               patient_name: `${patient.first_name} ${patient.last_name}`,
               patient_mrn: patient.mrn,
