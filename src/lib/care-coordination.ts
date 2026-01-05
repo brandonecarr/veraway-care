@@ -124,9 +124,10 @@ export async function getPatients(filters?: {
 }) {
   const supabase = await createClient();
 
+  // Fetch patients without the join (more reliable - avoids foreign key constraint issues)
   let query = supabase
     .from('patients')
-    .select('*, rn_case_manager:users!patients_rn_case_manager_id_fkey(id, name, email)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('last_name', { ascending: true });
 
   // Filter by status if provided
@@ -147,23 +148,38 @@ export async function getPatients(filters?: {
 
   if (error) throw error;
 
-  // Add job_role from user_roles if we have rn_case_manager data
+  // Fetch RN case manager data separately if any patients have one assigned
   if (data && data.length > 0) {
     const managerIds = data
-      .filter((p: any) => p.rn_case_manager?.id)
-      .map((p: any) => p.rn_case_manager.id);
+      .filter((p: any) => p.rn_case_manager_id)
+      .map((p: any) => p.rn_case_manager_id);
 
     if (managerIds.length > 0) {
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('user_id, job_role')
-        .in('user_id', managerIds);
+      // Fetch user data and roles in parallel
+      const [usersResult, rolesResult] = await Promise.all([
+        supabase
+          .from('users')
+          .select('id, name, email')
+          .in('id', managerIds),
+        supabase
+          .from('user_roles')
+          .select('user_id, job_role')
+          .in('user_id', managerIds)
+      ]);
 
-      const roleMap = new Map(roles?.map(r => [r.user_id, r.job_role]) || []);
+      const userMap = new Map(usersResult.data?.map(u => [u.id, u]) || []);
+      const roleMap = new Map(rolesResult.data?.map(r => [r.user_id, r.job_role]) || []);
 
+      // Attach rn_case_manager data to each patient
       data.forEach((patient: any) => {
-        if (patient.rn_case_manager?.id) {
-          patient.rn_case_manager.job_role = roleMap.get(patient.rn_case_manager.id) || null;
+        if (patient.rn_case_manager_id) {
+          const manager = userMap.get(patient.rn_case_manager_id);
+          if (manager) {
+            patient.rn_case_manager = {
+              ...manager,
+              job_role: roleMap.get(patient.rn_case_manager_id) || null
+            };
+          }
         }
       });
     }

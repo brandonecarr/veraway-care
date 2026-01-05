@@ -180,7 +180,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                 Add Patient
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Patient</DialogTitle>
               </DialogHeader>
@@ -306,7 +306,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Patient</DialogTitle>
           </DialogHeader>
