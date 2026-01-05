@@ -57,6 +57,15 @@ function formatPatientForPDF(patient: any, userMap?: Map<string, { name: string;
     }
   }
 
+  // Calculate BP end date
+  let bpEndDate: string | null = null;
+  if (admittedDate && patient.benefit_period) {
+    const admitted = new Date(admittedDate);
+    const daysInPeriod = patient.benefit_period <= 2 ? 90 : 60;
+    const endDate = new Date(admitted.getTime() + daysInPeriod * 24 * 60 * 60 * 1000);
+    bpEndDate = endDate.toISOString();
+  }
+
   return {
     id: patient.id,
     first_name: patient.first_name,
@@ -71,7 +80,10 @@ function formatPatientForPDF(patient: any, userMap?: Map<string, { name: string;
     discharge_date: patient.discharge_date,
     death_date: patient.death_date,
     rn_case_manager: rnCaseManager,
-    days_remaining: daysRemaining
+    days_remaining: daysRemaining,
+    bp_end_date: bpEndDate,
+    discharge_reason: patient.discharge_reason || null,
+    bereavement_status: patient.bereavement_status || null
   };
 }
 
@@ -259,7 +271,8 @@ export async function GET(request: Request) {
     const patientSelectFields = `
       id, first_name, last_name, mrn, date_of_birth, diagnosis,
       level_of_care, residence_type, benefit_period, admitted_date, admission_date,
-      discharge_date, death_date, rn_case_manager_id
+      discharge_date, death_date, rn_case_manager_id,
+      discharge_reason, bereavement_status
     `;
 
     // Get patient data for the summary stats and PDF export

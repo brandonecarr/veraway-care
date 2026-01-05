@@ -59,6 +59,9 @@ interface PatientOverviewItem {
   death_date?: string;
   rn_case_manager?: { name?: string; job_role?: string };
   days_remaining?: number | null;
+  bp_end_date?: string | null;
+  discharge_reason?: string | null;
+  bereavement_status?: string | null;
 }
 
 // Expiring benefit period can be either the old format or the new PatientOverviewItem format
@@ -80,6 +83,7 @@ interface ExpiringBenefitPeriodItem {
   rn_case_manager?: { name?: string; job_role?: string };
   days_remaining?: number | null;
   end_date?: string;
+  bp_end_date?: string | null;
 }
 
 interface ExportOptions {
@@ -253,25 +257,33 @@ export async function generateIDGPDF({
     };
 
     // 1. ADMISSIONS SECTION
+    // Columns: Patient name, Date of birth, Diagnosis, Level of Care, Home/Facility, Benefits Period, BP Dates, RNCM Assigned
     if (admissions.length > 0) {
       doc.setFontSize(14);
       doc.setTextColor(45, 122, 122); // Teal color
       doc.text(`Admissions (${admissions.length})`, 14, overviewY);
 
-      const admissionsData = admissions.map(p => [
-        `${p.first_name} ${p.last_name}`,
-        formatDate(p.date_of_birth),
-        p.diagnosis || '-',
-        p.level_of_care || '-',
-        p.residence_type || '-',
-        formatBP(p.benefit_period, p.days_remaining),
-        formatDate(p.admission_date),
-        p.rn_case_manager?.name || '-',
-      ]);
+      const admissionsData = admissions.map(p => {
+        // Format BP dates as "Start - End"
+        const bpDates = p.admission_date && p.bp_end_date
+          ? `${formatDate(p.admission_date)} - ${formatDate(p.bp_end_date)}`
+          : formatDate(p.admission_date);
+
+        return [
+          `${p.first_name} ${p.last_name}`,
+          formatDate(p.date_of_birth),
+          p.diagnosis || '-',
+          p.level_of_care || '-',
+          p.residence_type || '-',
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          bpDates,
+          p.rn_case_manager?.name || '-',
+        ];
+      });
 
       autoTable(doc, {
         startY: overviewY + 4,
-        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'Admission Date', 'Clinician Assigned']],
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'BP Dates', 'RNCM Assigned']],
         body: admissionsData,
         theme: 'striped',
         styles: { fontSize: 7, cellPadding: 2 },
@@ -287,6 +299,7 @@ export async function generateIDGPDF({
     }
 
     // 2. DISCHARGES SECTION
+    // Columns: Patient name, Diagnosis, Discharge date, Reason for discharge, Bereavement status (if applicable)
     if (discharges.length > 0) {
       // Check if we need a new page
       if (overviewY > pageHeight - 60) {
@@ -300,26 +313,23 @@ export async function generateIDGPDF({
 
       const dischargesData = discharges.map(p => [
         `${p.first_name} ${p.last_name}`,
-        formatDate(p.date_of_birth),
         p.diagnosis || '-',
-        p.level_of_care || '-',
-        p.residence_type || '-',
-        formatBP(p.benefit_period, p.days_remaining),
         formatDate(p.discharge_date),
-        p.rn_case_manager?.name || '-',
+        p.discharge_reason || '-',
+        p.bereavement_status || '-',
       ]);
 
       autoTable(doc, {
         startY: overviewY + 4,
-        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'Discharge Date', 'Clinician Assigned']],
+        head: [['Patient Name', 'Diagnosis', 'Discharge Date', 'Reason for Discharge', 'Bereavement Status']],
         body: dischargesData,
         theme: 'striped',
-        styles: { fontSize: 7, cellPadding: 2 },
+        styles: { fontSize: 8, cellPadding: 3 },
         headStyles: {
           fillColor: [234, 88, 12],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 7,
+          fontSize: 8,
         },
         alternateRowStyles: { fillColor: [255, 245, 235] },
       });
@@ -327,6 +337,7 @@ export async function generateIDGPDF({
     }
 
     // 3. UPCOMING RECERTIFICATIONS SECTION (≤14 days in BP)
+    // Columns: Patient name, DOB, diagnosis, Level of Care, Home/Facility, BP, Days until BP expiration (show date of expiration as well), Clinician assigned
     if (expiringBenefitPeriods.length > 0) {
       // Check if we need a new page
       if (overviewY > pageHeight - 60) {
@@ -344,21 +355,27 @@ export async function generateIDGPDF({
       const recertData = expiringBenefitPeriods.map(p => {
         // Support both old format (patient_name) and new format (first_name + last_name)
         const patientName = p.patient_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
+        // Format expiration as "X days (MM/DD/YYYY)"
+        const expirationDate = p.bp_end_date || p.end_date;
+        const daysUntilExpiration = expirationDate
+          ? `${p.days_remaining ?? 0} days (${formatDate(expirationDate)})`
+          : `${p.days_remaining ?? 0} days`;
+
         return [
           patientName,
           formatDate(p.date_of_birth),
           p.diagnosis || '-',
           p.level_of_care || '-',
           p.residence_type || '-',
-          formatBP(p.benefit_period, p.days_remaining),
-          `${p.days_remaining ?? 0} days`,
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          daysUntilExpiration,
           p.rn_case_manager?.name || '-',
         ];
       });
 
       autoTable(doc, {
         startY: overviewY + 9,
-        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'Days Remaining', 'Clinician Assigned']],
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'BP', 'Days Until Expiration', 'Clinician Assigned']],
         body: recertData,
         theme: 'striped',
         styles: { fontSize: 7, cellPadding: 2 },
@@ -374,6 +391,7 @@ export async function generateIDGPDF({
     }
 
     // 4. ISSUES SELECTED SECTION
+    // Columns: Patient name, Current Issue Card (issue type, description, status, assignee combined)
     if (issues.length > 0) {
       // Check if we need a new page
       if (overviewY > pageHeight - 60) {
@@ -385,26 +403,41 @@ export async function generateIDGPDF({
       doc.setTextColor(26, 26, 26);
       doc.text(`Issues Selected for IDG (${issues.length})`, 14, overviewY);
 
-      const issuesSelectedData = issues.map(issue => [
-        issue.patient_name,
-        issue.patient_mrn,
-        issue.issue_type,
-        issue.description?.substring(0, 50) + (issue.description && issue.description.length > 50 ? '...' : '') || '-',
-        issue.status.replace('_', ' ').toUpperCase(),
-        issue.assignee_job_role || issue.assignee_name,
-      ]);
+      const issuesSelectedData = issues.map(issue => {
+        // Format current issue card as a multi-line summary
+        const statusText = issue.status.replace('_', ' ').toUpperCase();
+        const assignee = issue.assignee_job_role || issue.assignee_name;
+        const descSnippet = issue.description
+          ? (issue.description.length > 80 ? issue.description.substring(0, 80) + '...' : issue.description)
+          : '';
+
+        const issueCard = [
+          `[${issue.issue_type}] ${statusText}`,
+          descSnippet,
+          `Assigned: ${assignee}`
+        ].filter(Boolean).join('\n');
+
+        return [
+          issue.patient_name,
+          issueCard,
+        ];
+      });
 
       autoTable(doc, {
         startY: overviewY + 4,
-        head: [['Patient Name', 'MRN', 'Issue Type', 'Description', 'Status', 'Assigned To']],
+        head: [['Patient Name', 'Current Issue']],
         body: issuesSelectedData,
         theme: 'striped',
-        styles: { fontSize: 7, cellPadding: 2 },
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
         headStyles: {
           fillColor: [45, 122, 122],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 7,
+          fontSize: 8,
+        },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 140 },
         },
         alternateRowStyles: { fillColor: [250, 250, 248] },
       });
@@ -412,6 +445,7 @@ export async function generateIDGPDF({
     }
 
     // 5. TOTAL CURRENT CENSUS SECTION
+    // Columns: Patient name, DOB, diagnosis, Level of Care, Home/Facility, BP, Days until BP expiration (show date of expiration as well), Clinician assigned
     if (censusPatients.length > 0) {
       // Check if we need a new page
       if (overviewY > pageHeight - 60) {
@@ -421,22 +455,29 @@ export async function generateIDGPDF({
 
       doc.setFontSize(14);
       doc.setTextColor(26, 26, 26);
-      doc.text(`Current Census (${censusPatients.length} patients)`, 14, overviewY);
+      doc.text(`Total Current Census (${censusPatients.length} patients)`, 14, overviewY);
 
-      const censusData = censusPatients.map(p => [
-        `${p.first_name} ${p.last_name}`,
-        formatDate(p.date_of_birth),
-        p.diagnosis || '-',
-        p.level_of_care || '-',
-        p.residence_type || '-',
-        formatBP(p.benefit_period, p.days_remaining),
-        formatDate(p.admission_date),
-        p.rn_case_manager?.name || '-',
-      ]);
+      const censusData = censusPatients.map(p => {
+        // Format expiration as "X days (MM/DD/YYYY)"
+        const daysUntilExpiration = p.bp_end_date
+          ? `${p.days_remaining ?? '-'} days (${formatDate(p.bp_end_date)})`
+          : (p.days_remaining !== null && p.days_remaining !== undefined ? `${p.days_remaining} days` : '-');
+
+        return [
+          `${p.first_name} ${p.last_name}`,
+          formatDate(p.date_of_birth),
+          p.diagnosis || '-',
+          p.level_of_care || '-',
+          p.residence_type || '-',
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          daysUntilExpiration,
+          p.rn_case_manager?.name || '-',
+        ];
+      });
 
       autoTable(doc, {
         startY: overviewY + 4,
-        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'Admission Date', 'Clinician Assigned']],
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'BP', 'Days Until Expiration', 'Clinician Assigned']],
         body: censusData,
         theme: 'striped',
         styles: { fontSize: 7, cellPadding: 2 },
