@@ -81,9 +81,8 @@ function formatPatientForPDF(patient: any, userMap?: Map<string, { name: string;
     death_date: patient.death_date,
     rn_case_manager: rnCaseManager,
     days_remaining: daysRemaining,
-    bp_end_date: bpEndDate,
-    discharge_reason: patient.discharge_reason || null,
-    bereavement_status: patient.bereavement_status || null
+    bp_end_date: bpEndDate
+    // Note: discharge_reason and bereavement_status are not yet columns in the patients table
   };
 }
 
@@ -268,11 +267,11 @@ export async function GET(request: Request) {
 
     // Define patient select fields for PDF export
     // Note: rn_case_manager_id references auth.users, so we look up user info separately
+    // Note: discharge_reason and bereavement_status are not yet columns in the patients table
     const patientSelectFields = `
       id, first_name, last_name, mrn, date_of_birth, diagnosis,
       level_of_care, residence_type, benefit_period, admitted_date, admission_date,
-      discharge_date, death_date, rn_case_manager_id,
-      discharge_reason, bereavement_status
+      discharge_date, death_date, rn_case_manager_id
     `;
 
     // Get patient data for the summary stats and PDF export
