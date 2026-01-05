@@ -605,7 +605,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             <Button
               variant="outline"
               className="flex items-center gap-2 w-fit"
-              disabled={isExporting || isLoading || displayedIssues.length === 0}
+              disabled={isExporting || isLoading}
               onClick={async () => {
                 if (!summary) return;
                 setIsExporting(true);
