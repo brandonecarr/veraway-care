@@ -163,6 +163,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'fromDate and toDate are required' }, { status: 400 });
     }
 
+    // Ensure toDate includes the full end day (23:59:59) for proper date comparisons
+    // This handles cases where timestamps like "2026-01-05 12:00:00" should match toDate "2026-01-05"
+    const toDateEndOfDay = toDate.includes('T') ? toDate : `${toDate}T23:59:59.999Z`;
+
     // Try RPC function first, fall back to direct query if not available
     let idgIssues: IDGIssue[] = [];
 
@@ -300,7 +304,7 @@ export async function GET(request: Request) {
         .select(patientSelectFields)
         .eq('hospice_id', userData.hospice_id)
         .gte('admitted_date', fromDate)
-        .lte('admitted_date', toDate);
+        .lte('admitted_date', toDateEndOfDay);
 
       // Get discharges in date range (using discharge_date)
       const { data: discharges } = await supabase
@@ -308,7 +312,7 @@ export async function GET(request: Request) {
         .select(patientSelectFields)
         .eq('hospice_id', userData.hospice_id)
         .gte('discharge_date', fromDate)
-        .lte('discharge_date', toDate);
+        .lte('discharge_date', toDateEndOfDay);
 
       // Collect all unique rn_case_manager_ids
       const allPatients = [...(activePatients || []), ...(admissions || []), ...(discharges || [])];
@@ -339,7 +343,7 @@ export async function GET(request: Request) {
         .select('*', { count: 'exact', head: true })
         .eq('hospice_id', userData.hospice_id)
         .gte('death_date', fromDate)
-        .lte('death_date', toDate);
+        .lte('death_date', toDateEndOfDay);
 
       deathsCount = deaths || 0;
     }
