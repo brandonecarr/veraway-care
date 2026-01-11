@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Send, FileText, Plus, Settings } from 'lucide-react';
+import { Send, FileText, Settings } from 'lucide-react';
 import { useMessageTemplates } from '@/hooks/use-message-templates';
 import { MessageTemplatesDialog } from './message-templates-dialog';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,7 @@ export function MessageInput({
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -107,12 +108,21 @@ export function MessageInput({
     }, 0);
   }, []);
 
+  const handleOpenManageTemplates = useCallback(() => {
+    // Close dropdown first, then open dialog after a short delay
+    // This prevents portal conflicts between DropdownMenu and Dialog
+    setIsDropdownOpen(false);
+    setTimeout(() => {
+      setIsTemplatesDialogOpen(true);
+    }, 100);
+  }, []);
+
   return (
     <>
       <div className="p-4 border-t border-[#D4D4D4] bg-[#FAFAF8]">
         <div className="flex gap-2">
           {/* Template Button */}
-          <DropdownMenu>
+          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
@@ -156,7 +166,10 @@ export function MessageInput({
                 </div>
               )}
               <DropdownMenuItem
-                onClick={() => setIsTemplatesDialogOpen(true)}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  handleOpenManageTemplates();
+                }}
                 className="cursor-pointer"
               >
                 <Settings className="w-4 h-4 mr-2" />
