@@ -2,6 +2,46 @@
 -- Adds indexes and optimized functions for scaling to thousands of messages
 
 -- =====================================================
+-- CLEANUP: Drop all existing versions of these functions
+-- =====================================================
+-- Using DO block to safely drop any existing function overloads
+
+DO $$
+DECLARE
+    func_record RECORD;
+BEGIN
+    -- Drop all overloads of get_batch_unread_counts
+    FOR func_record IN
+        SELECT p.oid::regprocedure AS func_signature
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'get_batch_unread_counts'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_signature || ' CASCADE';
+    END LOOP;
+
+    -- Drop all overloads of get_total_unread_count
+    FOR func_record IN
+        SELECT p.oid::regprocedure AS func_signature
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'get_total_unread_count'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_signature || ' CASCADE';
+    END LOOP;
+
+    -- Drop all overloads of get_user_conversations
+    FOR func_record IN
+        SELECT p.oid::regprocedure AS func_signature
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'get_user_conversations'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_signature || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- =====================================================
 -- ADDITIONAL INDEXES FOR PERFORMANCE
 -- =====================================================
 
@@ -35,9 +75,6 @@ INCLUDE (id, type, name, patient_id, last_message_preview);
 -- Returns unread counts for multiple conversations in a single query
 -- Much more efficient than calling get_conversation_unread_count per conversation
 
--- Drop any existing versions to avoid conflicts
-DROP FUNCTION IF EXISTS public.get_batch_unread_counts(uuid[]);
-
 CREATE OR REPLACE FUNCTION public.get_batch_unread_counts(conversation_ids uuid[])
 RETURNS TABLE(conversation_id uuid, unread_count bigint) AS $$
 BEGIN
@@ -63,9 +100,6 @@ COMMENT ON FUNCTION public.get_batch_unread_counts IS 'Efficiently returns unrea
 -- OPTIMIZED TOTAL UNREAD COUNT FUNCTION
 -- =====================================================
 -- Returns total unread message count across all conversations for the navbar badge
-
--- Drop any existing versions to avoid conflicts
-DROP FUNCTION IF EXISTS public.get_total_unread_count();
 
 CREATE OR REPLACE FUNCTION public.get_total_unread_count()
 RETURNS bigint AS $$
@@ -97,9 +131,6 @@ COMMENT ON FUNCTION public.get_total_unread_count IS 'Returns total unread messa
 -- OPTIMIZED CONVERSATIONS LIST FUNCTION
 -- =====================================================
 -- Returns conversations with unread counts in a single efficient query
-
--- Drop any existing versions to avoid conflicts
-DROP FUNCTION IF EXISTS public.get_user_conversations(boolean, text);
 
 CREATE OR REPLACE FUNCTION public.get_user_conversations(
     include_archived boolean DEFAULT false,
