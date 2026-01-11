@@ -4,6 +4,39 @@ import { notifyPatientUpdate, getUserHospiceId } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
+// Helper to format field names for notifications
+function formatFieldNames(fields: string[]): string {
+  const fieldLabels: Record<string, string> = {
+    mrn: 'MRN',
+    first_name: 'first name',
+    last_name: 'last name',
+    date_of_birth: 'date of birth',
+    admission_date: 'admission date',
+    admitted_date: 'admission date',
+    diagnosis: 'diagnosis',
+    status: 'status',
+    benefit_period: 'benefit period',
+    level_of_care: 'level of care',
+    rn_case_manager_id: 'case manager',
+    residence_type: 'residence type',
+    discharge_date: 'discharge date',
+    death_date: 'death date',
+    cause_of_death: 'cause of death',
+    bereavement_status: 'bereavement status',
+  };
+
+  // Filter out duplicate fields (admitted_date/admission_date are the same)
+  const uniqueFields = fields.filter(f => f !== 'admitted_date' || !fields.includes('admission_date'));
+
+  const formatted = uniqueFields.map(f => fieldLabels[f] || f.replace(/_/g, ' '));
+
+  if (formatted.length === 0) return '';
+  if (formatted.length === 1) return formatted[0];
+  if (formatted.length === 2) return `${formatted[0]} and ${formatted[1]}`;
+
+  return `${formatted.slice(0, -1).join(', ')}, and ${formatted[formatted.length - 1]}`;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -80,7 +113,7 @@ export async function PUT(
     // Send notifications to all hospice users (fire and forget)
     const hospiceId = await getUserHospiceId(user.id);
     if (hospiceId) {
-      const changedFields = Object.keys(updateData).join(', ');
+      const changedFields = formatFieldNames(Object.keys(updateData));
       notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,
@@ -145,7 +178,7 @@ export async function PATCH(
     // Send notifications to all hospice users (fire and forget)
     const hospiceId = await getUserHospiceId(user.id);
     if (hospiceId) {
-      const changedFields = Object.keys(updateData).join(', ');
+      const changedFields = formatFieldNames(Object.keys(updateData));
       notifyPatientUpdate(user.id, hospiceId, {
         id: data.id,
         first_name: data.first_name,

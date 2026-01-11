@@ -127,6 +127,13 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   const [summary, setSummary] = useState<IDGSummary | null>(null);
   const [expiringBenefitPeriods, setExpiringBenefitPeriods] = useState<ExpiringBenefitPeriod[]>([]);
 
+  // PDF export data
+  const [hospiceName, setHospiceName] = useState<string>('');
+  const [admissionsPatients, setAdmissionsPatients] = useState<any[]>([]);
+  const [dischargesPatients, setDischargesPatients] = useState<any[]>([]);
+  const [fullCensusPatients, setFullCensusPatients] = useState<any[]>([]);
+  const [totalCensusCount, setTotalCensusCount] = useState<number>(0);
+
   // Date range controls (replacing week navigation)
   const [fromDate, setFromDate] = useState<Date>(() => subDays(new Date(), 7));
   const [toDate, setToDate] = useState<Date>(() => new Date());
@@ -269,12 +276,23 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
       setDisciplines(data.disciplines || []);
       setDispositions(data.dispositions || []);
       setPreviousReview(data.previousReview || null);
+      // PDF export data
+      setHospiceName(data.hospiceName || '');
+      setAdmissionsPatients(data.admissionsPatients || []);
+      setDischargesPatients(data.dischargesPatients || []);
+      setFullCensusPatients(data.censusPatients || []);
+      setTotalCensusCount(data.totalCensusCount || 0);
     } catch (error) {
       console.error('Error fetching IDG data:', error);
       setIssues([]);
       setGrouped({});
       setSummary(null);
       setExpiringBenefitPeriods([]);
+      setHospiceName('');
+      setAdmissionsPatients([]);
+      setDischargesPatients([]);
+      setFullCensusPatients([]);
+      setTotalCensusCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -587,7 +605,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             <Button
               variant="outline"
               className="flex items-center gap-2 w-fit"
-              disabled={isExporting || isLoading || displayedIssues.length === 0}
+              disabled={isExporting || isLoading}
               onClick={async () => {
                 if (!summary) return;
                 setIsExporting(true);
@@ -597,7 +615,15 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
                     summary,
                     weekStart: fromDateStr,
                     weekEnd: toDateStr,
-                    groupBy
+                    groupBy,
+                    // New PDF export data
+                    hospiceName,
+                    meetingDateTime: meetingStartedAt || undefined,
+                    censusPatients: fullCensusPatients,
+                    admissions: admissionsPatients,
+                    discharges: dischargesPatients,
+                    expiringBenefitPeriods,
+                    totalCensusCount
                   });
                 } finally {
                   setIsExporting(false);

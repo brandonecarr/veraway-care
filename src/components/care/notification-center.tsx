@@ -21,6 +21,60 @@ import { createClient } from '../../../supabase/client';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { ConnectionStatus } from './connection-status';
 
+// Map raw database field names to human-readable labels
+const FIELD_LABELS: Record<string, string> = {
+  mrn: 'MRN',
+  first_name: 'first name',
+  last_name: 'last name',
+  date_of_birth: 'date of birth',
+  admission_date: 'admission date',
+  admitted_date: 'admission date',
+  diagnosis: 'diagnosis',
+  status: 'status',
+  benefit_period: 'benefit period',
+  level_of_care: 'level of care',
+  rn_case_manager_id: 'case manager',
+  residence_type: 'residence type',
+  discharge_date: 'discharge date',
+  death_date: 'death date',
+  cause_of_death: 'cause of death',
+  bereavement_status: 'bereavement status',
+};
+
+// Prettify notification messages that contain raw database field names
+function prettifyMessage(message: string): string {
+  if (!message) return message;
+
+  // Check if message contains a colon followed by field names (pattern: "updated Patient: field1, field2, ...")
+  const colonIndex = message.lastIndexOf(':');
+  if (colonIndex === -1) return message;
+
+  const beforeColon = message.substring(0, colonIndex);
+  const afterColon = message.substring(colonIndex + 1).trim();
+
+  // Check if the part after colon looks like raw field names (contains underscores or known raw fields)
+  const hasRawFieldNames = afterColon.includes('_') ||
+    Object.keys(FIELD_LABELS).some(field => afterColon.toLowerCase().includes(field));
+
+  if (!hasRawFieldNames) return message;
+
+  // Split by comma and transform each field
+  const fields = afterColon.split(',').map(f => f.trim()).filter(Boolean);
+
+  // Filter out duplicates (admitted_date/admission_date are the same)
+  const uniqueFields = fields.filter(f =>
+    f !== 'admitted_date' || !fields.includes('admission_date')
+  );
+
+  const formatted = uniqueFields.map(f => FIELD_LABELS[f] || f.replace(/_/g, ' '));
+
+  if (formatted.length === 0) return beforeColon;
+  if (formatted.length === 1) return `${beforeColon}: ${formatted[0]}`;
+  if (formatted.length === 2) return `${beforeColon}: ${formatted[0]} and ${formatted[1]}`;
+
+  return `${beforeColon}: ${formatted.slice(0, -1).join(', ')}, and ${formatted[formatted.length - 1]}`;
+}
+
 export function NotificationCenter() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -213,7 +267,7 @@ export function NotificationCenter() {
                         )}
                       </div>
                       <p className="text-body text-muted-foreground mt-1 line-clamp-2">
-                        {notification.message}
+                        {prettifyMessage(notification.message)}
                       </p>
                       {notification.type === 'message' && notification.metadata?.sender_name && (
                         <p className="text-metadata text-muted-foreground mt-2">

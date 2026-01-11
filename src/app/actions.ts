@@ -2,6 +2,7 @@
 
 import { encodedRedirect } from "@/utils/utils";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "../../supabase/server";
 import { getUserHospiceSlug } from "@/lib/hospice";
 
@@ -114,13 +115,18 @@ export const signInAction = async (formData: FormData) => {
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const supabase = await createClient();
-  const callbackUrl = formData.get("callbackUrl")?.toString();
+  const headersList = await headers();
+  const origin = headersList.get("origin") || headersList.get("x-forwarded-host") || process.env.NEXT_PUBLIC_SITE_URL || "";
+  const protocol = headersList.get("x-forwarded-proto") || "https";
+  const baseUrl = origin.startsWith("http") ? origin : `${protocol}://${origin}`;
 
   if (!email) {
     return encodedRedirect("error", "/forgot-password", "Email is required");
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {});
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${baseUrl}/auth/callback?redirect_to=/reset-password`,
+  });
 
   if (error) {
     return encodedRedirect(
@@ -128,10 +134,6 @@ export const forgotPasswordAction = async (formData: FormData) => {
       "/forgot-password",
       "Could not reset password",
     );
-  }
-
-  if (callbackUrl) {
-    return redirect(callbackUrl);
   }
 
   return encodedRedirect(
@@ -148,17 +150,17 @@ export const resetPasswordAction = async (formData: FormData) => {
   const confirmPassword = formData.get("confirmPassword") as string;
 
   if (!password || !confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/reset-password",
       "Password and confirm password are required",
     );
   }
 
   if (password !== confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
-      "/dashboard/reset-password",
+      "/reset-password",
       "Passwords do not match",
     );
   }
@@ -168,14 +170,14 @@ export const resetPasswordAction = async (formData: FormData) => {
   });
 
   if (error) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
-      "/dashboard/reset-password",
+      "/reset-password",
       "Password update failed",
     );
   }
 
-  encodedRedirect("success", "/protected/reset-password", "Password updated");
+  return encodedRedirect("success", "/sign-in", "Password updated successfully. Please sign in with your new password.");
 };
 
 export const signOutAction = async () => {

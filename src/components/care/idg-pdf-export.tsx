@@ -44,12 +44,62 @@ interface IDGSummary {
   thresholdHours: number;
 }
 
+interface PatientOverviewItem {
+  id: string;
+  first_name: string;
+  last_name: string;
+  mrn: string;
+  date_of_birth?: string;
+  diagnosis?: string;
+  level_of_care?: string;
+  residence_type?: string;
+  benefit_period?: number;
+  admission_date?: string;
+  discharge_date?: string;
+  death_date?: string;
+  rn_case_manager?: { name?: string; job_role?: string };
+  days_remaining?: number | null;
+  bp_end_date?: string | null;
+  discharge_reason?: string | null;
+  bereavement_status?: string | null;
+}
+
+// Expiring benefit period can be either the old format or the new PatientOverviewItem format
+interface ExpiringBenefitPeriodItem {
+  patient_id?: string;
+  patient_name?: string;
+  patient_mrn?: string;
+  // Also support PatientOverviewItem fields
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  mrn?: string;
+  date_of_birth?: string;
+  diagnosis?: string;
+  level_of_care?: string;
+  residence_type?: string;
+  benefit_period?: number;
+  admission_date?: string;
+  rn_case_manager?: { name?: string; job_role?: string };
+  days_remaining?: number | null;
+  end_date?: string;
+  bp_end_date?: string | null;
+}
+
 interface ExportOptions {
   issues: IDGIssue[];
   summary: IDGSummary;
   weekStart: string;
   weekEnd: string;
   groupBy: 'patient' | 'issue_type';
+  // New fields for enhanced PDF
+  hospiceName?: string;
+  meetingDateTime?: string;
+  censusPatients?: PatientOverviewItem[];
+  admissions?: PatientOverviewItem[];
+  discharges?: PatientOverviewItem[];
+  expiringBenefitPeriods?: ExpiringBenefitPeriodItem[];
+  totalCensusCount?: number;
 }
 
 export async function generateIDGPDF({
@@ -57,30 +107,57 @@ export async function generateIDGPDF({
   summary,
   weekStart,
   weekEnd,
-  groupBy
+  groupBy,
+  hospiceName,
+  meetingDateTime,
+  censusPatients = [],
+  admissions = [],
+  discharges = [],
+  expiringBenefitPeriods = [],
+  totalCensusCount = 0
 }: ExportOptions): Promise<void> {
   try {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Header
+    // Header - New format: Hospice Name, IDG Issues Outline, Meeting Date/Time
+    let headerY = 15;
+
+    // Hospice Name (if provided)
+    if (hospiceName) {
+      doc.setFontSize(16);
+      doc.setTextColor(102, 102, 102);
+      doc.text(hospiceName, pageWidth / 2, headerY, { align: 'center' });
+      headerY += 10;
+    }
+
+    // IDG Issues Outline title
     doc.setFontSize(24);
     doc.setTextColor(26, 26, 26);
-    doc.text('IDG Issue Review', pageWidth / 2, 20, { align: 'center' });
+    doc.text('IDG Issues Outline', pageWidth / 2, headerY, { align: 'center' });
+    headerY += 10;
 
+    // Meeting Date/Time (if provided) or fall back to date range
     doc.setFontSize(12);
     doc.setTextColor(102, 102, 102);
-    const weekRange = `Week of ${format(new Date(weekStart), 'MMM d')} - ${format(new Date(weekEnd), 'MMM d, yyyy')}`;
-    doc.text(weekRange, pageWidth / 2, 28, { align: 'center' });
+    if (meetingDateTime) {
+      const meetingDate = new Date(meetingDateTime);
+      doc.text(format(meetingDate, 'MMMM d, yyyy h:mm a'), pageWidth / 2, headerY, { align: 'center' });
+    } else {
+      const weekRange = `Week of ${format(new Date(weekStart), 'MMM d')} - ${format(new Date(weekEnd), 'MMM d, yyyy')}`;
+      doc.text(weekRange, pageWidth / 2, headerY, { align: 'center' });
+    }
+    headerY += 7;
 
     doc.setFontSize(10);
-    doc.text(`Generated: ${format(new Date(), 'MMM d, yyyy h:mm a')}`, pageWidth / 2, 35, { align: 'center' });
+    doc.text(`Generated: ${format(new Date(), 'MMM d, yyyy h:mm a')}`, pageWidth / 2, headerY, { align: 'center' });
 
     // Summary Section
+    let sectionY = headerY + 15;
     doc.setFontSize(14);
     doc.setTextColor(26, 26, 26);
-    doc.text('Summary', 14, 48);
+    doc.text('Summary', 14, sectionY);
 
     const summaryData = [
       ['Total Issues for IDG Review', summary.totalIssues.toString()],
@@ -92,7 +169,7 @@ export async function generateIDGPDF({
     ];
 
     autoTable(doc, {
-      startY: 52,
+      startY: sectionY + 4,
       head: [['Metric', 'Count']],
       body: summaryData,
       theme: 'plain',
@@ -139,6 +216,278 @@ export async function generateIDGPDF({
           0: { cellWidth: 100 },
           1: { cellWidth: 40, halign: 'center' },
         },
+      });
+    }
+
+    // Census Patient Count
+    if (totalCensusCount > 0 || censusPatients.length > 0) {
+      const currentY = (doc as any).lastAutoTable.finalY + 15;
+      doc.setFontSize(12);
+      doc.setTextColor(26, 26, 26);
+      const censusCount = totalCensusCount || censusPatients.length;
+      doc.text(`Total Current Census: ${censusCount} patients`, 14, currentY);
+    }
+
+    // =====================================================
+    // PATIENT OVERVIEW SECTIONS
+    // =====================================================
+    doc.addPage();
+    doc.setFontSize(18);
+    doc.setTextColor(26, 26, 26);
+    doc.text('Patient Overview', 14, 20);
+    let overviewY = 30;
+
+    // Helper function to format date
+    const formatDate = (dateStr: string | undefined | null) => {
+      if (!dateStr) return '-';
+      try {
+        return format(new Date(dateStr), 'MM/dd/yyyy');
+      } catch {
+        return '-';
+      }
+    };
+
+    // Helper function to format BP with days remaining
+    const formatBP = (bp: number | undefined, daysRemaining: number | null | undefined) => {
+      if (!bp) return '-';
+      if (daysRemaining !== null && daysRemaining !== undefined) {
+        return `BP${bp} (${daysRemaining}d)`;
+      }
+      return `BP${bp}`;
+    };
+
+    // 1. ADMISSIONS SECTION
+    // Columns: Patient name, Date of birth, Diagnosis, Level of Care, Home/Facility, Benefits Period, BP Dates, RNCM Assigned
+    if (admissions.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(45, 122, 122); // Teal color
+      doc.text(`Admissions (${admissions.length})`, 14, overviewY);
+
+      const admissionsData = admissions.map(p => {
+        // Format BP dates as "Start - End"
+        const bpDates = p.admission_date && p.bp_end_date
+          ? `${formatDate(p.admission_date)} - ${formatDate(p.bp_end_date)}`
+          : formatDate(p.admission_date);
+
+        return [
+          `${p.first_name} ${p.last_name}`,
+          formatDate(p.date_of_birth),
+          p.diagnosis || '-',
+          p.level_of_care || '-',
+          p.residence_type || '-',
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          bpDates,
+          p.rn_case_manager?.name || '-',
+        ];
+      });
+
+      autoTable(doc, {
+        startY: overviewY + 4,
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'Benefit Period', 'BP Dates', 'RNCM Assigned']],
+        body: admissionsData,
+        theme: 'striped',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: {
+          fillColor: [45, 122, 122],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+        },
+        alternateRowStyles: { fillColor: [240, 250, 250] },
+      });
+      overviewY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 2. DISCHARGES SECTION
+    // Columns: Patient name, Diagnosis, Discharge date, Reason for discharge, Bereavement status (if applicable)
+    if (discharges.length > 0) {
+      // Check if we need a new page
+      if (overviewY > pageHeight - 60) {
+        doc.addPage();
+        overviewY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(234, 88, 12); // Orange color
+      doc.text(`Discharges (${discharges.length})`, 14, overviewY);
+
+      const dischargesData = discharges.map(p => [
+        `${p.first_name} ${p.last_name}`,
+        p.diagnosis || '-',
+        formatDate(p.discharge_date),
+        p.discharge_reason || '-',
+        p.bereavement_status || '-',
+      ]);
+
+      autoTable(doc, {
+        startY: overviewY + 4,
+        head: [['Patient Name', 'Diagnosis', 'Discharge Date', 'Reason for Discharge', 'Bereavement Status']],
+        body: dischargesData,
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: {
+          fillColor: [234, 88, 12],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        alternateRowStyles: { fillColor: [255, 245, 235] },
+      });
+      overviewY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 3. UPCOMING RECERTIFICATIONS SECTION (≤14 days in BP)
+    // Columns: Patient name, DOB, diagnosis, Level of Care, Home/Facility, BP, Days until BP expiration (show date of expiration as well), Clinician assigned
+    if (expiringBenefitPeriods.length > 0) {
+      // Check if we need a new page
+      if (overviewY > pageHeight - 60) {
+        doc.addPage();
+        overviewY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(147, 51, 234); // Purple color
+      doc.text(`Upcoming Recertifications (${expiringBenefitPeriods.length})`, 14, overviewY);
+      doc.setFontSize(9);
+      doc.setTextColor(102, 102, 102);
+      doc.text('Patients with ≤14 days remaining in benefit period', 14, overviewY + 5);
+
+      const recertData = expiringBenefitPeriods.map(p => {
+        // Support both old format (patient_name) and new format (first_name + last_name)
+        const patientName = p.patient_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
+        // Format expiration as "X days (MM/DD/YYYY)"
+        const expirationDate = p.bp_end_date || p.end_date;
+        const daysUntilExpiration = expirationDate
+          ? `${p.days_remaining ?? 0} days (${formatDate(expirationDate)})`
+          : `${p.days_remaining ?? 0} days`;
+
+        return [
+          patientName,
+          formatDate(p.date_of_birth),
+          p.diagnosis || '-',
+          p.level_of_care || '-',
+          p.residence_type || '-',
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          daysUntilExpiration,
+          p.rn_case_manager?.name || '-',
+        ];
+      });
+
+      autoTable(doc, {
+        startY: overviewY + 9,
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'BP', 'Days Until Expiration', 'Clinician Assigned']],
+        body: recertData,
+        theme: 'striped',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: {
+          fillColor: [147, 51, 234],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+        },
+        alternateRowStyles: { fillColor: [250, 240, 255] },
+      });
+      overviewY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 4. ISSUES SELECTED SECTION
+    // Columns: Patient name, Current Issue Card (issue type, description, status, assignee combined)
+    if (issues.length > 0) {
+      // Check if we need a new page
+      if (overviewY > pageHeight - 60) {
+        doc.addPage();
+        overviewY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(26, 26, 26);
+      doc.text(`Issues Selected for IDG (${issues.length})`, 14, overviewY);
+
+      const issuesSelectedData = issues.map(issue => {
+        // Format current issue card as a multi-line summary
+        const statusText = issue.status.replace('_', ' ').toUpperCase();
+        const assignee = issue.assignee_job_role || issue.assignee_name;
+        const descSnippet = issue.description
+          ? (issue.description.length > 80 ? issue.description.substring(0, 80) + '...' : issue.description)
+          : '';
+
+        const issueCard = [
+          `[${issue.issue_type}] ${statusText}`,
+          descSnippet,
+          `Assigned: ${assignee}`
+        ].filter(Boolean).join('\n');
+
+        return [
+          issue.patient_name,
+          issueCard,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: overviewY + 4,
+        head: [['Patient Name', 'Current Issue']],
+        body: issuesSelectedData,
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
+        headStyles: {
+          fillColor: [45, 122, 122],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 140 },
+        },
+        alternateRowStyles: { fillColor: [250, 250, 248] },
+      });
+      overviewY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // 5. TOTAL CURRENT CENSUS SECTION
+    // Columns: Patient name, DOB, diagnosis, Level of Care, Home/Facility, BP, Days until BP expiration (show date of expiration as well), Clinician assigned
+    if (censusPatients.length > 0) {
+      // Check if we need a new page
+      if (overviewY > pageHeight - 60) {
+        doc.addPage();
+        overviewY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(26, 26, 26);
+      doc.text(`Total Current Census (${censusPatients.length} patients)`, 14, overviewY);
+
+      const censusData = censusPatients.map(p => {
+        // Format expiration as "X days (MM/DD/YYYY)"
+        const daysUntilExpiration = p.bp_end_date
+          ? `${p.days_remaining ?? '-'} days (${formatDate(p.bp_end_date)})`
+          : (p.days_remaining !== null && p.days_remaining !== undefined ? `${p.days_remaining} days` : '-');
+
+        return [
+          `${p.first_name} ${p.last_name}`,
+          formatDate(p.date_of_birth),
+          p.diagnosis || '-',
+          p.level_of_care || '-',
+          p.residence_type || '-',
+          p.benefit_period ? `BP${p.benefit_period}` : '-',
+          daysUntilExpiration,
+          p.rn_case_manager?.name || '-',
+        ];
+      });
+
+      autoTable(doc, {
+        startY: overviewY + 4,
+        head: [['Patient Name', 'DOB', 'Diagnosis', 'Level of Care', 'Home/Facility', 'BP', 'Days Until Expiration', 'Clinician Assigned']],
+        body: censusData,
+        theme: 'striped',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+        },
+        alternateRowStyles: { fillColor: [239, 246, 255] },
       });
     }
 
@@ -325,12 +674,15 @@ export async function generateIDGPDF({
 
     // Footer on all pages
     const pageCount = doc.internal.pages.length - 1;
+    const dateRangeStr = meetingDateTime
+      ? format(new Date(meetingDateTime), 'MMM d, yyyy')
+      : `${format(new Date(weekStart), 'MMM d')} - ${format(new Date(weekEnd), 'MMM d, yyyy')}`;
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(153, 153, 153);
       doc.text(
-        `CareTrack IDG Review | ${weekRange} | Page ${i} of ${pageCount}`,
+        `CareTrack IDG Outline | ${dateRangeStr} | Page ${i} of ${pageCount}`,
         pageWidth / 2,
         pageHeight - 10,
         { align: 'center' }
