@@ -51,10 +51,12 @@ export function MessageTemplatesDialog({
     setDeleteConfirmId(null);
   };
 
-  const handleClose = () => {
-    resetForm();
-    setViewMode('list');
-    onOpenChange(false);
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      resetForm();
+      setViewMode('list');
+    }
+    onOpenChange(open);
   };
 
   const handleAdd = () => {

@@ -45,9 +45,8 @@ export function useMessageTemplates(): UseMessageTemplatesReturn {
     }
   }, []);
 
-  // Save templates to localStorage whenever they change
-  const saveTemplates = useCallback((newTemplates: MessageTemplate[]) => {
-    setTemplates(newTemplates);
+  // Save to localStorage helper
+  const persistToStorage = useCallback((newTemplates: MessageTemplate[]) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newTemplates));
     } catch (error) {
@@ -63,27 +62,38 @@ export function useMessageTemplates(): UseMessageTemplatesReturn {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveTemplates([...templates, newTemplate]);
-  }, [templates, saveTemplates]);
+
+    setTemplates(prev => {
+      const newTemplates = [...prev, newTemplate];
+      persistToStorage(newTemplates);
+      return newTemplates;
+    });
+  }, [persistToStorage]);
 
   const updateTemplate = useCallback((id: string, name: string, content: string) => {
-    const newTemplates = templates.map(template =>
-      template.id === id
-        ? {
-            ...template,
-            name: name.trim(),
-            content: content.trim(),
-            updatedAt: new Date().toISOString(),
-          }
-        : template
-    );
-    saveTemplates(newTemplates);
-  }, [templates, saveTemplates]);
+    setTemplates(prev => {
+      const newTemplates = prev.map(template =>
+        template.id === id
+          ? {
+              ...template,
+              name: name.trim(),
+              content: content.trim(),
+              updatedAt: new Date().toISOString(),
+            }
+          : template
+      );
+      persistToStorage(newTemplates);
+      return newTemplates;
+    });
+  }, [persistToStorage]);
 
   const deleteTemplate = useCallback((id: string) => {
-    const newTemplates = templates.filter(template => template.id !== id);
-    saveTemplates(newTemplates);
-  }, [templates, saveTemplates]);
+    setTemplates(prev => {
+      const newTemplates = prev.filter(template => template.id !== id);
+      persistToStorage(newTemplates);
+      return newTemplates;
+    });
+  }, [persistToStorage]);
 
   const getTemplate = useCallback((id: string) => {
     return templates.find(template => template.id === id);
