@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Pencil, Trash2, ArrowUpDown, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowUpDown, Filter } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import type { Patient } from '@/types/care-coordination';
 import { BENEFIT_PERIODS, getBenefitPeriodDays, getBenefitPeriodDaysRemaining, LEVELS_OF_CARE, RESIDENCE_TYPES } from '@/types/care-coordination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -95,20 +96,25 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this patient?')) return;
+  const handleToggleStatus = async (patient: Patient) => {
+    const newStatus = patient.status === 'active' ? 'inactive' : 'active';
 
     try {
-      const response = await fetch(`/api/patients/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/patients/${patient.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
       if (response.ok) {
-        toast.success('Patient deleted');
+        toast.success(`Patient ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
         fetchPatients();
       } else {
-        toast.error('Failed to delete patient');
+        toast.error('Failed to update patient status');
       }
     } catch (error) {
-      console.error('Error deleting patient:', error);
-      toast.error('Failed to delete patient');
+      console.error('Error updating patient status:', error);
+      toast.error('Failed to update patient status');
     }
   };
 
@@ -229,7 +235,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
             </p>
           </div>
           <div className="space-y-3">
-          {filteredPatients.map((patient) => (
+          {filteredPatients.map((patient, index) => (
             <div
               key={patient.id}
               className="bg-white border border-[#D4D4D4] rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -239,61 +245,67 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
               }}
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-[#1A1A1A]">
-                      {patient.last_name}, {patient.first_name}
-                    </h3>
-                    <Badge
-                      variant="outline"
-                      className={
-                        patient.status === 'active'
-                          ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
-                          : 'bg-[#999]/10 text-[#999] border-[#999]'
-                      }
-                    >
-                      {patient.status}
-                    </Badge>
+                <div className="flex items-start gap-4 flex-1">
+                  {/* Index Number */}
+                  <div className="flex-shrink-0 w-8 h-8 bg-[#2D7A7A]/10 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-[#2D7A7A]">{index + 1}</span>
                   </div>
-                  <div className="text-sm text-[#666] space-y-1">
-                    <p>
-                      <span className="font-medium">MRN:</span> {patient.mrn}
-                    </p>
-                    {patient.date_of_birth && (
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold text-[#1A1A1A]">
+                        {patient.last_name}, {patient.first_name}
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className={
+                          patient.status === 'active'
+                            ? 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                            : 'bg-[#999]/10 text-[#999] border-[#999]'
+                        }
+                      >
+                        {patient.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-[#666] space-y-1">
                       <p>
-                        <span className="font-medium">DOB:</span>{' '}
-                        {new Date(patient.date_of_birth).toLocaleDateString()}
+                        <span className="font-medium">MRN:</span> {patient.mrn}
                       </p>
-                    )}
-                    {patient.diagnosis && (
-                      <p>
-                        <span className="font-medium">Diagnosis:</span> {patient.diagnosis}
-                      </p>
-                    )}
-                    {patient.benefit_period && (
-                      <p className="flex items-center gap-2">
-                        <span className="font-medium">Benefit Period {patient.benefit_period}</span>
-                        {(() => {
-                          const daysRemaining = getBenefitPeriodDaysRemaining(patient.admitted_date, patient.benefit_period);
-                          if (daysRemaining === null) return null;
-                          const isUrgent = daysRemaining <= 14;
-                          return (
-                            <Badge
-                              variant="outline"
-                              className={isUrgent
-                                ? 'bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]'
-                                : 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
-                              }
-                            >
-                              {daysRemaining} days remaining
-                            </Badge>
-                          );
-                        })()}
-                      </p>
-                    )}
+                      {patient.date_of_birth && (
+                        <p>
+                          <span className="font-medium">DOB:</span>{' '}
+                          {new Date(patient.date_of_birth).toLocaleDateString()}
+                        </p>
+                      )}
+                      {patient.diagnosis && (
+                        <p>
+                          <span className="font-medium">Diagnosis:</span> {patient.diagnosis}
+                        </p>
+                      )}
+                      {patient.benefit_period && (
+                        <p className="flex items-center gap-2">
+                          <span className="font-medium">Benefit Period {patient.benefit_period}</span>
+                          {(() => {
+                            const daysRemaining = getBenefitPeriodDaysRemaining(patient.admitted_date, patient.benefit_period);
+                            if (daysRemaining === null) return null;
+                            const isUrgent = daysRemaining <= 14;
+                            return (
+                              <Badge
+                                variant="outline"
+                                className={isUrgent
+                                  ? 'bg-[#E07A5F]/10 text-[#E07A5F] border-[#E07A5F]'
+                                  : 'bg-[#81B29A]/10 text-[#81B29A] border-[#81B29A]'
+                                }
+                              >
+                                {daysRemaining} days remaining
+                              </Badge>
+                            );
+                          })()}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -305,16 +317,20 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(patient.id);
-                    }}
+                  {/* Active/Inactive Toggle */}
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Trash2 className="h-4 w-4 text-[#E07A5F]" />
-                  </Button>
+                    <span className="text-xs text-[#666]">
+                      {patient.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                    <Switch
+                      checked={patient.status === 'active'}
+                      onCheckedChange={() => handleToggleStatus(patient)}
+                      className="data-[state=checked]:bg-[#81B29A]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
