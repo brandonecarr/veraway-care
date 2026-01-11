@@ -268,6 +268,9 @@ export function NotificationCenter() {
                       </div>
                       <p className="text-body text-muted-foreground mt-1 line-clamp-2">
                         {prettifyMessage(notification.message)}
+                        {(notification.type === 'assignment' || notification.type === 'issue_assigned') && (
+                          <span className="text-amber-600 font-medium"> Acknowledge now.</span>
+                        )}
                       </p>
                       {notification.type === 'message' && notification.metadata?.sender_name && (
                         <p className="text-metadata text-muted-foreground mt-2">
