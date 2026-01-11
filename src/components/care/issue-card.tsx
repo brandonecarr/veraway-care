@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import { Issue, TIMESTAMPED_ISSUE_TYPES } from "@/types/care-coordination";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, MessageSquare, CheckCircle, Heart, CheckCheck } from "lucide-react";
+import { Clock, User, MessageSquare, CheckCircle, Heart, CheckCheck, AlertCircle } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -174,10 +174,15 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
                   "Unassigned"}
               </span>
             </div>
-            {issue.acknowledged_at && (
+            {issue.acknowledged_at ? (
               <div className="flex items-center gap-1 text-[#81B29A]">
                 <CheckCheck className="w-3 h-3" />
                 <span className="font-medium">Acknowledged</span>
+              </div>
+            ) : issue.status !== 'resolved' && (
+              <div className="flex items-center gap-1 text-amber-600">
+                <AlertCircle className="w-3 h-3" />
+                <span className="font-medium">Not Acknowledged</span>
               </div>
             )}
           </div>
