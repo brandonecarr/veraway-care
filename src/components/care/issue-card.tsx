@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import { Issue, TIMESTAMPED_ISSUE_TYPES } from "@/types/care-coordination";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, MessageSquare, CheckCircle, Heart } from "lucide-react";
+import { Clock, User, MessageSquare, CheckCircle, Heart, CheckCheck } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -165,13 +165,21 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <div className="flex items-center gap-1">
-            <User className="w-3 h-3" />
-            <span>
-              {issue.assignee?.name ||
-                issue.assignee?.email?.split("@")[0] ||
-                "Unassigned"}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <User className="w-3 h-3" />
+              <span>
+                {issue.assignee?.name ||
+                  issue.assignee?.email?.split("@")[0] ||
+                  "Unassigned"}
+              </span>
+            </div>
+            {issue.acknowledged_at && (
+              <div className="flex items-center gap-1 text-[#81B29A]">
+                <CheckCheck className="w-3 h-3" />
+                <span className="font-medium">Acknowledged</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {onMessageClick && (

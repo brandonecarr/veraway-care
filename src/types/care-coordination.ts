@@ -77,12 +77,15 @@ export interface Issue {
   tags?: string[];
   resolved_at?: string;
   resolved_by?: string;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
   last_activity_at?: string;
   created_at: string;
   updated_at: string;
   patient?: Patient;
   reporter?: { id: string; email?: string; name?: string };
   assignee?: { id: string; email?: string; name?: string };
+  acknowledger?: { id: string; email?: string; name?: string };
 }
 
 export interface IssueMessage {

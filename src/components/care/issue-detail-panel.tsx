@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User, CheckCircle2, UserCircle, History, FileText, Users } from 'lucide-react';
+import { User, CheckCircle2, UserCircle, History, FileText, Users, AlertTriangle, CheckCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -65,6 +65,8 @@ export function IssueDetailPanel({
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [patientConversationId, setPatientConversationId] = useState<string | null>(null);
   const [localLastActivityAt, setLocalLastActivityAt] = useState<string | null>(null);
+  const [isAcknowledging, setIsAcknowledging] = useState(false);
+  const [localAcknowledged, setLocalAcknowledged] = useState<{ at: string; by: string } | null>(null);
 
   // Use local status if set, otherwise use issue status
   const currentStatus = localStatus || issue?.status;
@@ -73,6 +75,7 @@ export function IssueDetailPanel({
   useEffect(() => {
     setLocalStatus(null);
     setLocalLastActivityAt(null);
+    setLocalAcknowledged(null);
   }, [issue?.id, issue?.status]);
 
   // Clear form fields when the sheet closes
@@ -149,7 +152,7 @@ export function IssueDetailPanel({
       case 'created':
         return 'Issue created';
       case 'assigned':
-        const assigneeName = assignedToUser?.name || assignedToUser?.email?.split('@')[0] || 'user';
+        const assigneeName = assignedToUser?.name || assignedToUser?.email?.split('@')[0] || details?.assigned_to_name || 'user';
         return `Reassigned to ${assigneeName}`;
       case 'status_changed':
         return `Status: ${details?.old_status?.replace('_', ' ')} → ${details?.new_status?.replace('_', ' ')}`;
@@ -157,6 +160,8 @@ export function IssueDetailPanel({
         return 'Marked as resolved';
       case 'updated':
         return 'Added update note';
+      case 'acknowledged':
+        return 'Issue acknowledged';
       case 'lifecycle_completed':
         return `Total Lifecycle: ${details?.total_lifecycle}`;
       default:
@@ -236,6 +241,37 @@ export function IssueDetailPanel({
     onOpenChange(false);
   };
 
+  const handleAcknowledge = async () => {
+    if (!issue) return;
+
+    setIsAcknowledging(true);
+    try {
+      const response = await fetch(`/api/issues/${issue.id}/acknowledge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLocalAcknowledged({
+          at: data.acknowledged_at,
+          by: data.acknowledged_by
+        });
+        toast.success('Issue acknowledged', {
+          description: 'Your acknowledgement has been recorded'
+        });
+        fetchAuditHistory();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to acknowledge issue');
+      }
+    } catch (error) {
+      toast.error('Failed to acknowledge issue');
+    } finally {
+      setIsAcknowledging(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'open':
@@ -291,6 +327,20 @@ export function IssueDetailPanel({
               <p className="text-sm text-muted-foreground mt-1">
                 MRN: {issue.patient?.mrn}
               </p>
+              {/* Acknowledgement Status */}
+              {(localAcknowledged || issue.acknowledged_at) ? (
+                <div className="flex items-center gap-1.5 mt-2 text-[#81B29A]">
+                  <CheckCheck className="w-4 h-4" />
+                  <span className="text-sm font-medium">Acknowledged</span>
+                </div>
+              ) : (
+                issue.assigned_to === currentUserId && currentStatus !== 'resolved' && (
+                  <div className="flex items-center gap-1.5 mt-2 text-amber-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm font-medium">Acknowledgement Required</span>
+                  </div>
+                )
+              )}
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge variant={isOverdue() ? 'destructive' : 'outline'}>
@@ -365,6 +415,30 @@ export function IssueDetailPanel({
         </SheetHeader>
 
         <Separator />
+
+        {/* Acknowledgement Required Banner */}
+        {!localAcknowledged && !issue.acknowledged_at && issue.assigned_to === currentUserId && currentStatus !== 'resolved' && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-800 text-sm">Acknowledgement Required</h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  This issue has been assigned to you. Please acknowledge that you have reviewed it.
+                </p>
+                <Button
+                  onClick={handleAcknowledge}
+                  disabled={isAcknowledging}
+                  size="sm"
+                  className="mt-3 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <CheckCheck className="w-4 h-4 mr-2" />
+                  {isAcknowledging ? 'Acknowledging...' : 'Acknowledge Issue'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="flex-1 px-6">
           <div className="space-y-6 py-6">

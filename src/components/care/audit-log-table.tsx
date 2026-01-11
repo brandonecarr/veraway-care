@@ -501,6 +501,9 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
         return `Shift: ${details.shift_start ? format(new Date(details.shift_start), 'MMM d h:mm a') : ''} - ${details.shift_end ? format(new Date(details.shift_end), 'h:mm a') : ''}, ${details.tagged_count || 0} issues tagged`;
       case 'after_shift_report_created':
         return `${details.tagged_count || 0} issues tagged in report`;
+      case 'acknowledged':
+        const acknowledgerName = details?.acknowledged_by_name || 'Clinician';
+        return `Issue acknowledged by ${acknowledgerName}`;
       case 'patient_created':
         return `Patient: ${details.first_name} ${details.last_name} (MRN: ${details.mrn || 'N/A'})`;
       default:
