@@ -58,7 +58,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
-  const [filter, setFilter] = useState<'all' | 'my' | 'open' | 'overdue'>('all');
+  const [filter, setFilter] = useState<'all' | 'my' | 'overdue'>('my');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileDisplayCount, setMobileDisplayCount] = useState(5);
@@ -70,7 +70,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const isMobile = useIsMobile();
 
   // Helper to set filter and scroll to issues section
-  const setFilterAndScroll = useCallback((newFilter: 'all' | 'my' | 'open' | 'overdue') => {
+  const setFilterAndScroll = useCallback((newFilter: 'all' | 'my' | 'overdue') => {
     setFilter(newFilter);
     // Scroll to issues section after a brief delay to allow state update
     setTimeout(() => {
@@ -230,8 +230,6 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
 
     if (filter === 'my') {
       filtered = issues.filter(i => i.assigned_to === userId);
-    } else if (filter === 'open') {
-      filtered = issues.filter(i => i.status === 'open' || i.status === 'in_progress');
     } else if (filter === 'overdue') {
       filtered = issues.filter(i => {
         if (i.status === 'resolved') return false;
@@ -241,6 +239,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         return hoursSince > 24;
       });
     }
+    // 'all' filter shows all issues (no additional filtering)
 
     // Apply type filter if active
     if (typeFilter) {
@@ -676,10 +675,9 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
             <div className="w-full sm:w-auto overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
               <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="w-auto">
                 <TabsList className="inline-flex w-auto">
-                  <TabsTrigger value="all" className="text-xs md:text-sm px-2 md:px-3">All</TabsTrigger>
                   <TabsTrigger value="my" className="text-xs md:text-sm px-2 md:px-3">My Issues</TabsTrigger>
-                  <TabsTrigger value="open" className="text-xs md:text-sm px-2 md:px-3">Open</TabsTrigger>
-                  <TabsTrigger value="overdue" className="text-xs md:text-sm px-2 md:px-3">Overdue</TabsTrigger>
+                  <TabsTrigger value="all" className="text-xs md:text-sm px-2 md:px-3">All Issues</TabsTrigger>
+                  <TabsTrigger value="overdue" className="text-xs md:text-sm px-2 md:px-3">Overdue Issues</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
