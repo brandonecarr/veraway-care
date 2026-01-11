@@ -20,8 +20,7 @@ export async function getIssues(filters?: {
       patient:patients(*),
       assignee:assigned_to(id, email, name, avatar_url),
       reporter:reported_by(id, email, name, avatar_url),
-      resolver:resolved_by(id, email, name, avatar_url),
-      acknowledger:acknowledged_by(id, email, name, avatar_url)
+      resolver:resolved_by(id, email, name, avatar_url)
     `)
     .order('created_at', { ascending: false });
 
@@ -67,8 +66,7 @@ export async function getIssueById(id: string) {
       patient:patients(*),
       assignee:assigned_to(id, email, name, avatar_url),
       reporter:reported_by(id, email, name, avatar_url),
-      resolver:resolved_by(id, email, name, avatar_url),
-      acknowledger:acknowledged_by(id, email, name, avatar_url)
+      resolver:resolved_by(id, email, name, avatar_url)
     `)
     .eq('id', id)
     .single();
