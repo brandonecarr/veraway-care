@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle, Calendar as CalendarIcon, ClipboardList, ChevronDown, ChevronRight, Archive, Trash2 } from 'lucide-react';
+import { Download, Users, FileText, CheckCircle2, CalendarClock, AlertTriangle, Calendar as CalendarIcon, ClipboardList, ChevronDown, ChevronRight, Archive, Trash2, Search } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { IDGSummaryStats } from '@/components/care/idg-summary-stats';
@@ -155,6 +157,9 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
   // Archived outlines
   const [archivedOutlines, setArchivedOutlines] = useState<ArchivedOutline[]>([]);
   const [expandedArchives, setExpandedArchives] = useState<Set<string>>(new Set());
+  const [archiveSearchQuery, setArchiveSearchQuery] = useState('');
+  const [archiveSearchDate, setArchiveSearchDate] = useState<Date | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<'current' | 'archived'>('current');
 
   // LocalStorage keys for persisting IDG outline and archives
   const OUTLINE_STORAGE_KEY = `idg-outline-${slug}`;
@@ -400,6 +405,35 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
     });
   };
 
+  // Filter archived outlines by search query and date
+  const filteredArchivedOutlines = archivedOutlines.filter(archive => {
+    // Filter by date if set
+    if (archiveSearchDate) {
+      const archiveDate = new Date(archive.meetingStartedAt);
+      const searchDateOnly = format(archiveSearchDate, 'yyyy-MM-dd');
+      const archiveDateOnly = format(archiveDate, 'yyyy-MM-dd');
+      if (searchDateOnly !== archiveDateOnly) return false;
+    }
+
+    // Filter by search query (patient names, issue types)
+    if (archiveSearchQuery.trim()) {
+      const query = archiveSearchQuery.toLowerCase();
+      const matchesIssue = archive.issues.some(issue =>
+        issue.patient_name.toLowerCase().includes(query) ||
+        issue.issue_type.toLowerCase().includes(query) ||
+        issue.patient_mrn.toLowerCase().includes(query)
+      );
+      const matchesPatient = archive.censusPatients.some(patient =>
+        `${patient.first_name} ${patient.last_name}`.toLowerCase().includes(query) ||
+        patient.mrn.toLowerCase().includes(query)
+      );
+      const matchesDate = format(new Date(archive.meetingStartedAt), 'MMMM d, yyyy').toLowerCase().includes(query);
+      if (!matchesIssue && !matchesPatient && !matchesDate) return false;
+    }
+
+    return true;
+  });
+
   // Calculate days remaining in benefit period
   const calculateDaysRemaining = (patient: CensusPatient): number | null => {
     if (!patient.benefit_period || !patient.admission_date) return null;
@@ -564,8 +598,29 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         throw new Error('Failed to complete IDG review');
       }
 
+      // Auto-archive the completed outline before resetting
+      if (meetingStarted && (selectedIssueIds.size > 0 || selectedPatientIds.size > 0)) {
+        const archivedOutline: ArchivedOutline = {
+          id: crypto.randomUUID(),
+          archivedAt: new Date().toISOString(),
+          meetingStartedAt: meetingStartedAt || new Date().toISOString(),
+          fromDate: fromDateStr,
+          toDate: toDateStr,
+          selectedIssueIds: Array.from(selectedIssueIds),
+          selectedPatientIds: Array.from(selectedPatientIds),
+          censusPatients,
+          issues: displayedIssues,
+          issueCount: selectedIssueIds.size,
+          patientCount: selectedPatientIds.size,
+        };
+
+        const newArchives = [archivedOutline, ...archivedOutlines];
+        setArchivedOutlines(newArchives);
+        localStorage.setItem(ARCHIVES_STORAGE_KEY, JSON.stringify(newArchives));
+      }
+
       toast.success('IDG Review Completed', {
-        description: `Review recorded with ${disciplinesPresent.length} disciplines present and ${selectedIssueIds.size} issues reviewed.`,
+        description: `Review recorded with ${disciplinesPresent.length} disciplines present and ${selectedIssueIds.size} issues reviewed. Outline has been archived.`,
       });
 
       // Reset meeting state and refresh data
@@ -605,7 +660,8 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             <Button
               variant="outline"
               className="flex items-center gap-2 w-fit"
-              disabled={isExporting || isLoading}
+              disabled={isExporting || isLoading || !meetingStarted}
+              title={!meetingStarted ? 'Create an IDG outline first to export PDF' : undefined}
               onClick={async () => {
                 if (!summary) return;
                 setIsExporting(true);
@@ -768,366 +824,469 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
         {/* Summary Stats */}
         <IDGSummaryStats data={displaySummary || undefined} isLoading={isLoading} />
 
-        {/* Issue List or Empty State */}
-        {!meetingStarted ? (
-          <Card className="p-8 md:p-12 bg-white border-[#D4D4D4] text-center">
-            <div className="max-w-md mx-auto">
-              <ClipboardList className="w-16 h-16 mx-auto text-muted-foreground/40 mb-4" />
-              <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                No Meeting in Progress
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Click &quot;Create IDG Meeting Outline&quot; to select issues and start your IDG review meeting.
-              </p>
-              {issues.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {issues.length} issue{issues.length !== 1 ? 's' : ''} available for review in this date range.
-                </p>
+        {/* Tabbed Interface for Current Outline and Archives */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'current' | 'archived')} className="space-y-4">
+          <TabsList className="bg-white border border-[#D4D4D4]">
+            <TabsTrigger value="current" className="data-[state=active]:bg-[#2D7A7A] data-[state=active]:text-white">
+              <ClipboardList className="w-4 h-4 mr-2" />
+              Current Outline
+              {meetingStarted && (
+                <Badge variant="secondary" className="ml-2 bg-[#2D7A7A]/20">
+                  {selectedIssueIds.size + selectedPatientIds.size}
+                </Badge>
               )}
-            </div>
-          </Card>
-        ) : (
-          /* Current IDG Outline - Collapsible Card */
-          <Card className="bg-white border-[#D4D4D4] overflow-hidden">
-            {/* Collapsible Header */}
-            <div
-              className="flex items-center justify-between p-4 md:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-              onClick={() => setIsOutlineExpanded(!isOutlineExpanded)}
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  className="p-1 rounded hover:bg-gray-100 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOutlineExpanded(!isOutlineExpanded);
-                  }}
-                >
-                  {isOutlineExpanded ? (
-                    <ChevronDown className="w-5 h-5 text-[#666]" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-[#666]" />
-                  )}
-                </button>
-                <div className="p-2 rounded-lg bg-[#2D7A7A]/10">
-                  <ClipboardList className="w-5 h-5 text-[#2D7A7A]" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                    IDG Outline — {meetingStartedAt ? format(new Date(meetingStartedAt), 'MMMM d, yyyy') : format(new Date(), 'MMMM d, yyyy')}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {displayedIssues.length} issue{displayedIssues.length !== 1 ? 's' : ''}
-                    {censusPatients.length > 0 && ` • ${censusPatients.length} census patient${censusPatients.length !== 1 ? 's' : ''}`}
-                    {' '}• Created {meetingStartedAt ? format(new Date(meetingStartedAt), 'h:mm a') : ''}
+            </TabsTrigger>
+            <TabsTrigger value="archived" className="data-[state=active]:bg-[#2D7A7A] data-[state=active]:text-white">
+              <Archive className="w-4 h-4 mr-2" />
+              Archived Outlines
+              {archivedOutlines.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {archivedOutlines.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Current Outline Tab */}
+          <TabsContent value="current" className="space-y-6">
+            {!meetingStarted ? (
+              <Card className="p-8 md:p-12 bg-white border-[#D4D4D4] text-center">
+                <div className="max-w-md mx-auto">
+                  <ClipboardList className="w-16 h-16 mx-auto text-muted-foreground/40 mb-4" />
+                  <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                    No Meeting in Progress
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    Click &quot;Create IDG Meeting Outline&quot; to select issues and start your IDG review meeting.
                   </p>
+                  {issues.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {issues.length} issue{issues.length !== 1 ? 's' : ''} available for review in this date range.
+                    </p>
+                  )}
                 </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  archiveOutline();
-                }}
-              >
-                <Archive className="w-4 h-4" />
-                Archive Outline
-              </Button>
-            </div>
-
-            {/* Collapsible Content */}
-            {isOutlineExpanded && (
-              <div className="border-t border-[#D4D4D4] p-4 md:p-6 space-y-6">
-                {/* Issue List */}
-                {displayedIssues.length > 0 && (
-                  <IDGIssueList
-                    issues={displayedIssues}
-                    grouped={displayedGrouped}
-                    groupBy={groupBy}
-                    onIssueClick={handleIssueClick}
-                    onFlagForMD={handleFlagForMD}
-                    onDispositionChange={handleDispositionChange}
-                    dispositions={dispositions}
-                  />
-                )}
-
-                {/* Census Patients */}
-                {censusPatients.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-2 rounded-lg bg-teal-100">
-                        <Users className="w-5 h-5 text-teal-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                          Census Patients
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {censusPatients.length} patient{censusPatients.length !== 1 ? 's' : ''} selected from census (no active issues)
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {censusPatients.map((patient) => {
-                        const daysRemaining = calculateDaysRemaining(patient);
-                        return (
-                          <div
-                            key={patient.id}
-                            className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <p className="font-medium text-[#1A1A1A]">
-                                  {patient.first_name} {patient.last_name}
-                                </p>
-                                <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {patient.benefit_period && (
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    daysRemaining !== null && daysRemaining <= 14
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                      : 'bg-teal-50 text-teal-700 border-teal-200'
-                                  )}
-                                >
-                                  <CalendarClock className="w-3 h-3 mr-1" />
-                                  BP{patient.benefit_period}
-                                  {daysRemaining !== null && ` · ${daysRemaining}d left`}
-                                </Badge>
-                              )}
-                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                                No active issues
-                              </Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Empty state if no issues or patients */}
-                {displayedIssues.length === 0 && censusPatients.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No items in this outline.
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* Expiring Benefit Periods */}
-        {expiringBenefitPeriods.length > 0 && (
-          <Card className="p-4 md:p-6 bg-white border-[#D4D4D4]">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <CalendarClock className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                  Benefit Period Expiring
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Patients with ≤14 days remaining - Face-to-Face visit required
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {expiringBenefitPeriods.map((patient) => (
+              </Card>
+            ) : (
+              /* Current IDG Outline - Collapsible Card */
+              <Card className="bg-white border-[#D4D4D4] overflow-hidden">
+                {/* Collapsible Header */}
                 <div
-                  key={patient.patient_id}
-                  className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                  className="flex items-center justify-between p-4 md:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => setIsOutlineExpanded(!isOutlineExpanded)}
                 >
                   <div className="flex items-center gap-3">
+                    <button
+                      className="p-1 rounded hover:bg-gray-100 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsOutlineExpanded(!isOutlineExpanded);
+                      }}
+                    >
+                      {isOutlineExpanded ? (
+                        <ChevronDown className="w-5 h-5 text-[#666]" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-[#666]" />
+                      )}
+                    </button>
+                    <div className="p-2 rounded-lg bg-[#2D7A7A]/10">
+                      <ClipboardList className="w-5 h-5 text-[#2D7A7A]" />
+                    </div>
                     <div>
-                      <p className="font-medium text-[#1A1A1A]">{patient.patient_name}</p>
-                      <p className="text-sm text-[#666]">MRN: {patient.patient_mrn}</p>
+                      <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                        IDG Outline — {meetingStartedAt ? format(new Date(meetingStartedAt), 'MMMM d, yyyy') : format(new Date(), 'MMMM d, yyyy')}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {displayedIssues.length} issue{displayedIssues.length !== 1 ? 's' : ''}
+                        {censusPatients.length > 0 && ` • ${censusPatients.length} census patient${censusPatients.length !== 1 ? 's' : ''}`}
+                        {' '}• Created {meetingStartedAt ? format(new Date(meetingStartedAt), 'h:mm a') : ''}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                      BP{patient.benefit_period}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={patient.days_remaining <= 7
-                        ? 'bg-red-50 text-red-700 border-red-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }
-                    >
-                      {patient.days_remaining === 0 ? (
-                        <span className="flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Expired
-                        </span>
-                      ) : (
-                        `${patient.days_remaining} days remaining`
-                      )}
-                    </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      archiveOutline();
+                    }}
+                  >
+                    <Archive className="w-4 h-4" />
+                    Archive Outline
+                  </Button>
+                </div>
+
+                {/* Collapsible Content */}
+                {isOutlineExpanded && (
+                  <div className="border-t border-[#D4D4D4] p-4 md:p-6 space-y-6">
+                    {/* Issue List */}
+                    {displayedIssues.length > 0 && (
+                      <IDGIssueList
+                        issues={displayedIssues}
+                        grouped={displayedGrouped}
+                        groupBy={groupBy}
+                        onIssueClick={handleIssueClick}
+                        onFlagForMD={handleFlagForMD}
+                        onDispositionChange={handleDispositionChange}
+                        dispositions={dispositions}
+                      />
+                    )}
+
+                    {/* Census Patients */}
+                    {censusPatients.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="p-2 rounded-lg bg-teal-100">
+                            <Users className="w-5 h-5 text-teal-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                              Census Patients
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {censusPatients.length} patient{censusPatients.length !== 1 ? 's' : ''} selected from census (no active issues)
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {censusPatients.map((patient) => {
+                            const daysRemaining = calculateDaysRemaining(patient);
+                            return (
+                              <div
+                                key={patient.id}
+                                className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    <p className="font-medium text-[#1A1A1A]">
+                                      {patient.first_name} {patient.last_name}
+                                    </p>
+                                    <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {patient.benefit_period && (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        daysRemaining !== null && daysRemaining <= 14
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                          : 'bg-teal-50 text-teal-700 border-teal-200'
+                                      )}
+                                    >
+                                      <CalendarClock className="w-3 h-3 mr-1" />
+                                      BP{patient.benefit_period}
+                                      {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                    No active issues
+                                  </Badge>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty state if no issues or patients */}
+                    {displayedIssues.length === 0 && censusPatients.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No items in this outline.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Expiring Benefit Periods */}
+            {expiringBenefitPeriods.length > 0 && (
+              <Card className="p-4 md:p-6 bg-white border-[#D4D4D4]">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded-lg bg-purple-100">
+                    <CalendarClock className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                      Benefit Period Expiring
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Patients with ≤14 days remaining - Face-to-Face visit required
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
 
-        {/* Archived Outlines Section */}
-        {archivedOutlines.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-gray-100">
-                <Archive className="w-5 h-5 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-[#1A1A1A]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-                  Archived Outlines
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {archivedOutlines.length} archived outline{archivedOutlines.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {archivedOutlines.map((archive) => (
-                <Card key={archive.id} className="bg-white border-[#D4D4D4] overflow-hidden">
-                  {/* Archive Header */}
-                  <div
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => toggleArchiveExpansion(archive.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="p-1 rounded hover:bg-gray-100 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleArchiveExpansion(archive.id);
-                        }}
-                      >
-                        {expandedArchives.has(archive.id) ? (
-                          <ChevronDown className="w-5 h-5 text-[#666]" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-[#666]" />
-                        )}
-                      </button>
-                      <div className="p-2 rounded-lg bg-gray-100">
-                        <ClipboardList className="w-4 h-4 text-gray-500" />
+                <div className="space-y-3">
+                  {expiringBenefitPeriods.map((patient) => (
+                    <div
+                      key={patient.patient_id}
+                      className="flex items-center justify-between p-3 bg-[#FAFAF8] border border-[#D4D4D4] rounded-lg hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="font-medium text-[#1A1A1A]">{patient.patient_name}</p>
+                          <p className="text-sm text-[#666]">MRN: {patient.patient_mrn}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-base font-medium text-[#1A1A1A]">
-                          IDG Outline — {format(new Date(archive.meetingStartedAt), 'MMMM d, yyyy')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {archive.issueCount} issue{archive.issueCount !== 1 ? 's' : ''}
-                          {archive.patientCount > 0 && ` • ${archive.patientCount} census patient${archive.patientCount !== 1 ? 's' : ''}`}
-                          {' '}• Archived {format(new Date(archive.archivedAt), 'MMM d, yyyy h:mm a')}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                          BP{patient.benefit_period}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={patient.days_remaining <= 7
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }
+                        >
+                          {patient.days_remaining === 0 ? (
+                            <span className="flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              Expired
+                            </span>
+                          ) : (
+                            `${patient.days_remaining} days remaining`
+                          )}
+                        </Badge>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Archived Outlines Tab */}
+          <TabsContent value="archived" className="space-y-4">
+            {/* Search and Filter Controls */}
+            <Card className="p-4 bg-white border-[#D4D4D4]">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                {/* Search Input */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by patient name, MRN, or issue type..."
+                    value={archiveSearchQuery}
+                    onChange={(e) => setArchiveSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Date Filter */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">Filter by date:</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[160px] justify-start text-left font-normal",
+                          !archiveSearchDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {archiveSearchDate ? format(archiveSearchDate, "MMM d, yyyy") : "Any date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={archiveSearchDate}
+                        onSelect={setArchiveSearchDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {archiveSearchDate && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteArchivedOutline(archive.id);
-                      }}
+                      onClick={() => setArchiveSearchDate(undefined)}
+                      className="px-2"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      Clear
                     </Button>
-                  </div>
+                  )}
+                </div>
+              </div>
 
-                  {/* Archive Content */}
-                  {expandedArchives.has(archive.id) && (
-                    <div className="border-t border-[#D4D4D4] p-4 space-y-4 bg-gray-50/50">
-                      {/* Archived Issues */}
-                      {archive.issues.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-[#666]">Issues ({archive.issues.length})</h4>
-                          <div className="space-y-2">
-                            {archive.issues.map((issue) => (
-                              <div
-                                key={issue.id}
-                                className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
-                              >
-                                <div>
-                                  <p className="font-medium text-[#1A1A1A]">{issue.patient_name}</p>
-                                  <p className="text-sm text-[#666]">
-                                    {issue.issue_type} • MRN: {issue.patient_mrn}
-                                  </p>
-                                </div>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    issue.priority === 'urgent' && 'bg-red-50 text-red-700 border-red-200',
-                                    issue.priority === 'high' && 'bg-orange-50 text-orange-700 border-orange-200',
-                                    issue.priority === 'normal' && 'bg-blue-50 text-blue-700 border-blue-200',
-                                    issue.priority === 'low' && 'bg-gray-50 text-gray-600 border-gray-200'
-                                  )}
-                                >
-                                  {issue.priority}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
+              {/* Active filters display */}
+              {(archiveSearchQuery || archiveSearchDate) && (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#D4D4D4]">
+                  <span className="text-sm text-muted-foreground">Showing:</span>
+                  <span className="text-sm font-medium">
+                    {filteredArchivedOutlines.length} of {archivedOutlines.length} archived outline{archivedOutlines.length !== 1 ? 's' : ''}
+                  </span>
+                  {(archiveSearchQuery || archiveSearchDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setArchiveSearchQuery('');
+                        setArchiveSearchDate(undefined);
+                      }}
+                      className="ml-auto text-xs"
+                    >
+                      Clear all filters
+                    </Button>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            {/* Archived Outlines List */}
+            {filteredArchivedOutlines.length === 0 ? (
+              <Card className="p-8 md:p-12 bg-white border-[#D4D4D4] text-center">
+                <div className="max-w-md mx-auto">
+                  <Archive className="w-16 h-16 mx-auto text-muted-foreground/40 mb-4" />
+                  <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                    {archivedOutlines.length === 0 ? 'No Archived Outlines' : 'No Matching Archives'}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {archivedOutlines.length === 0
+                      ? 'Archived outlines will appear here after you complete or archive an IDG meeting.'
+                      : 'No archived outlines match your search criteria. Try adjusting your filters.'}
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredArchivedOutlines.map((archive) => (
+                  <Card key={archive.id} className="bg-white border-[#D4D4D4] overflow-hidden">
+                    {/* Archive Header */}
+                    <div
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => toggleArchiveExpansion(archive.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <button
+                          className="p-1 rounded hover:bg-gray-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleArchiveExpansion(archive.id);
+                          }}
+                        >
+                          {expandedArchives.has(archive.id) ? (
+                            <ChevronDown className="w-5 h-5 text-[#666]" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-[#666]" />
+                          )}
+                        </button>
+                        <div className="p-2 rounded-lg bg-gray-100">
+                          <ClipboardList className="w-4 h-4 text-gray-500" />
                         </div>
-                      )}
+                        <div>
+                          <h3 className="text-base font-medium text-[#1A1A1A]">
+                            IDG Outline — {format(new Date(archive.meetingStartedAt), 'MMMM d, yyyy')}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {archive.issueCount} issue{archive.issueCount !== 1 ? 's' : ''}
+                            {archive.patientCount > 0 && ` • ${archive.patientCount} census patient${archive.patientCount !== 1 ? 's' : ''}`}
+                            {' '}• Archived {format(new Date(archive.archivedAt), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteArchivedOutline(archive.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
 
-                      {/* Archived Census Patients */}
-                      {archive.censusPatients.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-[#666]">Census Patients ({archive.censusPatients.length})</h4>
+                    {/* Archive Content */}
+                    {expandedArchives.has(archive.id) && (
+                      <div className="border-t border-[#D4D4D4] p-4 space-y-4 bg-gray-50/50">
+                        {/* Archived Issues */}
+                        {archive.issues.length > 0 && (
                           <div className="space-y-2">
-                            {archive.censusPatients.map((patient) => {
-                              const daysRemaining = calculateDaysRemaining(patient);
-                              return (
+                            <h4 className="text-sm font-medium text-[#666]">Issues ({archive.issues.length})</h4>
+                            <div className="space-y-2">
+                              {archive.issues.map((issue) => (
                                 <div
-                                  key={patient.id}
+                                  key={issue.id}
                                   className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
                                 >
                                   <div>
-                                    <p className="font-medium text-[#1A1A1A]">{patient.first_name} {patient.last_name}</p>
-                                    <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                                    <p className="font-medium text-[#1A1A1A]">{issue.patient_name}</p>
+                                    <p className="text-sm text-[#666]">
+                                      {issue.issue_type} • MRN: {issue.patient_mrn}
+                                    </p>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    {patient.benefit_period && (
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          daysRemaining !== null && daysRemaining <= 14
-                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                            : 'bg-teal-50 text-teal-700 border-teal-200'
-                                        )}
-                                      >
-                                        <CalendarClock className="w-3 h-3 mr-1" />
-                                        BP{patient.benefit_period}
-                                        {daysRemaining !== null && ` · ${daysRemaining}d left`}
-                                      </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      issue.priority === 'urgent' && 'bg-red-50 text-red-700 border-red-200',
+                                      issue.priority === 'high' && 'bg-orange-50 text-orange-700 border-orange-200',
+                                      issue.priority === 'normal' && 'bg-blue-50 text-blue-700 border-blue-200',
+                                      issue.priority === 'low' && 'bg-gray-50 text-gray-600 border-gray-200'
                                     )}
-                                    <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                                      No active issues
-                                    </Badge>
-                                  </div>
+                                  >
+                                    {issue.priority}
+                                  </Badge>
                                 </div>
-                              );
-                            })}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+                        )}
+
+                        {/* Archived Census Patients */}
+                        {archive.censusPatients.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-[#666]">Census Patients ({archive.censusPatients.length})</h4>
+                            <div className="space-y-2">
+                              {archive.censusPatients.map((patient) => {
+                                const daysRemaining = calculateDaysRemaining(patient);
+                                return (
+                                  <div
+                                    key={patient.id}
+                                    className="flex items-center justify-between p-3 bg-white border border-[#D4D4D4] rounded-lg"
+                                  >
+                                    <div>
+                                      <p className="font-medium text-[#1A1A1A]">{patient.first_name} {patient.last_name}</p>
+                                      <p className="text-sm text-[#666]">MRN: {patient.mrn}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {patient.benefit_period && (
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            daysRemaining !== null && daysRemaining <= 14
+                                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                              : 'bg-teal-50 text-teal-700 border-teal-200'
+                                          )}
+                                        >
+                                          <CalendarClock className="w-3 h-3 mr-1" />
+                                          BP{patient.benefit_period}
+                                          {daysRemaining !== null && ` · ${daysRemaining}d left`}
+                                        </Badge>
+                                      )}
+                                      <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                                        No active issues
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Issue Detail Panel */}
