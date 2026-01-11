@@ -168,7 +168,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     return encodedRedirect(
       "error",
       "/reset-password",
-      "Password update failed",
+      error.message || "Password update failed",
     );
   }
 
