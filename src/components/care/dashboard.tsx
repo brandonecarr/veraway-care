@@ -15,6 +15,7 @@ import { AfterShiftReportBanner } from './after-shift-report-banner';
 import { IssueCard } from './issue-card';
 import { ConnectionStatus } from './connection-status';
 import { IssueCardSkeleton, MetricCardSkeleton, ChartSkeleton } from './loading-skeletons';
+import { IssueAcknowledgeModal } from './issue-acknowledge-modal';
 
 // Dynamic imports for chart components to reduce initial bundle size
 const IssuesByTypeChart = dynamic(
@@ -64,6 +65,8 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
   const [mobileDisplayCount, setMobileDisplayCount] = useState(5);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [recertificationCount, setRecertificationCount] = useState(0);
+  const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
+  const [pendingAcknowledgeIssue, setPendingAcknowledgeIssue] = useState<Issue | null>(null);
   const openQuickReportModalRef = useRef<(() => void) | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const issuesSectionRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,28 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
     }
   }, [issues.length]); // Only trigger when count changes, not on every array reference change
 
+  // Helper to open issue from URL or notification (handles acknowledgement check)
+  const openIssueFromUrl = useCallback((issue: Issue) => {
+    // Clear the query param from URL without triggering a reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete('issue');
+    window.history.replaceState({}, '', url.toString());
+
+    // Check if acknowledgement is required
+    const requiresAcknowledgement =
+      issue.assigned_to === userId &&
+      issue.status !== 'resolved' &&
+      !issue.acknowledged_at;
+
+    if (requiresAcknowledgement) {
+      setPendingAcknowledgeIssue(issue);
+      setShowAcknowledgeModal(true);
+    } else {
+      setSelectedIssue(issue);
+      setIsDetailPanelOpen(true);
+    }
+  }, [userId]);
+
   // Handle issue query parameter from URL (e.g., from notification click)
   useEffect(() => {
     const issueId = searchParams.get('issue');
@@ -115,30 +140,20 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
       // Find the issue in the loaded issues
       const issue = issues.find(i => i.id === issueId);
       if (issue) {
-        setSelectedIssue(issue);
-        setIsDetailPanelOpen(true);
-        // Clear the query param from URL without triggering a reload
-        const url = new URL(window.location.href);
-        url.searchParams.delete('issue');
-        window.history.replaceState({}, '', url.toString());
+        openIssueFromUrl(issue);
       } else {
         // Issue not in active issues, try to fetch it directly
         fetch(`/api/issues/${issueId}`)
           .then(res => res.ok ? res.json() : null)
           .then(data => {
             if (data) {
-              setSelectedIssue(data);
-              setIsDetailPanelOpen(true);
-              // Clear the query param from URL
-              const url = new URL(window.location.href);
-              url.searchParams.delete('issue');
-              window.history.replaceState({}, '', url.toString());
+              openIssueFromUrl(data);
             }
           })
           .catch(console.error);
       }
     }
-  }, [searchParams, issues]);
+  }, [searchParams, issues, openIssueFromUrl]);
 
   const fetchMetrics = async () => {
     try {
@@ -223,6 +238,43 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
 
     // Refresh data - the real-time subscription will handle updates automatically
     await refreshIssues();
+  };
+
+  // Handle issue card click - check if acknowledgement is required
+  const handleIssueClick = (issue: Issue) => {
+    // Check if this issue requires acknowledgement:
+    // - Issue is assigned to current user
+    // - Issue is not resolved
+    // - Issue has not been acknowledged yet
+    const requiresAcknowledgement =
+      issue.assigned_to === userId &&
+      issue.status !== 'resolved' &&
+      !issue.acknowledged_at;
+
+    if (requiresAcknowledgement) {
+      // Show acknowledgement modal first
+      setPendingAcknowledgeIssue(issue);
+      setShowAcknowledgeModal(true);
+    } else {
+      // Open issue detail panel directly
+      setSelectedIssue(issue);
+      setIsDetailPanelOpen(true);
+    }
+  };
+
+  // Handle acknowledgement complete - open the issue detail panel
+  const handleAcknowledged = (acknowledgedIssue: Issue) => {
+    setShowAcknowledgeModal(false);
+    setPendingAcknowledgeIssue(null);
+    setSelectedIssue(acknowledgedIssue);
+    setIsDetailPanelOpen(true);
+    refreshIssues(); // Refresh to get updated acknowledgement status
+  };
+
+  // Handle acknowledgement cancelled - just close the modal
+  const handleAcknowledgeCancelled = () => {
+    setShowAcknowledgeModal(false);
+    setPendingAcknowledgeIssue(null);
   };
 
   const getFilteredIssues = () => {
@@ -401,10 +453,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         {/* After Shift Report Banner */}
         {(userRole === 'after_hours' || userRole === 'coordinator') && (
           <AfterShiftReportBanner
-            onIssueClick={(issue) => {
-              setSelectedIssue(issue);
-              setIsDetailPanelOpen(true);
-            }}
+            onIssueClick={(issue) => handleIssueClick(issue)}
           />
         )}
 
@@ -700,10 +749,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   <IssueCard
                     key={issue.id}
                     issue={issue}
-                    onClick={() => {
-                      setSelectedIssue(issue);
-                      setIsDetailPanelOpen(true);
-                    }}
+                    onClick={() => handleIssueClick(issue)}
                     onMessageClick={async (e) => {
                       e.stopPropagation();
                       // Navigate to Message Center with patient's group chat
@@ -839,6 +885,15 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
         userRole={userRole}
         availableUsers={availableUsers}
         slug={slug}
+      />
+
+      {/* Acknowledgement Modal - blocks issue detail view until acknowledged */}
+      <IssueAcknowledgeModal
+        issue={pendingAcknowledgeIssue}
+        open={showAcknowledgeModal}
+        onOpenChange={setShowAcknowledgeModal}
+        onAcknowledged={handleAcknowledged}
+        onCancel={handleAcknowledgeCancelled}
       />
     </main>
   );
