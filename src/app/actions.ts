@@ -119,7 +119,9 @@ export const forgotPasswordAction = async (formData: FormData) => {
     return encodedRedirect("error", "/forgot-password", "Email is required");
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {});
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://www.verawaycare.com/auth/callback?redirect_to=/reset-password",
+  });
 
   if (error) {
     return encodedRedirect(
