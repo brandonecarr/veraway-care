@@ -10,7 +10,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,11 +30,12 @@ import {
   Send,
   AlertCircle,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Archive
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { Issue } from '@/types/care-coordination';
+import type { Issue, Handoff } from '@/types/care-coordination';
 
 interface AfterShiftReportModalProps {
   issues: Issue[];
@@ -35,6 +47,9 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
   const [notes, setNotes] = useState('');
   const [selectedIssueIds, setSelectedIssueIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [activeReport, setActiveReport] = useState<(Handoff & { creator?: { name?: string; email?: string } }) | null>(null);
+  const [isCheckingActive, setIsCheckingActive] = useState(false);
 
   // Filter to show only open/in_progress issues
   const activeIssues = issues.filter(i => i.status === 'open' || i.status === 'in_progress');
@@ -73,9 +88,68 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
     })
     .map(i => i.id);
 
-  const handleOpen = () => {
-    setSelectedIssueIds(overdueIssueIds);
-    setOpen(true);
+  const handleOpen = async () => {
+    setIsCheckingActive(true);
+    try {
+      // Check if there's an active (non-archived) report
+      const response = await fetch('/api/handoffs/active');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.handoff) {
+          // There's an active report - show confirmation dialog
+          setActiveReport(data.handoff);
+          setShowArchiveConfirm(true);
+          return;
+        }
+      }
+      // No active report - proceed to open the form
+      setSelectedIssueIds(overdueIssueIds);
+      setOpen(true);
+    } catch (error) {
+      console.error('Error checking for active report:', error);
+      // On error, allow opening anyway
+      setSelectedIssueIds(overdueIssueIds);
+      setOpen(true);
+    } finally {
+      setIsCheckingActive(false);
+    }
+  };
+
+  const handleArchiveAndCreate = async () => {
+    if (!activeReport) return;
+
+    setIsCheckingActive(true);
+    try {
+      // Archive the existing report
+      const response = await fetch(`/api/handoffs/${activeReport.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: true })
+      });
+
+      if (!response.ok) {
+        toast.error('Failed to archive previous report');
+        return;
+      }
+
+      toast.success('Previous report archived');
+      setShowArchiveConfirm(false);
+      setActiveReport(null);
+
+      // Now open the create form
+      setSelectedIssueIds(overdueIssueIds);
+      setOpen(true);
+    } catch (error) {
+      console.error('Error archiving report:', error);
+      toast.error('Failed to archive previous report');
+    } finally {
+      setIsCheckingActive(false);
+    }
+  };
+
+  const handleCancelArchive = () => {
+    setShowArchiveConfirm(false);
+    setActiveReport(null);
   };
 
   const toggleIssue = (issueId: string) => {
@@ -164,17 +238,65 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
-          onClick={handleOpen}
-        >
-          <FileText className="w-4 h-4" />
-          After Shift Report
-        </Button>
-      </DialogTrigger>
+    <>
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="w-5 h-5 text-[#2D7A7A]" />
+              Active Report Exists
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                There is already an active After Shift Report
+                {activeReport?.creator?.name && (
+                  <span> created by <strong>{activeReport.creator.name}</strong></span>
+                )}
+                {activeReport?.creator?.email && !activeReport?.creator?.name && (
+                  <span> created by <strong>{activeReport.creator.email.split('@')[0]}</strong></span>
+                )}
+                .
+              </p>
+              <p>
+                To create a new report, you must first archive the previous one. Would you like to archive it now and create a new report?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelArchive} disabled={isCheckingActive}>
+              No, Keep Current Report
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveAndCreate}
+              disabled={isCheckingActive}
+              className="bg-[#2D7A7A] hover:bg-[#236060]"
+            >
+              {isCheckingActive ? (
+                'Archiving...'
+              ) : (
+                <>
+                  <Archive className="w-4 h-4 mr-2" />
+                  Yes, Archive and Create New
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="gap-2 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
+            onClick={handleOpen}
+            disabled={isCheckingActive}
+          >
+            <FileText className="w-4 h-4" />
+            {isCheckingActive ? 'Checking...' : 'After Shift Report'}
+          </Button>
+        </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
@@ -281,5 +403,6 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

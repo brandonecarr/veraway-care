@@ -345,19 +345,17 @@ export default function AfterShiftReportsPage() {
             {/* Footer */}
             {!isArchived && (
               <div className="flex items-center justify-end pt-4 border-t">
-                {canArchive && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleArchiveReport(handoff.id);
-                    }}
-                  >
-                    <Archive className="w-4 h-4 mr-1" />
-                    Archive
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleArchiveReport(handoff.id);
+                  }}
+                >
+                  <Archive className="w-4 h-4 mr-1" />
+                  Archive
+                </Button>
               </div>
             )}
 

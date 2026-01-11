@@ -98,6 +98,33 @@ export async function PATCH(
 
     const issue = await updateIssue(issueId, body);
 
+    // Create audit log entry for assignment change
+    if (isAssignmentUpdate && currentIssue && body.assigned_to !== currentIssue.assigned_to) {
+      // Fetch the name of the newly assigned user
+      let assigneeName = null;
+      if (body.assigned_to) {
+        const { data: assigneeData } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', body.assigned_to)
+          .single();
+        assigneeName = assigneeData?.name || assigneeData?.email || body.assigned_to;
+      }
+
+      await supabase
+        .from('issue_audit_log')
+        .insert({
+          issue_id: issueId,
+          user_id: user.id,
+          action: 'assigned',
+          details: {
+            assigned_to: body.assigned_to,
+            assigned_to_name: assigneeName,
+            previous_assigned_to: currentIssue.assigned_to
+          }
+        });
+    }
+
     // Send notification for assignment if it changed
     if (isAssignmentUpdate && body.assigned_to && currentIssue && currentIssue.patient) {
       const hospiceId = await getUserHospiceId(user.id);

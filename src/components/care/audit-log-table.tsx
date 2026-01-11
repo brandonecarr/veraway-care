@@ -485,7 +485,7 @@ export function AuditLogTable({ issueId }: AuditLogTableProps) {
       case 'created':
         return `Type: ${details.issue_type || 'N/A'}`;
       case 'assigned':
-        const assigneeName = assignedToUser?.name || assignedToUser?.email?.split('@')[0] || 'Unknown user';
+        const assigneeName = assignedToUser?.name || assignedToUser?.email?.split('@')[0] || details?.assigned_to_name || 'Unknown user';
         return `Assigned to ${assigneeName}`;
       case 'status_changed':
         return `${details.old_status?.replace('_', ' ')} → ${details.new_status?.replace('_', ' ')}${details.note ? ` - ${details.note}` : ''}`;
