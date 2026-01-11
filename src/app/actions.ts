@@ -172,7 +172,15 @@ export const resetPasswordAction = async (formData: FormData) => {
     );
   }
 
-  return encodedRedirect("success", "/sign-in", "Password updated successfully. Please sign in with your new password.");
+  // Get user's hospice slug to redirect to their dashboard
+  const hospiceSlug = await getUserHospiceSlug();
+
+  if (hospiceSlug) {
+    return redirect(`/${hospiceSlug}/dashboard?password_reset=success`);
+  }
+
+  // Fallback if no hospice found
+  return redirect("/onboarding?password_reset=success");
 };
 
 export const signOutAction = async () => {
