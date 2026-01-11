@@ -24,6 +24,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { NotificationCenter } from './care/notification-center'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useHospicePath } from '@/hooks/use-hospice-slug'
+import { useUnreadMessages } from '@/hooks/use-unread-messages'
+import { Badge } from './ui/badge'
 
 interface UserInfo {
   name: string;
@@ -40,6 +42,7 @@ export default function DashboardNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const getPath = useHospicePath()
+  const { totalUnread: unreadMessages } = useUnreadMessages()
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -93,7 +96,6 @@ export default function DashboardNavbar() {
     { path: 'patients', label: 'Patients', icon: Users },
     { path: 'audit-log', label: 'Audit Log', icon: FileText },
     { path: 'after-shift-reports', label: 'Shift Reports', icon: FileText },
-    { path: 'messages', label: 'Message Center', icon: MessageSquare },
   ];
 
   // IDG Review is coordinator-only
@@ -138,6 +140,24 @@ export default function DashboardNavbar() {
         </div>
         
         <div className="flex gap-2 md:gap-4 items-center">
+          {/* Message Center Icon */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            onClick={() => router.push(getPath('messages'))}
+          >
+            <MessageSquare className="h-5 w-5" />
+            {unreadMessages > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              >
+                {unreadMessages > 9 ? '9+' : unreadMessages}
+              </Badge>
+            )}
+          </Button>
+
           <NotificationCenter />
           
           {/* Desktop User Menu */}
