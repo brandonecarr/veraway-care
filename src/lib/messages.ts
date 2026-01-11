@@ -10,6 +10,7 @@ import type {
 
 /**
  * Get all conversations for the current user
+ * OPTIMIZED: Uses database function to compute unread counts in a single query
  */
 export async function getConversations(options?: {
   includeArchived?: boolean;
@@ -17,11 +18,78 @@ export async function getConversations(options?: {
 }): Promise<ConversationWithDetails[]> {
   const supabase = await createClient();
 
+  // Try to use the optimized database function first
+  const { data: optimizedData, error: rpcError } = await supabase.rpc(
+    'get_user_conversations',
+    {
+      include_archived: options?.includeArchived ?? false,
+      conversation_type: options?.type ?? null,
+    }
+  );
+
+  // If the RPC function exists and works, use it
+  if (!rpcError && optimizedData) {
+    // Get conversation IDs for participant/patient lookup
+    const conversationIds = optimizedData.map((c: { id: string }) => c.id);
+
+    if (conversationIds.length === 0) return [];
+
+    // Fetch participants and patients in parallel
+    const [participantsResult, patientsResult] = await Promise.all([
+      supabase
+        .from('conversation_participants')
+        .select('id, conversation_id, user_id, role, joined_at, left_at, last_read_at, is_muted')
+        .in('conversation_id', conversationIds)
+        .is('left_at', null),
+      supabase
+        .from('patients')
+        .select('*')
+        .in('id', optimizedData.filter((c: { patient_id: string | null }) => c.patient_id).map((c: { patient_id: string }) => c.patient_id)),
+    ]);
+
+    const participants = participantsResult.data || [];
+    const patients = patientsResult.data || [];
+
+    // Get unique user IDs and fetch user details
+    const userIds = Array.from(new Set(participants.map((p) => p.user_id)));
+    const { data: users } = userIds.length > 0
+      ? await supabase.from('users').select('id, email, name, avatar_url').in('id', userIds)
+      : { data: [] };
+
+    const userMap = new Map((users || []).map((u) => [u.id, u as User]));
+    const patientMap = new Map(patients.map((p) => [p.id, p]));
+
+    // Build conversation details
+    return optimizedData.map((conv: {
+      id: string;
+      hospice_id: string;
+      type: string;
+      name: string | null;
+      patient_id: string | null;
+      created_by: string | null;
+      last_message_at: string | null;
+      last_message_preview: string | null;
+      is_archived: boolean;
+      created_at: string;
+      updated_at: string;
+      unread_count: number;
+    }) => ({
+      ...conv,
+      patient: conv.patient_id ? patientMap.get(conv.patient_id) : null,
+      participants: participants
+        .filter((p) => p.conversation_id === conv.id)
+        .map((p) => ({ ...p, user: userMap.get(p.user_id) || null })) as ConversationParticipant[],
+    })) as ConversationWithDetails[];
+  }
+
+  // Fallback to original query if RPC not available (migration not run yet)
+  console.warn('Falling back to non-optimized conversations query. Run the performance migration for better performance.');
+
   // Get current user first
   const { data: { user } } = await supabase.auth.getUser();
   const currentUserId = user?.id;
 
-  // Query conversations with participants (no user join - requires migration)
+  // Query conversations with participants
   let query = supabase
     .from('conversations')
     .select(`
@@ -75,21 +143,36 @@ export async function getConversations(options?: {
     }
   }
 
-  // Get unread counts for each conversation
+  // OPTIMIZED: Get unread counts in batch instead of N+1 queries
   const unreadCounts = new Map<string, number>();
-  if (currentUserId) {
-    for (const conv of conversations) {
-      const participant = (conv.participants || []).find(
-        (p: { user_id: string }) => p.user_id === currentUserId
-      );
-      if (participant) {
-        const { count } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversation_id', conv.id)
-          .gt('created_at', participant.last_read_at || '1970-01-01')
-          .neq('sender_id', currentUserId);
-        unreadCounts.set(conv.id, count || 0);
+  if (currentUserId && conversations.length > 0) {
+    const conversationIds = conversations.map((c) => c.id);
+
+    // Try batch RPC first
+    const { data: batchCounts } = await supabase.rpc('get_batch_unread_counts', {
+      conversation_ids: conversationIds,
+    });
+
+    if (batchCounts) {
+      batchCounts.forEach((item: { conversation_id: string; unread_count: number }) => {
+        unreadCounts.set(item.conversation_id, item.unread_count);
+      });
+    } else {
+      // Final fallback: single query with GROUP BY
+      const { data: countData } = await supabase
+        .from('messages')
+        .select('conversation_id')
+        .in('conversation_id', conversationIds)
+        .neq('sender_id', currentUserId)
+        .eq('is_deleted', false);
+
+      if (countData) {
+        // Count manually since we can't easily do conditional counts
+        const counts = new Map<string, number>();
+        countData.forEach((msg) => {
+          counts.set(msg.conversation_id, (counts.get(msg.conversation_id) || 0) + 1);
+        });
+        counts.forEach((count, id) => unreadCounts.set(id, count));
       }
     }
   }

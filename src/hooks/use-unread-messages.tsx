@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '../../supabase/client';
 import type { Conversation } from '@/types/messages';
 
@@ -12,58 +12,66 @@ interface UnreadMessagesState {
   refresh: () => Promise<void>;
 }
 
+/**
+ * OPTIMIZED: Hook for tracking unread message counts
+ * - Uses dedicated lightweight API endpoint instead of fetching all conversations
+ * - Debounces real-time updates to prevent excessive API calls
+ * - Optimistically updates count on new messages
+ */
 export function useUnreadMessages(): UnreadMessagesState {
   const [totalUnread, setTotalUnread] = useState(0);
   const [latestConversation, setLatestConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
 
-  const fetchUnreadMessages = useCallback(async () => {
+  // Fetch just the unread count (lightweight)
+  const fetchUnreadCount = useCallback(async () => {
     try {
-      const response = await fetch('/api/conversations');
+      const response = await fetch('/api/messages/unread-count');
       if (!response.ok) {
-        throw new Error('Failed to fetch conversations');
+        throw new Error('Failed to fetch unread count');
       }
 
       const data = await response.json();
-      const conversations: Conversation[] = data.conversations || [];
-
-      // Calculate total unread count
-      const total = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
-      setTotalUnread(total);
-
-      // Find the conversation with the most recent unread message
-      const conversationsWithUnread = conversations.filter((c) => (c.unread_count || 0) > 0);
-      if (conversationsWithUnread.length > 0) {
-        // Sort by last_message_at descending
-        conversationsWithUnread.sort(
-          (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
-        );
-        setLatestConversation(conversationsWithUnread[0]);
-      } else {
-        setLatestConversation(null);
-      }
-
+      setTotalUnread(data.count || 0);
       setError(null);
     } catch (err) {
-      console.error('Error fetching unread messages:', err);
+      console.error('Error fetching unread count:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchUnreadMessages();
-  }, [fetchUnreadMessages]);
+  // Debounced fetch to prevent rapid consecutive API calls
+  const debouncedFetch = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchUnreadCount();
+    }, 500); // 500ms debounce
+  }, [fetchUnreadCount]);
 
-  // Subscribe to realtime message updates
+  // Initial fetch and get current user
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUserIdRef.current = user?.id || null;
+      await fetchUnreadCount();
+    };
+    init();
+  }, [fetchUnreadCount]);
+
+  // Subscribe to realtime message updates with optimistic updates
   useEffect(() => {
     const supabase = createClient();
 
     const channel = supabase
-      .channel('dashboard-messages')
+      .channel('unread-messages-optimized')
       .on(
         'postgres_changes',
         {
@@ -71,9 +79,17 @@ export function useUnreadMessages(): UnreadMessagesState {
           schema: 'public',
           table: 'messages',
         },
-        () => {
-          // Refresh unread count when a new message is inserted
-          fetchUnreadMessages();
+        (payload) => {
+          // Optimistic update: increment count if message is from another user
+          const newMessage = payload.new as { sender_id: string | null; message_type: string };
+          if (
+            newMessage.sender_id !== currentUserIdRef.current &&
+            newMessage.message_type !== 'system'
+          ) {
+            setTotalUnread((prev) => prev + 1);
+          }
+          // Debounced fetch to sync with server (handles edge cases)
+          debouncedFetch();
         }
       )
       .on(
@@ -83,23 +99,30 @@ export function useUnreadMessages(): UnreadMessagesState {
           schema: 'public',
           table: 'conversation_participants',
         },
-        () => {
-          // Refresh when read status changes
-          fetchUnreadMessages();
+        (payload) => {
+          // Only refresh if it's our own last_read_at update
+          const updated = payload.new as { user_id: string; last_read_at: string };
+          if (updated.user_id === currentUserIdRef.current) {
+            // Debounce the fetch since multiple updates might come quickly
+            debouncedFetch();
+          }
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [fetchUnreadMessages]);
+  }, [debouncedFetch]);
 
   return {
     totalUnread,
-    latestConversation,
+    latestConversation, // Note: This is now always null for performance. Use conversations list if needed.
     isLoading,
     error,
-    refresh: fetchUnreadMessages,
+    refresh: fetchUnreadCount,
   };
 }
