@@ -521,7 +521,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                       value={metrics.openIssues}
                       subtitle={`of ${metrics.totalIssues} total`}
                       icon={Clock}
-                      onClick={() => setFilterAndScroll('open')}
+                      onClick={() => setFilterAndScroll('all')}
                     />
                   </div>
                   <div className="w-[280px] flex-shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
@@ -563,7 +563,7 @@ export function CareCoordinationDashboard({ userId, userRole }: CareCoordination
                   value={metrics.openIssues}
                   subtitle={`of ${metrics.totalIssues} total`}
                   icon={Clock}
-                  onClick={() => setFilterAndScroll('open')}
+                  onClick={() => setFilterAndScroll('all')}
                 />
               </div>
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
