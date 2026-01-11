@@ -9,8 +9,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -285,19 +283,19 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Trigger Button - separate from Dialog to control open state */}
+      <Button
+        variant="outline"
+        className="gap-2 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
+        onClick={handleOpen}
+        disabled={isCheckingActive}
+      >
+        <FileText className="w-4 h-4" />
+        {isCheckingActive ? 'Checking...' : 'After Shift Report'}
+      </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            className="gap-2 border-[#2D7A7A] text-[#2D7A7A] hover:bg-[#2D7A7A]/10"
-            onClick={handleOpen}
-            disabled={isCheckingActive}
-          >
-            <FileText className="w-4 h-4" />
-            {isCheckingActive ? 'Checking...' : 'After Shift Report'}
-          </Button>
-        </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             <FileText className="w-5 h-5 text-[#2D7A7A]" />
