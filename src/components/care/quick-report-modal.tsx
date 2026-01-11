@@ -418,8 +418,8 @@ function QuickReportForm({
                 }}
               >
                 <option value="">Select status...</option>
-                <option value="Education Provided">Education Provided</option>
-                <option value="Education Not Yet Provided">Education Not Yet Provided</option>
+                <option value="Started">Started</option>
+                <option value="Not Started">Not Started</option>
               </select>
             </div>
           )}
