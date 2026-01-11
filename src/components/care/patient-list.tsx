@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Pencil, ArrowUpDown, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowUpDown, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import type { Patient } from '@/types/care-coordination';
 import { BENEFIT_PERIODS, getBenefitPeriodDays, getBenefitPeriodDaysRemaining, LEVELS_OF_CARE, RESIDENCE_TYPES } from '@/types/care-coordination';
@@ -40,8 +40,11 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'mrn' | 'admission'>('name');
+  const [currentPage, setCurrentPage] = useState(1);
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     fetchPatients();
@@ -134,6 +137,16 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
           return 0;
       }
     });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedPatients = filteredPatients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, sortBy, searchQuery]);
 
   if (isLoading) {
     return (
@@ -231,11 +244,11 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
         <>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-[#666]">
-              Showing {filteredPatients.length} of {patients.length} patients
+              Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredPatients.length)} of {filteredPatients.length} patients
             </p>
           </div>
           <div className="space-y-3">
-          {filteredPatients.map((patient, index) => (
+          {paginatedPatients.map((patient) => (
             <div
               key={patient.id}
               className="bg-white border border-[#D4D4D4] rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -245,12 +258,7 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
               }}
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  {/* Index Number */}
-                  <div className="flex-shrink-0 w-8 h-8 bg-[#2D7A7A]/10 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-[#2D7A7A]">{index + 1}</span>
-                  </div>
-                  <div className="flex-1">
+                <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-semibold text-[#1A1A1A]">
                         {patient.last_name}, {patient.first_name}
@@ -304,7 +312,6 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
                       )}
                     </div>
                   </div>
-                </div>
                 <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
@@ -336,6 +343,35 @@ export function PatientList({ onSelectPatient }: PatientListProps) {
             </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm text-[#666] px-3">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="gap-1"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </>
       )}
 

@@ -156,35 +156,35 @@ export const IssueCard = memo(function IssueCard({ issue, onClick, onMessageClic
               </p>
             )}
           </div>
-          <Badge
-            variant={isOverdue() ? "destructive" : "outline"}
-            className="text-xs shrink-0 w-[115px] flex items-center justify-center"
-          >
-            {isOverdue() ? "OVERDUE" : issue.status.toUpperCase().replace(/_/g, ' ')}
-          </Badge>
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <User className="w-3 h-3" />
-              <span>
-                {issue.assignee?.name ||
-                  issue.assignee?.email?.split("@")[0] ||
-                  "Unassigned"}
-              </span>
-            </div>
+          <div className="flex flex-col items-end gap-1">
+            <Badge
+              variant={isOverdue() ? "destructive" : "outline"}
+              className="text-xs shrink-0 w-[115px] flex items-center justify-center"
+            >
+              {isOverdue() ? "OVERDUE" : issue.status.toUpperCase().replace(/_/g, ' ')}
+            </Badge>
             {issue.acknowledged_at ? (
-              <div className="flex items-center gap-1 text-[#81B29A]">
+              <div className="flex items-center gap-1 text-[#81B29A] text-xs">
                 <CheckCheck className="w-3 h-3" />
                 <span className="font-medium">Acknowledged</span>
               </div>
             ) : issue.status !== 'resolved' && (
-              <div className="flex items-center gap-1 text-amber-600">
+              <div className="flex items-center gap-1 text-amber-600 text-xs">
                 <AlertCircle className="w-3 h-3" />
                 <span className="font-medium">Not Acknowledged</span>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+          <div className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            <span>
+              {issue.assignee?.name ||
+                issue.assignee?.email?.split("@")[0] ||
+                "Unassigned"}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {onMessageClick && (
