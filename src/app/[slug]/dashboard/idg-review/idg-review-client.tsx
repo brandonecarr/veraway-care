@@ -693,7 +693,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             {!meetingStarted ? (
               <Button
                 className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
-                disabled={isLoading || issues.length === 0}
+                disabled={isLoading}
                 onClick={() => setIsIssueSelectionModalOpen(true)}
               >
                 <ClipboardList className="w-4 h-4" />
@@ -702,7 +702,7 @@ export default function IDGReviewClient({ slug }: IDGReviewClientProps) {
             ) : (
               <Button
                 className="flex items-center gap-2 bg-[#2D7A7A] hover:bg-[#236060]"
-                disabled={isLoading || selectedIssueIds.size === 0}
+                disabled={isLoading || (selectedIssueIds.size === 0 && selectedPatientIds.size === 0)}
                 onClick={() => setIsCompletionModalOpen(true)}
               >
                 <CheckCircle2 className="w-4 h-4" />
