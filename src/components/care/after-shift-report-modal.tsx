@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -20,6 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,11 +36,15 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
-  Archive
+  Archive,
+  ChevronDown,
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Issue, Handoff } from '@/types/care-coordination';
+import { useReportTemplates } from '@/hooks/use-report-templates';
+import { ReportTemplatesDialog } from './report-templates-dialog';
 
 interface AfterShiftReportModalProps {
   issues: Issue[];
@@ -48,6 +59,28 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [activeReport, setActiveReport] = useState<(Handoff & { creator?: { name?: string; email?: string } }) | null>(null);
   const [isCheckingActive, setIsCheckingActive] = useState(false);
+  const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const {
+    templates,
+    addTemplate,
+    updateTemplate,
+    deleteTemplate,
+  } = useReportTemplates();
+
+  const handleSelectTemplate = useCallback((content: string) => {
+    setNotes(content);
+  }, []);
+
+  const handleOpenManageTemplates = useCallback(() => {
+    // Close dropdown first, then open dialog after a short delay
+    // This prevents portal conflicts between DropdownMenu and Dialog
+    setIsDropdownOpen(false);
+    setTimeout(() => {
+      setIsTemplatesDialogOpen(true);
+    }, 100);
+  }, []);
 
   // Filter to show only open/in_progress issues
   const activeIssues = issues.filter(i => i.status === 'open' || i.status === 'in_progress');
@@ -309,7 +342,53 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
         <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
           {/* Notes */}
           <div className="space-y-2 shrink-0">
-            <label className="text-sm font-medium">Report Notes</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Report Notes</label>
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1 border-[#D4D4D4]"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Templates
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {templates.length > 0 ? (
+                    <>
+                      {templates.map((template) => (
+                        <DropdownMenuItem
+                          key={template.id}
+                          onSelect={() => handleSelectTemplate(template.content)}
+                          className="cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
+                          <span className="truncate">{template.name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      No templates yet
+                    </div>
+                  )}
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      handleOpenManageTemplates();
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Manage Templates
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -401,6 +480,16 @@ export function AfterShiftReportModal({ issues, onSuccess }: AfterShiftReportMod
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Report Templates Dialog */}
+    <ReportTemplatesDialog
+      open={isTemplatesDialogOpen}
+      onOpenChange={setIsTemplatesDialogOpen}
+      templates={templates}
+      onAdd={addTemplate}
+      onUpdate={updateTemplate}
+      onDelete={deleteTemplate}
+    />
     </>
   );
 }
