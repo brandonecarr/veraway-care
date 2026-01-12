@@ -61,6 +61,7 @@ interface PatientOverviewItem {
   days_remaining?: number | null;
   bp_end_date?: string | null;
   discharge_reason?: string | null;
+  cause_of_death?: string | null;
   bereavement_status?: string | null;
 }
 
@@ -299,7 +300,7 @@ export async function generateIDGPDF({
     }
 
     // 2. DISCHARGES SECTION
-    // Columns: Patient name, Diagnosis, Discharge date, Reason for discharge, Bereavement status (if applicable)
+    // Columns: Patient name, Diagnosis, Discharge date, Reason for discharge, Cause of Death (if deceased), Bereavement status (if applicable)
     if (discharges.length > 0) {
       // Check if we need a new page
       if (overviewY > pageHeight - 60) {
@@ -314,22 +315,23 @@ export async function generateIDGPDF({
       const dischargesData = discharges.map(p => [
         `${p.first_name} ${p.last_name}`,
         p.diagnosis || '-',
-        formatDate(p.discharge_date),
-        p.discharge_reason || '-',
+        formatDate(p.discharge_date || p.death_date),
+        p.discharge_reason || (p.death_date ? 'Deceased' : '-'),
+        p.cause_of_death || '-',
         p.bereavement_status || '-',
       ]);
 
       autoTable(doc, {
         startY: overviewY + 4,
-        head: [['Patient Name', 'Diagnosis', 'Discharge Date', 'Reason for Discharge', 'Bereavement Status']],
+        head: [['Patient Name', 'Diagnosis', 'Discharge Date', 'Reason for Discharge', 'Cause of Death', 'Bereavement Status']],
         body: dischargesData,
         theme: 'striped',
-        styles: { fontSize: 8, cellPadding: 3 },
+        styles: { fontSize: 7, cellPadding: 2 },
         headStyles: {
           fillColor: [234, 88, 12],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 8,
+          fontSize: 7,
         },
         alternateRowStyles: { fillColor: [255, 245, 235] },
       });
