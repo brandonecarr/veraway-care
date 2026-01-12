@@ -21,6 +21,7 @@ function formatFieldNames(fields: string[]): string {
     residence_type: 'residence type',
     discharge_date: 'discharge date',
     death_date: 'death date',
+    discharge_reason: 'discharge reason',
     cause_of_death: 'cause of death',
     bereavement_status: 'bereavement status',
   };
@@ -80,7 +81,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type, discharge_date, death_date, discharge_reason, cause_of_death, bereavement_status } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -97,6 +98,11 @@ export async function PUT(
     if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
     if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
     if (residence_type !== undefined) updateData.residence_type = residence_type;
+    if (discharge_date !== undefined) updateData.discharge_date = discharge_date;
+    if (death_date !== undefined) updateData.death_date = death_date;
+    if (discharge_reason !== undefined) updateData.discharge_reason = discharge_reason;
+    if (cause_of_death !== undefined) updateData.cause_of_death = cause_of_death;
+    if (bereavement_status !== undefined) updateData.bereavement_status = bereavement_status;
 
     const { data, error } = await supabase
       .from('patients')
@@ -145,7 +151,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type } = body;
+    const { mrn, first_name, last_name, date_of_birth, admission_date, diagnosis, status, benefit_period, level_of_care, rn_case_manager_id, residence_type, discharge_date, death_date, discharge_reason, cause_of_death, bereavement_status } = body;
 
     const updateData: any = {};
     if (mrn !== undefined) updateData.mrn = mrn;
@@ -162,6 +168,11 @@ export async function PATCH(
     if (level_of_care !== undefined) updateData.level_of_care = level_of_care;
     if (rn_case_manager_id !== undefined) updateData.rn_case_manager_id = rn_case_manager_id || null;
     if (residence_type !== undefined) updateData.residence_type = residence_type;
+    if (discharge_date !== undefined) updateData.discharge_date = discharge_date;
+    if (death_date !== undefined) updateData.death_date = death_date;
+    if (discharge_reason !== undefined) updateData.discharge_reason = discharge_reason;
+    if (cause_of_death !== undefined) updateData.cause_of_death = cause_of_death;
+    if (bereavement_status !== undefined) updateData.bereavement_status = bereavement_status;
 
     const { data, error } = await supabase
       .from('patients')

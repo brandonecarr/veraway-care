@@ -445,6 +445,11 @@ function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSucce
     level_of_care: patient?.level_of_care || '',
     rn_case_manager_id: patient?.rn_case_manager_id || '',
     residence_type: patient?.residence_type || '',
+    discharge_date: formatDateForInput(patient?.discharge_date),
+    death_date: formatDateForInput(patient?.death_date),
+    discharge_reason: patient?.discharge_reason || '',
+    cause_of_death: patient?.cause_of_death || '',
+    bereavement_status: patient?.bereavement_status || '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -483,6 +488,11 @@ function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSucce
       level_of_care: patient?.level_of_care || '',
       rn_case_manager_id: patient?.rn_case_manager_id || '',
       residence_type: patient?.residence_type || '',
+      discharge_date: formatDateForInput(patient?.discharge_date),
+      death_date: formatDateForInput(patient?.death_date),
+      discharge_reason: patient?.discharge_reason || '',
+      cause_of_death: patient?.cause_of_death || '',
+      bereavement_status: patient?.bereavement_status || '',
     });
   }, [patient]);
 
@@ -657,6 +667,82 @@ function PatientForm({ patient, onSuccess }: { patient?: Patient | null; onSucce
           </SelectContent>
         </Select>
       </div>
+
+      {/* Discharge/Death Information - Only show when editing existing patient */}
+      {patient && (
+        <>
+          <div className="border-t border-[#D4D4D4] pt-4 mt-4">
+            <h4 className="text-sm font-semibold text-[#1A1A1A] mb-3">Discharge / End of Care Information</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-[#1A1A1A]">Discharge Date</label>
+              <Input
+                type="date"
+                value={formData.discharge_date}
+                onChange={(e) => setFormData({ ...formData, discharge_date: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-[#1A1A1A]">Date of Death</label>
+              <Input
+                type="date"
+                value={formData.death_date}
+                onChange={(e) => setFormData({ ...formData, death_date: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Reason for Discharge</label>
+            <Select
+              value={formData.discharge_reason}
+              onValueChange={(value) => setFormData({ ...formData, discharge_reason: value })}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select discharge reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Revoked">Revoked</SelectItem>
+                <SelectItem value="Transferred">Transferred</SelectItem>
+                <SelectItem value="No Longer Eligible">No Longer Eligible</SelectItem>
+                <SelectItem value="Deceased">Deceased</SelectItem>
+                <SelectItem value="Moved Out of Service Area">Moved Out of Service Area</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Cause of Death</label>
+            <Input
+              value={formData.cause_of_death}
+              onChange={(e) => setFormData({ ...formData, cause_of_death: e.target.value })}
+              placeholder="Enter cause of death (if applicable)"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-[#1A1A1A]">Bereavement Status</label>
+            <Select
+              value={formData.bereavement_status}
+              onValueChange={(value) => setFormData({ ...formData, bereavement_status: value })}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select bereavement status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Not Started">Not Started</SelectItem>
+                <SelectItem value="In Progress">In Progress</SelectItem>
+                <SelectItem value="Education Provided">Education Provided</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Declined">Declined</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+
       <div className="flex justify-end gap-2 pt-4">
         <Button type="submit" disabled={isSubmitting} className="bg-[#2D7A7A] hover:bg-[#236060]">
           {isSubmitting ? (patient ? 'Updating...' : 'Creating...') : (patient ? 'Update Patient' : 'Create Patient')}
@@ -798,6 +884,18 @@ function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: () => vo
             <div>
               <p className="text-[#666] mb-1">Residence</p>
               <p className="font-medium">{patient.residence_type}</p>
+            </div>
+          )}
+          {patient.discharge_date && (
+            <div>
+              <p className="text-[#666] mb-1">Discharge Date</p>
+              <p className="font-medium">{new Date(patient.discharge_date).toLocaleDateString()}</p>
+            </div>
+          )}
+          {patient.discharge_reason && (
+            <div>
+              <p className="text-[#666] mb-1">Discharge Reason</p>
+              <p className="font-medium">{patient.discharge_reason}</p>
             </div>
           )}
           {patient.death_date && (

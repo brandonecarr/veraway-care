@@ -14,6 +14,7 @@ export interface Patient {
   status: string;
   admitted_date?: string;
   discharge_date?: string;
+  discharge_reason?: string;
   death_date?: string;
   cause_of_death?: string;
   bereavement_status?: string;
