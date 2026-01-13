@@ -684,7 +684,7 @@ async function fallbackQuery(
   thresholdHours: number
 ): Promise<IDGIssue[]> {
   // Direct query fallback if RPC is not available
-  const thresholdDate = new Date(Date.now() - thresholdHours * 60 * 60 * 1000).toISOString();
+  // Show ALL open/in_progress issues for the tenant (RLS will filter by hospice_id)
 
   const { data, error } = await supabase
     .from('issues')
@@ -705,8 +705,6 @@ async function fallbackQuery(
       reporter:users!issues_reported_by_fkey(id, name, email)
     `)
     .in('status', ['open', 'in_progress'])
-    .lte('created_at', weekEnd)
-    .or(`priority.in.(high,urgent),issue_type.in.(${IDG_ISSUE_TYPES.map(t => `"${t}"`).join(',')}),created_at.lt.${thresholdDate}`)
     .order('priority', { ascending: true })
     .order('created_at', { ascending: false });
 
@@ -722,7 +720,7 @@ async function fallbackQuery(
     const isIdgType = IDG_ISSUE_TYPES.includes(issue.issue_type);
     const isOverdue = hoursOpen > thresholdHours;
 
-    // Build array of all applicable IDG reasons
+    // Build array of all applicable IDG reasons (informational only)
     const idgReasons: string[] = [];
     if (isHighPriority) {
       idgReasons.push(issue.priority === 'urgent' ? 'Urgent Priority' : 'High Priority');
@@ -732,6 +730,10 @@ async function fallbackQuery(
     }
     if (isOverdue) {
       idgReasons.push(`Unresolved > ${thresholdHours}h`);
+    }
+    // If no specific IDG reason, mark as general active issue
+    if (idgReasons.length === 0) {
+      idgReasons.push('Active Issue');
     }
 
     return {
