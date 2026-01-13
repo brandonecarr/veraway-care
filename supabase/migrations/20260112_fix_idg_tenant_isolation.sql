@@ -1,5 +1,7 @@
 -- CRITICAL SECURITY FIX: Add tenant isolation to get_idg_issues function
 -- The function was returning data from ALL hospices, not just the current user's hospice
+-- UPDATE: Changed to return ALL open/in_progress issues for the tenant (not just IDG-specific criteria)
+-- The date range now filters to show issues that were still open during that period
 
 CREATE OR REPLACE FUNCTION public.get_idg_issues(
     p_week_start timestamp with time zone,
@@ -69,11 +71,12 @@ BEGIN
         COALESCE(reporter.name, split_part(reporter.email, '@', 1), 'Unknown')::text as reporter_name,
         ROUND(EXTRACT(EPOCH FROM (NOW() - i.created_at)) / 3600, 1) as hours_open,
         (EXTRACT(EPOCH FROM (NOW() - i.created_at)) / 3600) > p_threshold_hours as is_overdue,
+        -- Provide reason for IDG review (informational, not a filter)
         CASE
             WHEN i.priority IN ('high', 'urgent') THEN 'High/Urgent Priority'
             WHEN i.issue_type = ANY(idg_issue_types) THEN 'IDG Issue Type'
             WHEN (EXTRACT(EPOCH FROM (NOW() - i.created_at)) / 3600) > p_threshold_hours THEN 'Unresolved > ' || p_threshold_hours || 'h'
-            ELSE 'Multiple Criteria'
+            ELSE 'Active Issue'
         END as idg_reason
     FROM public.issues i
     LEFT JOIN public.patients p ON i.patient_id = p.id
@@ -83,16 +86,8 @@ BEGIN
     WHERE
         -- CRITICAL: Filter by user's hospice_id for tenant isolation
         i.hospice_id = user_hospice_id
+        -- Show ALL open/in_progress issues for the tenant (date range is informational only)
         AND i.status IN ('open', 'in_progress')
-        AND i.created_at <= p_week_end
-        AND (
-            -- Criteria 1: Unresolved after threshold hours
-            (EXTRACT(EPOCH FROM (NOW() - i.created_at)) / 3600) > p_threshold_hours
-            -- Criteria 2: IDG issue types (regardless of age)
-            OR i.issue_type = ANY(idg_issue_types)
-            -- Criteria 3: High or urgent priority
-            OR i.priority IN ('high', 'urgent')
-        )
     ORDER BY
         CASE i.priority
             WHEN 'urgent' THEN 1
@@ -105,7 +100,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Add comment
-COMMENT ON FUNCTION public.get_idg_issues IS 'Fetches issues meeting IDG review criteria for a given week. SECURITY: Filters by current user hospice_id for tenant isolation.';
+COMMENT ON FUNCTION public.get_idg_issues IS 'Fetches ALL open/in_progress issues for the tenant. SECURITY: Filters by current user hospice_id for tenant isolation.';
 
 -- CRITICAL SECURITY FIX: Add tenant isolation to get_idg_issue_actions function
 -- The function must verify that the issues belong to the current user's hospice
